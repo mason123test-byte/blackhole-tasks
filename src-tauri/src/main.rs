@@ -1,2 +1,3 @@
-fn main() { blackhole_tasks_lib::run() }
-
+fn main() {
+    blackhole_tasks_lib::run()
+}

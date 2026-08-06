@@ -3,78 +3,612 @@ mod error;
 mod models;
 mod placement;
 
-use crate::{database::Database,error::{AppError,AppResult},models::*};
+use crate::{
+    database::Database,
+    error::{AppError, AppResult},
+    models::*,
+};
 use serde_json::Value;
-use std::{path::PathBuf,sync::Mutex,time::Duration};
-use tauri::{Emitter,Manager,PhysicalPosition,PhysicalSize,State};
+use std::{path::PathBuf, sync::Mutex, time::Duration};
+use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, State};
 
-struct WindowState { inner: Mutex<WindowInteraction> }
-#[derive(Default)]struct WindowInteraction{orb_hovered:bool,workspace_hovered:bool,pinned:bool,close_generation:u64}
+struct WindowState {
+    inner: Mutex<WindowInteraction>,
+}
+#[derive(Default)]
+struct WindowInteraction {
+    orb_hovered: bool,
+    workspace_hovered: bool,
+    pinned: bool,
+    close_generation: u64,
+}
 
-#[tauri::command]fn list_tasks(db:State<Database>)->AppResult<Vec<Task>>{db.list_tasks()}
-#[tauri::command]fn get_task(id:String,db:State<Database>)->AppResult<Task>{db.get_task(&id)}
-#[tauri::command]fn create_task(input:CreateTaskInput,db:State<Database>)->AppResult<Task>{db.create_task(input)}
-#[tauri::command]fn update_task(id:String,patch:Value,db:State<Database>)->AppResult<Task>{db.update_task(&id,patch)}
-#[tauri::command]fn delete_task(id:String,db:State<Database>)->AppResult<()>{db.delete_task(&id)}
-#[tauri::command]fn complete_task(id:String,db:State<Database>,app:tauri::AppHandle)->AppResult<Task>{let task=db.complete_task(&id)?;let _=app.emit("task:completed",&task);let _=app.emit("orb:render-pulse",());Ok(task)}
-#[tauri::command]fn restore_task(id:String,db:State<Database>)->AppResult<Task>{db.update_task(&id,serde_json::json!({"status":"todo","progress":0,"completedAt":null}))}
-#[tauri::command]fn archive_task(id:String,db:State<Database>)->AppResult<Task>{db.update_task(&id,serde_json::json!({"status":"archived"}))}
-#[tauri::command]fn restore_archived_task(id:String,db:State<Database>)->AppResult<Task>{db.update_task(&id,serde_json::json!({"status":"todo"}))}
-#[tauri::command]fn duplicate_task(id:String,db:State<Database>)->AppResult<Task>{let task=db.get_task(&id)?;db.create_task(CreateTaskInput{title:format!("{}（副本）",task.title),description:Some(task.description),quadrant:Some(task.quadrant),priority:Some(task.priority),canvas_x:Some(task.canvas_x+30.0),canvas_y:Some(task.canvas_y+30.0),due_at:task.due_at,parent_id:task.parent_id})}
-#[tauri::command]fn update_task_position(update:TaskPositionUpdate,db:State<Database>)->AppResult<()>{db.update_positions(vec![update])}
-#[tauri::command]fn update_tasks_positions(updates:Vec<TaskPositionUpdate>,db:State<Database>)->AppResult<()>{db.update_positions(updates)}
+#[tauri::command]
+fn list_tasks(db: State<Database>) -> AppResult<Vec<Task>> {
+    db.list_tasks()
+}
+#[tauri::command]
+fn get_task(id: String, db: State<Database>) -> AppResult<Task> {
+    db.get_task(&id)
+}
+#[tauri::command]
+fn create_task(input: CreateTaskInput, db: State<Database>) -> AppResult<Task> {
+    db.create_task(input)
+}
+#[tauri::command]
+fn update_task(id: String, patch: Value, db: State<Database>) -> AppResult<Task> {
+    db.update_task(&id, patch)
+}
+#[tauri::command]
+fn delete_task(id: String, db: State<Database>) -> AppResult<()> {
+    db.delete_task(&id)
+}
+#[tauri::command]
+fn complete_task(id: String, db: State<Database>, app: tauri::AppHandle) -> AppResult<Task> {
+    let task = db.complete_task(&id)?;
+    let _ = app.emit("task:completed", &task);
+    let _ = app.emit("orb:render-pulse", ());
+    Ok(task)
+}
+#[tauri::command]
+fn restore_task(id: String, db: State<Database>) -> AppResult<Task> {
+    db.update_task(
+        &id,
+        serde_json::json!({"status":"todo","progress":0,"completedAt":null}),
+    )
+}
+#[tauri::command]
+fn archive_task(id: String, db: State<Database>) -> AppResult<Task> {
+    db.update_task(&id, serde_json::json!({"status":"archived"}))
+}
+#[tauri::command]
+fn restore_archived_task(id: String, db: State<Database>) -> AppResult<Task> {
+    db.update_task(&id, serde_json::json!({"status":"todo"}))
+}
+#[tauri::command]
+fn duplicate_task(id: String, db: State<Database>) -> AppResult<Task> {
+    let task = db.get_task(&id)?;
+    db.create_task(CreateTaskInput {
+        title: format!("{}（副本）", task.title),
+        description: Some(task.description),
+        quadrant: Some(task.quadrant),
+        priority: Some(task.priority),
+        canvas_x: Some(task.canvas_x + 30.0),
+        canvas_y: Some(task.canvas_y + 30.0),
+        due_at: task.due_at,
+        parent_id: task.parent_id,
+    })
+}
+#[tauri::command]
+fn update_task_position(update: TaskPositionUpdate, db: State<Database>) -> AppResult<()> {
+    db.update_positions(vec![update])
+}
+#[tauri::command]
+fn update_tasks_positions(updates: Vec<TaskPositionUpdate>, db: State<Database>) -> AppResult<()> {
+    db.update_positions(updates)
+}
 
-#[tauri::command]fn list_relations(db:State<Database>)->AppResult<Vec<TaskRelation>>{db.list_relations()}
-#[tauri::command]fn create_relation(input:CreateRelationInput,db:State<Database>)->AppResult<TaskRelation>{db.create_relation(input)}
-#[tauri::command]fn delete_relation(id:String,db:State<Database>)->AppResult<()>{db.delete_relation(&id)}
-#[tauri::command]fn validate_parent_relation(source_task_id:String,target_task_id:String,db:State<Database>)->AppResult<bool>{Ok(db.validate_cycle(&source_task_id,&target_task_id,"parent_child")?)}
-#[tauri::command]fn validate_dependency_relation(source_task_id:String,target_task_id:String,db:State<Database>)->AppResult<bool>{Ok(db.validate_cycle(&source_task_id,&target_task_id,"dependency")?)}
+#[tauri::command]
+fn list_relations(db: State<Database>) -> AppResult<Vec<TaskRelation>> {
+    db.list_relations()
+}
+#[tauri::command]
+fn create_relation(input: CreateRelationInput, db: State<Database>) -> AppResult<TaskRelation> {
+    db.create_relation(input)
+}
+#[tauri::command]
+fn delete_relation(id: String, db: State<Database>) -> AppResult<()> {
+    db.delete_relation(&id)
+}
+#[tauri::command]
+fn validate_parent_relation(
+    source_task_id: String,
+    target_task_id: String,
+    db: State<Database>,
+) -> AppResult<bool> {
+    Ok(db.validate_cycle(&source_task_id, &target_task_id, "parent_child")?)
+}
+#[tauri::command]
+fn validate_dependency_relation(
+    source_task_id: String,
+    target_task_id: String,
+    db: State<Database>,
+) -> AppResult<bool> {
+    Ok(db.validate_cycle(&source_task_id, &target_task_id, "dependency")?)
+}
 
-#[tauri::command]fn list_tags(db:State<Database>)->AppResult<Vec<Tag>>{db.list_tags()}
-#[tauri::command]fn create_tag(name:String,db:State<Database>)->AppResult<Tag>{db.create_tag(&name)}
-#[tauri::command]fn rename_tag(id:String,name:String,db:State<Database>)->AppResult<Tag>{db.rename_tag(&id,&name)}
-#[tauri::command]fn delete_tag(id:String,db:State<Database>)->AppResult<()>{db.delete_tag(&id)}
-#[tauri::command]fn set_task_tags(task_id:String,tag_ids:Vec<String>,db:State<Database>)->AppResult<()>{db.set_task_tags(&task_id,tag_ids)}
+#[tauri::command]
+fn list_tags(db: State<Database>) -> AppResult<Vec<Tag>> {
+    db.list_tags()
+}
+#[tauri::command]
+fn create_tag(name: String, db: State<Database>) -> AppResult<Tag> {
+    db.create_tag(&name)
+}
+#[tauri::command]
+fn rename_tag(id: String, name: String, db: State<Database>) -> AppResult<Tag> {
+    db.rename_tag(&id, &name)
+}
+#[tauri::command]
+fn delete_tag(id: String, db: State<Database>) -> AppResult<()> {
+    db.delete_tag(&id)
+}
+#[tauri::command]
+fn set_task_tags(task_id: String, tag_ids: Vec<String>, db: State<Database>) -> AppResult<()> {
+    db.set_task_tags(&task_id, tag_ids)
+}
 
-#[tauri::command]fn get_settings(db:State<Database>)->AppResult<AppSettings>{db.get_settings()}
-#[tauri::command]fn update_settings(patch:Value,db:State<Database>)->AppResult<AppSettings>{let current=db.get_settings()?;let mut value=serde_json::to_value(current)?;merge_json(&mut value,&patch);let settings:AppSettings=serde_json::from_value(value)?;db.save_settings(&settings)?;Ok(settings)}
-#[tauri::command]fn reset_settings(db:State<Database>)->AppResult<AppSettings>{let settings=AppSettings::default();db.save_settings(&settings)?;Ok(settings)}
+#[tauri::command]
+fn get_settings(db: State<Database>) -> AppResult<AppSettings> {
+    db.get_settings()
+}
+#[tauri::command]
+fn update_settings(patch: Value, db: State<Database>) -> AppResult<AppSettings> {
+    let current = db.get_settings()?;
+    let mut value = serde_json::to_value(current)?;
+    merge_json(&mut value, &patch);
+    let settings: AppSettings = serde_json::from_value(value)?;
+    db.save_settings(&settings)?;
+    Ok(settings)
+}
+#[tauri::command]
+fn reset_settings(db: State<Database>) -> AppResult<AppSettings> {
+    let settings = AppSettings::default();
+    db.save_settings(&settings)?;
+    Ok(settings)
+}
 
-fn merge_json(target:&mut Value,patch:&Value){if let (Some(target),Some(patch))=(target.as_object_mut(),patch.as_object()){for(key,value)in patch{target.insert(key.clone(),value.clone());}}}
-fn map_window(error:tauri::Error)->AppError{AppError::Window(error.to_string())}
+fn merge_json(target: &mut Value, patch: &Value) {
+    if let (Some(target), Some(patch)) = (target.as_object_mut(), patch.as_object()) {
+        for (key, value) in patch {
+            target.insert(key.clone(), value.clone());
+        }
+    }
+}
+fn map_window(error: tauri::Error) -> AppError {
+    AppError::Window(error.to_string())
+}
 
-fn workspace(app:&tauri::AppHandle)->AppResult<tauri::WebviewWindow>{app.get_webview_window("workspace").ok_or_else(||AppError::Window("工作区窗口不存在".into()))}
-fn show_workspace_inner(app:&tauri::AppHandle)->AppResult<()>{reposition_workspace_inner(app)?;let window=workspace(app)?;window.show().map_err(map_window)?;let _=window.set_focus();let _=app.emit("workspace:visibility-changed",true);Ok(())}
-fn hide_workspace_inner(app:&tauri::AppHandle)->AppResult<()>{workspace(app)?.hide().map_err(map_window)?;let _=app.emit("workspace:visibility-changed",false);Ok(())}
+fn workspace(app: &tauri::AppHandle) -> AppResult<tauri::WebviewWindow> {
+    app.get_webview_window("workspace")
+        .ok_or_else(|| AppError::Window("工作区窗口不存在".into()))
+}
+fn show_workspace_inner(app: &tauri::AppHandle) -> AppResult<()> {
+    reposition_workspace_inner(app)?;
+    let window = workspace(app)?;
+    window.show().map_err(map_window)?;
+    let _ = window.set_focus();
+    let _ = app.emit("workspace:visibility-changed", true);
+    Ok(())
+}
+fn hide_workspace_inner(app: &tauri::AppHandle) -> AppResult<()> {
+    workspace(app)?.hide().map_err(map_window)?;
+    let _ = app.emit("workspace:visibility-changed", false);
+    Ok(())
+}
 
-#[tauri::command]fn show_workspace(app:tauri::AppHandle)->AppResult<()>{show_workspace_inner(&app)}
-#[tauri::command]fn hide_workspace(app:tauri::AppHandle)->AppResult<()>{hide_workspace_inner(&app)}
-#[tauri::command]fn toggle_workspace(app:tauri::AppHandle)->AppResult<()>{if workspace(&app)?.is_visible().map_err(map_window)?{hide_workspace_inner(&app)}else{show_workspace_inner(&app)}}
-#[tauri::command]fn pin_workspace(pinned:bool,state:State<WindowState>,app:tauri::AppHandle)->AppResult<()>{state.inner.lock().map_err(|_|AppError::Window("窗口状态锁已损坏".into()))?.pinned=pinned;let _=app.emit("workspace:pin-changed",pinned);if pinned{show_workspace_inner(&app)?}Ok(())}
-#[tauri::command]fn unpin_workspace(state:State<WindowState>,app:tauri::AppHandle)->AppResult<()>{pin_workspace(false,state,app)}
-#[tauri::command]fn set_orb_hovered(hovered:bool,state:State<WindowState>,app:tauri::AppHandle)->AppResult<()>{state.inner.lock().map_err(|_|AppError::Window("窗口状态锁已损坏".into()))?.orb_hovered=hovered;let _=app.emit("orb:hover-changed",hovered);if hovered{show_workspace_inner(&app)}else{schedule_close(app,state.inner.lock().map_err(|_|AppError::Window("窗口状态锁已损坏".into()))?.close_generation+1);Ok(())}}
-#[tauri::command]fn set_workspace_hovered(hovered:bool,state:State<WindowState>,app:tauri::AppHandle)->AppResult<()>{let generation={let mut s=state.inner.lock().map_err(|_|AppError::Window("窗口状态锁已损坏".into()))?;s.workspace_hovered=hovered;s.close_generation+=1;s.close_generation};let _=app.emit("workspace:hover-changed",hovered);if !hovered{schedule_close(app,generation)}Ok(())}
-fn schedule_close(app:tauri::AppHandle,generation:u64){if let Some(state)=app.try_state::<WindowState>(){if let Ok(mut s)=state.inner.lock(){s.close_generation=generation;}}std::thread::spawn(move||{std::thread::sleep(Duration::from_millis(350));let Some(state)=app.try_state::<WindowState>()else{return};let should_close=state.inner.lock().map(|s|s.close_generation==generation&&!s.orb_hovered&&!s.workspace_hovered&&!s.pinned).unwrap_or(false);if should_close{let _=hide_workspace_inner(&app);}});}
+#[tauri::command]
+fn show_workspace(app: tauri::AppHandle) -> AppResult<()> {
+    show_workspace_inner(&app)
+}
+#[tauri::command]
+fn hide_workspace(app: tauri::AppHandle) -> AppResult<()> {
+    hide_workspace_inner(&app)
+}
+#[tauri::command]
+fn toggle_workspace(app: tauri::AppHandle) -> AppResult<()> {
+    if workspace(&app)?.is_visible().map_err(map_window)? {
+        hide_workspace_inner(&app)
+    } else {
+        show_workspace_inner(&app)
+    }
+}
+#[tauri::command]
+fn pin_workspace(pinned: bool, state: State<WindowState>, app: tauri::AppHandle) -> AppResult<()> {
+    state
+        .inner
+        .lock()
+        .map_err(|_| AppError::Window("窗口状态锁已损坏".into()))?
+        .pinned = pinned;
+    let _ = app.emit("workspace:pin-changed", pinned);
+    if pinned {
+        show_workspace_inner(&app)?
+    }
+    Ok(())
+}
+#[tauri::command]
+fn unpin_workspace(state: State<WindowState>, app: tauri::AppHandle) -> AppResult<()> {
+    pin_workspace(false, state, app)
+}
+#[tauri::command]
+fn set_orb_hovered(
+    hovered: bool,
+    state: State<WindowState>,
+    app: tauri::AppHandle,
+) -> AppResult<()> {
+    state
+        .inner
+        .lock()
+        .map_err(|_| AppError::Window("窗口状态锁已损坏".into()))?
+        .orb_hovered = hovered;
+    let _ = app.emit("orb:hover-changed", hovered);
+    if hovered {
+        show_workspace_inner(&app)
+    } else {
+        schedule_close(
+            app,
+            state
+                .inner
+                .lock()
+                .map_err(|_| AppError::Window("窗口状态锁已损坏".into()))?
+                .close_generation
+                + 1,
+        );
+        Ok(())
+    }
+}
+#[tauri::command]
+fn set_workspace_hovered(
+    hovered: bool,
+    state: State<WindowState>,
+    app: tauri::AppHandle,
+) -> AppResult<()> {
+    let generation = {
+        let mut s = state
+            .inner
+            .lock()
+            .map_err(|_| AppError::Window("窗口状态锁已损坏".into()))?;
+        s.workspace_hovered = hovered;
+        s.close_generation += 1;
+        s.close_generation
+    };
+    let _ = app.emit("workspace:hover-changed", hovered);
+    if !hovered {
+        schedule_close(app, generation)
+    }
+    Ok(())
+}
+fn schedule_close(app: tauri::AppHandle, generation: u64) {
+    if let Some(state) = app.try_state::<WindowState>() {
+        if let Ok(mut s) = state.inner.lock() {
+            s.close_generation = generation;
+        }
+    }
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(350));
+        let Some(state) = app.try_state::<WindowState>() else {
+            return;
+        };
+        let should_close = state
+            .inner
+            .lock()
+            .map(|s| {
+                s.close_generation == generation
+                    && !s.orb_hovered
+                    && !s.workspace_hovered
+                    && !s.pinned
+            })
+            .unwrap_or(false);
+        if should_close {
+            let _ = hide_workspace_inner(&app);
+        }
+    });
+}
 
-#[tauri::command]fn reposition_workspace(app:tauri::AppHandle)->AppResult<()>{reposition_workspace_inner(&app)}
-fn reposition_workspace_inner(app:&tauri::AppHandle)->AppResult<()>{let orb=app.get_webview_window("orb").ok_or_else(||AppError::Window("黑洞窗口不存在".into()))?;let work=workspace(app)?;let position=orb.outer_position().map_err(map_window)?;let size=orb.outer_size().map_err(map_window)?;let monitor=orb.current_monitor().map_err(map_window)?.or_else(||orb.primary_monitor().ok().flatten()).ok_or_else(||AppError::Window("未找到显示器".into()))?;let area=monitor.work_area();let settings=app.state::<Database>().get_settings()?;let result=placement::calculate(placement::PlacementInput{orb_rect:placement::Rect{x:position.x,y:position.y,width:size.width,height:size.height},monitor_work_area:placement::Rect{x:area.position.x,y:area.position.y,width:area.size.width,height:area.size.height},preferred_workspace_width:settings.workspace_width,preferred_workspace_height:settings.workspace_height,gap:8});work.set_size(PhysicalSize::new(result.width,result.height)).map_err(map_window)?;work.set_position(PhysicalPosition::new(result.x,result.y)).map_err(map_window)?;Ok(())}
-#[tauri::command]fn save_orb_position(x:i32,y:i32,db:State<Database>)->AppResult<AppSettings>{let mut settings=db.get_settings()?;settings.orb_position_x=x;settings.orb_position_y=y;db.save_settings(&settings)?;Ok(settings)}
-#[tauri::command]fn restore_orb_position(app:tauri::AppHandle,db:State<Database>)->AppResult<()>{let settings=db.get_settings()?;if settings.orb_position_x!=0||settings.orb_position_y!=0{app.get_webview_window("orb").ok_or_else(||AppError::Window("黑洞窗口不存在".into()))?.set_position(PhysicalPosition::new(settings.orb_position_x,settings.orb_position_y)).map_err(map_window)?}Ok(())}
-#[tauri::command]fn set_click_through(enabled:bool,app:tauri::AppHandle,db:State<Database>)->AppResult<AppSettings>{let orb=app.get_webview_window("orb").ok_or_else(||AppError::Window("黑洞窗口不存在".into()))?;orb.set_ignore_cursor_events(enabled).map_err(map_window)?;let mut settings=db.get_settings()?;settings.orb_click_through=enabled;db.save_settings(&settings)?;Ok(settings)}
-#[tauri::command]fn set_always_on_top(enabled:bool,app:tauri::AppHandle,db:State<Database>)->AppResult<AppSettings>{app.get_webview_window("orb").ok_or_else(||AppError::Window("黑洞窗口不存在".into()))?.set_always_on_top(enabled).map_err(map_window)?;let mut settings=db.get_settings()?;settings.orb_always_on_top=enabled;db.save_settings(&settings)?;Ok(settings)}
-#[tauri::command]fn open_quick_add(app:tauri::AppHandle)->AppResult<()>{let window=app.get_webview_window("quick-add").ok_or_else(||AppError::Window("快速新增窗口不存在".into()))?;window.show().map_err(map_window)?;window.set_focus().map_err(map_window)?;Ok(())}
-#[tauri::command]fn hide_quick_add(app:tauri::AppHandle)->AppResult<()>{app.get_webview_window("quick-add").ok_or_else(||AppError::Window("快速新增窗口不存在".into()))?.hide().map_err(map_window)}
-#[tauri::command]fn show_orb_menu(_app:tauri::AppHandle)->AppResult<()>{Ok(())}
+#[tauri::command]
+fn reposition_workspace(app: tauri::AppHandle) -> AppResult<()> {
+    reposition_workspace_inner(&app)
+}
+fn reposition_workspace_inner(app: &tauri::AppHandle) -> AppResult<()> {
+    let orb = app
+        .get_webview_window("orb")
+        .ok_or_else(|| AppError::Window("黑洞窗口不存在".into()))?;
+    let work = workspace(app)?;
+    let position = orb.outer_position().map_err(map_window)?;
+    let size = orb.outer_size().map_err(map_window)?;
+    let monitor = orb
+        .current_monitor()
+        .map_err(map_window)?
+        .or_else(|| orb.primary_monitor().ok().flatten())
+        .ok_or_else(|| AppError::Window("未找到显示器".into()))?;
+    let area = monitor.work_area();
+    let settings = app.state::<Database>().get_settings()?;
+    let result = placement::calculate(placement::PlacementInput {
+        orb_rect: placement::Rect {
+            x: position.x,
+            y: position.y,
+            width: size.width,
+            height: size.height,
+        },
+        monitor_work_area: placement::Rect {
+            x: area.position.x,
+            y: area.position.y,
+            width: area.size.width,
+            height: area.size.height,
+        },
+        preferred_workspace_width: settings.workspace_width,
+        preferred_workspace_height: settings.workspace_height,
+        gap: 8,
+    });
+    work.set_size(PhysicalSize::new(result.width, result.height))
+        .map_err(map_window)?;
+    work.set_position(PhysicalPosition::new(result.x, result.y))
+        .map_err(map_window)?;
+    Ok(())
+}
+#[tauri::command]
+fn save_orb_position(x: i32, y: i32, db: State<Database>) -> AppResult<AppSettings> {
+    let mut settings = db.get_settings()?;
+    settings.orb_position_x = x;
+    settings.orb_position_y = y;
+    db.save_settings(&settings)?;
+    Ok(settings)
+}
+#[tauri::command]
+fn restore_orb_position(app: tauri::AppHandle, db: State<Database>) -> AppResult<()> {
+    let settings = db.get_settings()?;
+    if settings.orb_position_x != 0 || settings.orb_position_y != 0 {
+        app.get_webview_window("orb")
+            .ok_or_else(|| AppError::Window("黑洞窗口不存在".into()))?
+            .set_position(PhysicalPosition::new(
+                settings.orb_position_x,
+                settings.orb_position_y,
+            ))
+            .map_err(map_window)?
+    }
+    Ok(())
+}
+#[tauri::command]
+fn set_click_through(
+    enabled: bool,
+    app: tauri::AppHandle,
+    db: State<Database>,
+) -> AppResult<AppSettings> {
+    let orb = app
+        .get_webview_window("orb")
+        .ok_or_else(|| AppError::Window("黑洞窗口不存在".into()))?;
+    orb.set_ignore_cursor_events(enabled).map_err(map_window)?;
+    let mut settings = db.get_settings()?;
+    settings.orb_click_through = enabled;
+    db.save_settings(&settings)?;
+    Ok(settings)
+}
+#[tauri::command]
+fn set_always_on_top(
+    enabled: bool,
+    app: tauri::AppHandle,
+    db: State<Database>,
+) -> AppResult<AppSettings> {
+    app.get_webview_window("orb")
+        .ok_or_else(|| AppError::Window("黑洞窗口不存在".into()))?
+        .set_always_on_top(enabled)
+        .map_err(map_window)?;
+    let mut settings = db.get_settings()?;
+    settings.orb_always_on_top = enabled;
+    db.save_settings(&settings)?;
+    Ok(settings)
+}
+#[tauri::command]
+fn open_quick_add(app: tauri::AppHandle) -> AppResult<()> {
+    let window = app
+        .get_webview_window("quick-add")
+        .ok_or_else(|| AppError::Window("快速新增窗口不存在".into()))?;
+    window.show().map_err(map_window)?;
+    window.set_focus().map_err(map_window)?;
+    Ok(())
+}
+#[tauri::command]
+fn hide_quick_add(app: tauri::AppHandle) -> AppResult<()> {
+    app.get_webview_window("quick-add")
+        .ok_or_else(|| AppError::Window("快速新增窗口不存在".into()))?
+        .hide()
+        .map_err(map_window)
+}
+#[tauri::command]
+fn show_orb_menu(_app: tauri::AppHandle) -> AppResult<()> {
+    Ok(())
+}
 
-#[tauri::command]fn export_data(db:State<Database>)->AppResult<String>{db.export_json()}
-#[tauri::command]fn import_data(json:String,mode:String,db:State<Database>)->AppResult<Value>{db.import_json(&json,&mode)}
-#[tauri::command]fn create_backup(db:State<Database>)->AppResult<PathBuf>{db.backup()}
-#[tauri::command]fn list_backups(db:State<Database>)->AppResult<Vec<PathBuf>>{db.list_backups()}
-#[tauri::command]fn restore_backup(path:PathBuf,db:State<Database>)->AppResult<()>{db.restore_backup(&path)}
-#[tauri::command]fn open_data_directory(app:tauri::AppHandle,db:State<Database>)->AppResult<()>{tauri_plugin_opener::open_path(&db.data_dir,None::<&str>).map_err(|e|AppError::Io(e.to_string()))?;let _=app;Ok(())}
-#[tauri::command]fn open_log_directory(app:tauri::AppHandle)->AppResult<()>{let path=app.path().app_log_dir().map_err(|e|AppError::Io(e.to_string()))?;tauri_plugin_opener::open_path(path,None::<&str>).map_err(|e|AppError::Io(e.to_string()))}
+#[tauri::command]
+fn export_data(db: State<Database>) -> AppResult<String> {
+    db.export_json()
+}
+#[tauri::command]
+fn import_data(json: String, mode: String, db: State<Database>) -> AppResult<Value> {
+    db.import_json(&json, &mode)
+}
+#[tauri::command]
+fn create_backup(db: State<Database>) -> AppResult<PathBuf> {
+    db.backup()
+}
+#[tauri::command]
+fn list_backups(db: State<Database>) -> AppResult<Vec<PathBuf>> {
+    db.list_backups()
+}
+#[tauri::command]
+fn restore_backup(path: PathBuf, db: State<Database>) -> AppResult<()> {
+    db.restore_backup(&path)
+}
+#[tauri::command]
+fn open_data_directory(app: tauri::AppHandle, db: State<Database>) -> AppResult<()> {
+    tauri_plugin_opener::open_path(&db.data_dir, None::<&str>)
+        .map_err(|e| AppError::Io(e.to_string()))?;
+    let _ = app;
+    Ok(())
+}
+#[tauri::command]
+fn open_log_directory(app: tauri::AppHandle) -> AppResult<()> {
+    let path = app
+        .path()
+        .app_log_dir()
+        .map_err(|e| AppError::Io(e.to_string()))?;
+    tauri_plugin_opener::open_path(path, None::<&str>).map_err(|e| AppError::Io(e.to_string()))
+}
 
-fn setup_tray(app:&tauri::App)->tauri::Result<()> {use tauri::menu::{Menu,MenuItem,PredefinedMenuItem};use tauri::tray::TrayIconBuilder;let open=MenuItem::with_id(app,"open","打开任务面板",true,None::<&str>)?;let quick=MenuItem::with_id(app,"quick","快速新增任务",true,None::<&str>)?;let passthrough=MenuItem::with_id(app,"passthrough","切换穿透模式",true,None::<&str>)?;let quit=MenuItem::with_id(app,"quit","退出",true,None::<&str>)?;let separator=PredefinedMenuItem::separator(app)?;let menu=Menu::with_items(app,&[&open,&quick,&passthrough,&separator,&quit])?;TrayIconBuilder::with_id("main").tooltip("黑洞任务").menu(&menu).on_menu_event(|app,event|match event.id().as_ref(){"open"=>{let _=show_workspace_inner(app);},"quick"=>{let _=open_quick_add(app.clone());},"passthrough"=>{if let Some(db)=app.try_state::<Database>(){if let Ok(settings)=db.get_settings(){let _=set_click_through(!settings.orb_click_through,app.clone(),db);}}},"quit"=>app.exit(0),_=>{}}).build(app)?;Ok(())}
+fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
+    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+    use tauri::tray::TrayIconBuilder;
+    let open = MenuItem::with_id(app, "open", "打开任务面板", true, None::<&str>)?;
+    let quick = MenuItem::with_id(app, "quick", "快速新增任务", true, None::<&str>)?;
+    let passthrough = MenuItem::with_id(app, "passthrough", "切换穿透模式", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+    let separator = PredefinedMenuItem::separator(app)?;
+    let menu = Menu::with_items(app, &[&open, &quick, &passthrough, &separator, &quit])?;
+    TrayIconBuilder::with_id("main")
+        .tooltip("黑洞任务")
+        .menu(&menu)
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "open" => {
+                let _ = show_workspace_inner(app);
+            }
+            "quick" => {
+                let _ = open_quick_add(app.clone());
+            }
+            "passthrough" => {
+                if let Some(db) = app.try_state::<Database>() {
+                    if let Ok(settings) = db.get_settings() {
+                        let _ = set_click_through(!settings.orb_click_through, app.clone(), db);
+                    }
+                }
+            }
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .build(app)?;
+    Ok(())
+}
 
-#[cfg_attr(mobile,tauri::mobile_entry_point)]
-pub fn run(){tauri::Builder::default().plugin(tauri_plugin_single_instance::init(|app,_args,_cwd|{if let Some(window)=app.get_webview_window("orb"){let _=window.show();}let _=show_workspace_inner(app);})).plugin(tauri_plugin_log::Builder::new().level(log::LevelFilter::Info).build()).plugin(tauri_plugin_opener::init()).plugin(tauri_plugin_dialog::init()).plugin(tauri_plugin_fs::init()).plugin(tauri_plugin_autostart::Builder::new().build()).plugin(tauri_plugin_global_shortcut::Builder::new().with_handler(|app,shortcut,event|{use tauri_plugin_global_shortcut::ShortcutState;if event.state()!=ShortcutState::Pressed{return}match shortcut.to_string().as_str(){"Ctrl+Shift+Space"=>{let _=toggle_workspace(app.clone());},"Ctrl+Shift+N"=>{let _=open_quick_add(app.clone());},"Ctrl+Shift+B"=>{if let Some(db)=app.try_state::<Database>(){if let Ok(settings)=db.get_settings(){let _=set_click_through(!settings.orb_click_through,app.clone(),db);}}},_=>{}}}).build()).setup(|app|{let data_dir=app.path().app_data_dir()?;let db=Database::open(&data_dir).map_err(|e|Box::<dyn std::error::Error>::from(e.to_string()))?;let settings=db.get_settings().unwrap_or_default();app.manage(db);app.manage(WindowState{inner:Mutex::new(WindowInteraction::default())});setup_tray(app)?;use tauri_plugin_global_shortcut::GlobalShortcutExt;app.global_shortcut().register("Ctrl+Shift+Space")?;app.global_shortcut().register("Ctrl+Shift+B")?;app.global_shortcut().register("Ctrl+Shift+N")?;if let Some(orb)=app.get_webview_window("orb"){let _=orb.set_always_on_top(settings.orb_always_on_top);if settings.orb_position_x!=0||settings.orb_position_y!=0{let _=orb.set_position(PhysicalPosition::new(settings.orb_position_x,settings.orb_position_y));}}if let Some(workspace)=app.get_webview_window("workspace"){let app_handle=app.handle().clone();workspace.on_window_event(move|event|if let tauri::WindowEvent::CloseRequested{api,..}=event{api.prevent_close();let _=hide_workspace_inner(&app_handle);});}Ok(())}).invoke_handler(tauri::generate_handler![list_tasks,get_task,create_task,update_task,update_task_position,update_tasks_positions,delete_task,complete_task,restore_task,archive_task,restore_archived_task,duplicate_task,list_relations,create_relation,delete_relation,validate_parent_relation,validate_dependency_relation,list_tags,create_tag,rename_tag,delete_tag,set_task_tags,get_settings,update_settings,reset_settings,show_workspace,hide_workspace,toggle_workspace,pin_workspace,unpin_workspace,set_orb_hovered,set_workspace_hovered,save_orb_position,restore_orb_position,reposition_workspace,set_click_through,set_always_on_top,open_quick_add,hide_quick_add,show_orb_menu,export_data,import_data,create_backup,list_backups,restore_backup,open_data_directory,open_log_directory]).run(tauri::generate_context!()).expect("BlackHole Tasks failed to start")}
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("orb") {
+                let _ = window.show();
+            }
+            let _ = show_workspace_inner(app);
+        }))
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .level(log::LevelFilter::Info)
+                .build(),
+        )
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_autostart::Builder::new().build())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, shortcut, event| {
+                    use tauri_plugin_global_shortcut::ShortcutState;
+                    if event.state() != ShortcutState::Pressed {
+                        return;
+                    }
+                    match shortcut.to_string().as_str() {
+                        "Ctrl+Shift+Space" => {
+                            let _ = toggle_workspace(app.clone());
+                        }
+                        "Ctrl+Shift+N" => {
+                            let _ = open_quick_add(app.clone());
+                        }
+                        "Ctrl+Shift+B" => {
+                            if let Some(db) = app.try_state::<Database>() {
+                                if let Ok(settings) = db.get_settings() {
+                                    let _ = set_click_through(
+                                        !settings.orb_click_through,
+                                        app.clone(),
+                                        db,
+                                    );
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                })
+                .build(),
+        )
+        .setup(|app| {
+            let data_dir = app.path().app_data_dir()?;
+            let db = Database::open(&data_dir)
+                .map_err(|e| Box::<dyn std::error::Error>::from(e.to_string()))?;
+            let settings = db.get_settings().unwrap_or_default();
+            app.manage(db);
+            app.manage(WindowState {
+                inner: Mutex::new(WindowInteraction::default()),
+            });
+            setup_tray(app)?;
+            use tauri_plugin_global_shortcut::GlobalShortcutExt;
+            app.global_shortcut().register("Ctrl+Shift+Space")?;
+            app.global_shortcut().register("Ctrl+Shift+B")?;
+            app.global_shortcut().register("Ctrl+Shift+N")?;
+            if let Some(orb) = app.get_webview_window("orb") {
+                let _ = orb.set_always_on_top(settings.orb_always_on_top);
+                if settings.orb_position_x != 0 || settings.orb_position_y != 0 {
+                    let _ = orb.set_position(PhysicalPosition::new(
+                        settings.orb_position_x,
+                        settings.orb_position_y,
+                    ));
+                }
+            }
+            if let Some(workspace) = app.get_webview_window("workspace") {
+                let app_handle = app.handle().clone();
+                workspace.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = hide_workspace_inner(&app_handle);
+                    }
+                });
+            }
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            list_tasks,
+            get_task,
+            create_task,
+            update_task,
+            update_task_position,
+            update_tasks_positions,
+            delete_task,
+            complete_task,
+            restore_task,
+            archive_task,
+            restore_archived_task,
+            duplicate_task,
+            list_relations,
+            create_relation,
+            delete_relation,
+            validate_parent_relation,
+            validate_dependency_relation,
+            list_tags,
+            create_tag,
+            rename_tag,
+            delete_tag,
+            set_task_tags,
+            get_settings,
+            update_settings,
+            reset_settings,
+            show_workspace,
+            hide_workspace,
+            toggle_workspace,
+            pin_workspace,
+            unpin_workspace,
+            set_orb_hovered,
+            set_workspace_hovered,
+            save_orb_position,
+            restore_orb_position,
+            reposition_workspace,
+            set_click_through,
+            set_always_on_top,
+            open_quick_add,
+            hide_quick_add,
+            show_orb_menu,
+            export_data,
+            import_data,
+            create_backup,
+            list_backups,
+            restore_backup,
+            open_data_directory,
+            open_log_directory
+        ])
+        .run(tauri::generate_context!())
+        .expect("BlackHole Tasks failed to start")
+}

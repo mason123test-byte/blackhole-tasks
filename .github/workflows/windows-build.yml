@@ -53,18 +53,8 @@ jobs:
       - name: Test frontend
         run: npm run test
 
-      - name: Format Rust sources
-        run: cargo fmt --manifest-path src-tauri/Cargo.toml
-
-      - name: Upload formatted Rust sources
-        uses: actions/upload-artifact@v4
-        with:
-          name: rustfmt-sources-${{ github.run_number }}
-          path: |
-            src-tauri/build.rs
-            src-tauri/src/*.rs
-          if-no-files-found: error
-          retention-days: 1
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
 
       - name: Lint Rust
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
@@ -76,7 +66,7 @@ jobs:
         run: npm run tauri build
 
       - name: Upload Windows installers
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: blackhole-tasks-windows-${{ github.run_number }}
           path: |
