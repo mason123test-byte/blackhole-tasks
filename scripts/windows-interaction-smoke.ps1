@@ -230,12 +230,12 @@ try {
     throw
   }
 
-  $separated = $workspace.Bounds.Right -le $orb.Bounds.Left -or
-    $workspace.Bounds.Left -ge $orb.Bounds.Right -or
-    $workspace.Bounds.Bottom -le $orb.Bounds.Top -or
-    $workspace.Bounds.Top -ge $orb.Bounds.Bottom
+  $separated = $workspace.ClientBounds.Right -le $orb.ClientBounds.Left -or
+    $workspace.ClientBounds.Left -ge $orb.ClientBounds.Right -or
+    $workspace.ClientBounds.Bottom -le $orb.ClientBounds.Top -or
+    $workspace.ClientBounds.Top -ge $orb.ClientBounds.Bottom
   if (-not $separated) {
-    throw "Workspace overlaps the orb: orb=$($orb.Bounds.Left),$($orb.Bounds.Top),$($orb.Bounds.Right),$($orb.Bounds.Bottom) workspace=$($workspace.Bounds.Left),$($workspace.Bounds.Top),$($workspace.Bounds.Right),$($workspace.Bounds.Bottom)."
+    throw "Workspace client area overlaps the orb: orb=$($orb.ClientBounds.Left),$($orb.ClientBounds.Top),$($orb.ClientBounds.Right),$($orb.ClientBounds.Bottom) workspace=$($workspace.ClientBounds.Left),$($workspace.ClientBounds.Top),$($workspace.ClientBounds.Right),$($workspace.ClientBounds.Bottom)."
   }
   Save-DesktopScreenshot (Join-Path $OutputDirectory "02-hover-open.png")
 
