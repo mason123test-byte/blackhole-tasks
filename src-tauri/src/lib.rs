@@ -411,6 +411,8 @@ fn cursor_inside_window(
 
 fn start_cursor_monitor(app: tauri::AppHandle, hover_delay_ms: u64) {
     let diagnostics_enabled = std::env::var_os("BLACKHOLE_SMOKE_DIAGNOSTICS").is_some();
+    let diagnostics_path =
+        std::env::var_os("BLACKHOLE_SMOKE_DIAGNOSTICS_PATH").map(PathBuf::from);
     std::thread::spawn(move || loop {
         let Some(orb) = app.get_webview_window("orb") else {
             return;
@@ -425,14 +427,6 @@ fn start_cursor_monitor(app: tauri::AppHandle, hover_delay_ms: u64) {
         let workspace_visible = workspace.is_visible().unwrap_or(false);
         let orb_inside = cursor_inside_window(&orb, cursor);
         let workspace_inside = workspace_visible && cursor_inside_window(&workspace, cursor);
-        if diagnostics_enabled {
-            let position = orb.inner_position().ok();
-            let size = orb.inner_size().ok();
-            let _ = orb.set_title(&format!(
-                "黑洞任务|cursor={:.0},{:.0}|inner={:?},{:?}|inside={}|workspace={}",
-                cursor.x, cursor.y, position, size, orb_inside, workspace_inside
-            ));
-        }
         let now = Instant::now();
         let (should_show, should_schedule_close) = {
             let Some(state) = app.try_state::<WindowState>() else {
@@ -466,9 +460,29 @@ fn start_cursor_monitor(app: tauri::AppHandle, hover_delay_ms: u64) {
         };
         if should_show {
             log::info!("workspace opened by native cursor monitor");
-            let _ = show_workspace_inner(&app, false);
+            let show_result = show_workspace_inner(&app, false);
+            if let Err(error) = &show_result {
+                log::error!("native cursor monitor failed to open workspace: {error}");
+            }
+            if diagnostics_enabled {
+                let _ = orb.set_title(&format!(
+                    "黑洞任务|cursor={:.0},{:.0}|inside={}|show={:?}",
+                    cursor.x, cursor.y, orb_inside, show_result
+                ));
+            }
         } else if should_schedule_close {
             schedule_close(app.clone());
+        }
+        if let Some(path) = &diagnostics_path {
+            let position = orb.inner_position().ok();
+            let size = orb.inner_size().ok();
+            let executable = std::env::current_exe().ok();
+            let _ = std::fs::write(
+                path,
+                format!(
+                    "build=native-cursor-v2 exe={executable:?} cursor={cursor:?} inner={position:?},{size:?} inside={orb_inside} workspace_inside={workspace_inside} workspace_visible={workspace_visible} should_show={should_show} should_schedule_close={should_schedule_close}"
+                ),
+            );
         }
         std::thread::sleep(Duration::from_millis(50));
     });

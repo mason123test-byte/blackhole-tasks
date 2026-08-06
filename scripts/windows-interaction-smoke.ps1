@@ -67,6 +67,9 @@ public static class BlackHoleWindowProbe
     [DllImport("user32.dll")]
     public static extern bool SetCursorPos(int x, int y);
 
+    [DllImport("user32.dll")]
+    public static extern bool GetCursorPos(out Point point);
+
     public static WindowInfo[] VisibleWindows(int expectedProcessId)
     {
         var result = new List<WindowInfo>();
@@ -131,7 +134,9 @@ function Get-ColorDistance([System.Drawing.Color]$First, [System.Drawing.Color]$
     [Math]::Abs([int]$First.B - [int]$Second.B)
 }
 
+$diagnosticPath = Join-Path (Resolve-Path $OutputDirectory) "native-cursor-diagnostics.txt"
 $env:BLACKHOLE_SMOKE_DIAGNOSTICS = "1"
+$env:BLACKHOLE_SMOKE_DIAGNOSTICS_PATH = $diagnosticPath
 $process = Start-Process -FilePath (Resolve-Path $ExePath) -PassThru
 try {
   $orb = Wait-AppWindow $process.Id "黑洞任务" $true
@@ -165,12 +170,24 @@ try {
 
   $orbCenterX = [int](($orb.ClientBounds.Left + $orb.ClientBounds.Right) / 2)
   $orbCenterY = [int](($orb.ClientBounds.Top + $orb.ClientBounds.Bottom) / 2)
-  [BlackHoleWindowProbe]::SetCursorPos($orbCenterX, $orbCenterY) | Out-Null
+  if (-not [BlackHoleWindowProbe]::SetCursorPos($orbCenterX, $orbCenterY)) {
+    throw "SetCursorPos failed for $orbCenterX,$orbCenterY."
+  }
+  $actualCursor = [BlackHoleWindowProbe+Point]::new()
+  if (-not [BlackHoleWindowProbe]::GetCursorPos([ref]$actualCursor)) {
+    throw "GetCursorPos failed after moving to the orb."
+  }
+  "SCRIPT_CURSOR requested=$orbCenterX,$orbCenterY actual=$($actualCursor.X),$($actualCursor.Y)"
   try {
     $workspace = Wait-AppWindow $process.Id "黑洞任务工作区" $true
   } catch {
     Get-AppWindows $process.Id | ForEach-Object {
       "HOVER_TIMEOUT_WINDOW title=$($_.Title) client=$($_.ClientBounds.Left),$($_.ClientBounds.Top),$($_.ClientBounds.Right),$($_.ClientBounds.Bottom)"
+    }
+    if (Test-Path $diagnosticPath) {
+      "NATIVE_CURSOR_DIAGNOSTICS $(Get-Content -LiteralPath $diagnosticPath -Raw)"
+    } else {
+      "NATIVE_CURSOR_DIAGNOSTICS_MISSING path=$diagnosticPath"
     }
     Save-DesktopScreenshot (Join-Path $OutputDirectory "02-hover-timeout.png")
     throw
@@ -220,6 +237,7 @@ try {
   "WINDOWS_INTERACTION_SMOKE_OK pid=$($process.Id) threadsDelta=$threadGrowth handlesDelta=$handleGrowth"
 } finally {
   Remove-Item Env:BLACKHOLE_SMOKE_DIAGNOSTICS -ErrorAction SilentlyContinue
+  Remove-Item Env:BLACKHOLE_SMOKE_DIAGNOSTICS_PATH -ErrorAction SilentlyContinue
   if (-not $process.HasExited) {
     Stop-Process -Id $process.Id -Force
     $process.WaitForExit(5000) | Out-Null
