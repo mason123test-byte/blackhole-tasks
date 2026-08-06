@@ -106,7 +106,7 @@ fn validate_parent_relation(
     target_task_id: String,
     db: State<Database>,
 ) -> AppResult<bool> {
-    Ok(db.validate_cycle(&source_task_id, &target_task_id, "parent_child")?)
+    db.validate_cycle(&source_task_id, &target_task_id, "parent_child")
 }
 #[tauri::command]
 fn validate_dependency_relation(
@@ -114,7 +114,7 @@ fn validate_dependency_relation(
     target_task_id: String,
     db: State<Database>,
 ) -> AppResult<bool> {
-    Ok(db.validate_cycle(&source_task_id, &target_task_id, "dependency")?)
+    db.validate_cycle(&source_task_id, &target_task_id, "dependency")
 }
 
 #[tauri::command]

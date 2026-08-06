@@ -12,7 +12,6 @@ use std::{
 
 pub struct Database {
     pub connection: Mutex<Connection>,
-    pub path: PathBuf,
     pub data_dir: PathBuf,
 }
 
@@ -36,7 +35,6 @@ impl Database {
         conn.execute("INSERT OR IGNORE INTO schema_migrations(version,name,applied_at) VALUES(1,'initial',?1)",[Utc::now().to_rfc3339()])?;
         Ok(Self {
             connection: Mutex::new(conn),
-            path,
             data_dir: data_dir.to_path_buf(),
         })
     }
