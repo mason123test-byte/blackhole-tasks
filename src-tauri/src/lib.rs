@@ -185,6 +185,9 @@ fn show_workspace_inner(app: &tauri::AppHandle, focus: bool) -> AppResult<()> {
     if !was_visible {
         reposition_workspace_inner(app)?;
         window.show().map_err(map_window)?;
+        // Windows may apply the configured initial centering when a hidden WebView is first shown.
+        // Reapply the orb-relative placement after show so the two windows never overlap.
+        reposition_workspace_inner(app)?;
         let _ = app.emit("workspace:visibility-changed", true);
     }
     if focus {

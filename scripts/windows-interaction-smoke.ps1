@@ -64,39 +64,73 @@ public static class BlackHoleWindowProbe
     [DllImport("user32.dll")]
     private static extern bool ClientToScreen(IntPtr window, ref Point point);
 
-    [DllImport("user32.dll")]
-    public static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll", EntryPoint = "SetCursorPos")]
+    private static extern bool NativeSetCursorPos(int x, int y);
+
+    [DllImport("user32.dll", EntryPoint = "GetCursorPos")]
+    private static extern bool NativeGetCursorPos(out Point point);
 
     [DllImport("user32.dll")]
-    public static extern bool GetCursorPos(out Point point);
+    private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr dpiContext);
+
+    public static bool EnablePerMonitorV2()
+    {
+        return SetThreadDpiAwarenessContext(new IntPtr(-4)) != IntPtr.Zero;
+    }
+
+    public static bool SetCursorPos(int x, int y)
+    {
+        var previous = SetThreadDpiAwarenessContext(new IntPtr(-4));
+        try { return NativeSetCursorPos(x, y); }
+        finally { if (previous != IntPtr.Zero) SetThreadDpiAwarenessContext(previous); }
+    }
+
+    public static bool GetCursorPos(out Point point)
+    {
+        var previous = SetThreadDpiAwarenessContext(new IntPtr(-4));
+        try { return NativeGetCursorPos(out point); }
+        finally { if (previous != IntPtr.Zero) SetThreadDpiAwarenessContext(previous); }
+    }
 
     public static WindowInfo[] VisibleWindows(int expectedProcessId)
     {
         var result = new List<WindowInfo>();
-        EnumWindows((window, parameter) =>
+        var previous = SetThreadDpiAwarenessContext(new IntPtr(-4));
+        try
         {
-            uint processId;
-            GetWindowThreadProcessId(window, out processId);
-            if (processId != expectedProcessId || !IsWindowVisible(window)) return true;
-            Rect rect;
-            if (!GetWindowRect(window, out rect)) return true;
-            Rect clientRect;
-            Point clientOrigin = new Point();
-            GetClientRect(window, out clientRect);
-            ClientToScreen(window, ref clientOrigin);
-            clientRect.Right = clientOrigin.X + clientRect.Right;
-            clientRect.Bottom = clientOrigin.Y + clientRect.Bottom;
-            clientRect.Left = clientOrigin.X;
-            clientRect.Top = clientOrigin.Y;
-            var title = new StringBuilder(256);
-            GetWindowText(window, title, title.Capacity);
-            result.Add(new WindowInfo { Handle = window, Title = title.ToString(), Bounds = rect, ClientBounds = clientRect });
-            return true;
-        }, IntPtr.Zero);
-        return result.ToArray();
+            EnumWindows((window, parameter) =>
+            {
+                uint processId;
+                GetWindowThreadProcessId(window, out processId);
+                if (processId != expectedProcessId || !IsWindowVisible(window)) return true;
+                Rect rect;
+                if (!GetWindowRect(window, out rect)) return true;
+                Rect clientRect;
+                Point clientOrigin = new Point();
+                GetClientRect(window, out clientRect);
+                ClientToScreen(window, ref clientOrigin);
+                clientRect.Right = clientOrigin.X + clientRect.Right;
+                clientRect.Bottom = clientOrigin.Y + clientRect.Bottom;
+                clientRect.Left = clientOrigin.X;
+                clientRect.Top = clientOrigin.Y;
+                var title = new StringBuilder(256);
+                GetWindowText(window, title, title.Capacity);
+                result.Add(new WindowInfo { Handle = window, Title = title.ToString(), Bounds = rect, ClientBounds = clientRect });
+                return true;
+            }, IntPtr.Zero);
+            return result.ToArray();
+        }
+        finally
+        {
+            if (previous != IntPtr.Zero) SetThreadDpiAwarenessContext(previous);
+        }
     }
 }
 '@
+
+if (-not [BlackHoleWindowProbe]::EnablePerMonitorV2()) {
+  throw "Failed to enable per-monitor-v2 DPI awareness for the Windows probe."
+}
 
 function Get-AppWindows([int]$ProcessId) {
   return @([BlackHoleWindowProbe]::VisibleWindows($ProcessId))
@@ -134,7 +168,7 @@ function Get-ColorDistance([System.Drawing.Color]$First, [System.Drawing.Color]$
     [Math]::Abs([int]$First.B - [int]$Second.B)
 }
 
-$diagnosticPath = Join-Path (Resolve-Path $OutputDirectory) "native-cursor-diagnostics.txt"
+$diagnosticPath = Join-Path $env:TEMP "blackhole-tasks-native-cursor-diagnostics.txt"
 $env:BLACKHOLE_SMOKE_DIAGNOSTICS = "1"
 $env:BLACKHOLE_SMOKE_DIAGNOSTICS_PATH = $diagnosticPath
 $process = Start-Process -FilePath (Resolve-Path $ExePath) -ArgumentList "--smoke-diagnostics=$diagnosticPath" -PassThru
@@ -245,5 +279,8 @@ try {
   $diagnosticLog = Join-Path $env:LOCALAPPDATA "com.blackhole.tasks\logs\BlackHole Tasks.log"
   if (Test-Path $diagnosticLog) {
     Copy-Item -LiteralPath $diagnosticLog -Destination (Join-Path $OutputDirectory "BlackHole-Tasks.log") -Force
+  }
+  if (Test-Path $diagnosticPath) {
+    Copy-Item -LiteralPath $diagnosticPath -Destination (Join-Path $OutputDirectory "native-cursor-diagnostics.txt") -Force
   }
 }
