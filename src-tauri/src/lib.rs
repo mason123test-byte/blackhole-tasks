@@ -450,8 +450,8 @@ fn start_cursor_monitor(app: tauri::AppHandle, hover_delay_ms: u64) {
     let diagnostics_path = std::env::var_os("BLACKHOLE_SMOKE_DIAGNOSTICS_PATH")
         .map(PathBuf::from)
         .or_else(diagnostics_path_from_args);
-    let diagnostics_enabled = diagnostics_path.is_some()
-        || std::env::var_os("BLACKHOLE_SMOKE_DIAGNOSTICS").is_some();
+    let diagnostics_enabled =
+        diagnostics_path.is_some() || std::env::var_os("BLACKHOLE_SMOKE_DIAGNOSTICS").is_some();
     if let Some(path) = &diagnostics_path {
         let _ = std::fs::write(path, "build=native-cursor-v4 phase=monitor-started");
     }
