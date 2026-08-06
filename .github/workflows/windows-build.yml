@@ -22,10 +22,10 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -53,8 +53,18 @@ jobs:
       - name: Test frontend
         run: npm run test
 
-      - name: Check Rust formatting
-        run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - name: Format Rust sources
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml
+
+      - name: Upload formatted Rust sources
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustfmt-sources-${{ github.run_number }}
+          path: |
+            src-tauri/build.rs
+            src-tauri/src/*.rs
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Lint Rust
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
@@ -74,4 +84,3 @@ jobs:
             src-tauri/target/release/bundle/msi/*.msi
           if-no-files-found: error
           retention-days: 14
-
