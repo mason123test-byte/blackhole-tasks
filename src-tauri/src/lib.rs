@@ -439,12 +439,23 @@ fn global_cursor_position(window: &tauri::WebviewWindow) -> Option<PhysicalPosit
 fn start_cursor_monitor(app: tauri::AppHandle, hover_delay_ms: u64) {
     let diagnostics_enabled = std::env::var_os("BLACKHOLE_SMOKE_DIAGNOSTICS").is_some();
     let diagnostics_path = std::env::var_os("BLACKHOLE_SMOKE_DIAGNOSTICS_PATH").map(PathBuf::from);
+    if let Some(path) = &diagnostics_path {
+        let _ = std::fs::write(path, "build=native-cursor-v4 phase=monitor-started");
+    }
     std::thread::spawn(move || loop {
         let Some(orb) = app.get_webview_window("orb") else {
-            return;
+            if let Some(path) = &diagnostics_path {
+                let _ = std::fs::write(path, "build=native-cursor-v4 phase=orb-unavailable");
+            }
+            std::thread::sleep(Duration::from_millis(50));
+            continue;
         };
         let Some(workspace) = app.get_webview_window("workspace") else {
-            return;
+            if let Some(path) = &diagnostics_path {
+                let _ = std::fs::write(path, "build=native-cursor-v4 phase=workspace-unavailable");
+            }
+            std::thread::sleep(Duration::from_millis(50));
+            continue;
         };
         let Some(cursor) = global_cursor_position(&orb) else {
             if let Some(path) = &diagnostics_path {
@@ -459,10 +470,12 @@ fn start_cursor_monitor(app: tauri::AppHandle, hover_delay_ms: u64) {
         let now = Instant::now();
         let (should_show, should_schedule_close) = {
             let Some(state) = app.try_state::<WindowState>() else {
-                return;
+                std::thread::sleep(Duration::from_millis(50));
+                continue;
             };
             let Ok(mut interaction) = state.inner.lock() else {
-                return;
+                std::thread::sleep(Duration::from_millis(50));
+                continue;
             };
             let was_inside = interaction.orb_hovered || interaction.workspace_hovered;
             interaction.orb_hovered = orb_inside;
@@ -509,7 +522,7 @@ fn start_cursor_monitor(app: tauri::AppHandle, hover_delay_ms: u64) {
             let _ = std::fs::write(
                 path,
                 format!(
-                    "build=native-cursor-v3 exe={executable:?} cursor={cursor:?} inner={position:?},{size:?} inside={orb_inside} workspace_inside={workspace_inside} workspace_visible={workspace_visible} should_show={should_show} should_schedule_close={should_schedule_close}"
+                    "build=native-cursor-v4 exe={executable:?} cursor={cursor:?} inner={position:?},{size:?} inside={orb_inside} workspace_inside={workspace_inside} workspace_visible={workspace_visible} should_show={should_show} should_schedule_close={should_schedule_close}"
                 ),
             );
         }
