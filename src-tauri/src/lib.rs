@@ -799,11 +799,6 @@ pub fn run() {
                 inner: Mutex::new(WindowInteraction::default()),
             });
             log::info!("application state initialized at {}", data_dir.display());
-            setup_tray(app)?;
-            use tauri_plugin_global_shortcut::GlobalShortcutExt;
-            app.global_shortcut().register("Ctrl+Shift+Space")?;
-            app.global_shortcut().register("Ctrl+Shift+B")?;
-            app.global_shortcut().register("Ctrl+Shift+N")?;
             if let Some(orb) = app.get_webview_window("orb") {
                 let _ = orb.set_always_on_top(settings.orb_always_on_top);
                 if settings.orb_position_x != 0 || settings.orb_position_y != 0 {
@@ -838,6 +833,15 @@ pub fn run() {
                 let _ = quick_add.hide();
             }
             start_cursor_monitor(app.handle().clone(), settings.hover_open_delay_ms);
+            if let Err(error) = setup_tray(app) {
+                log::error!("system tray initialization failed: {error}");
+            }
+            use tauri_plugin_global_shortcut::GlobalShortcutExt;
+            for shortcut in ["Ctrl+Shift+Space", "Ctrl+Shift+B", "Ctrl+Shift+N"] {
+                if let Err(error) = app.global_shortcut().register(shortcut) {
+                    log::warn!("global shortcut {shortcut} unavailable: {error}");
+                }
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
