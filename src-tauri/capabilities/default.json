@@ -1,0 +1,19 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Least-privilege permissions for BlackHole Tasks windows",
+  "windows": ["orb", "workspace", "quick-add"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-ignore-cursor-events",
+    "core:window:allow-set-always-on-top",
+    "dialog:default",
+    "global-shortcut:allow-is-registered",
+    "opener:default",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled"
+  ]
+}
+
