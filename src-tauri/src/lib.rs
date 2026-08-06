@@ -411,8 +411,7 @@ fn cursor_inside_window(
 
 fn start_cursor_monitor(app: tauri::AppHandle, hover_delay_ms: u64) {
     let diagnostics_enabled = std::env::var_os("BLACKHOLE_SMOKE_DIAGNOSTICS").is_some();
-    let diagnostics_path =
-        std::env::var_os("BLACKHOLE_SMOKE_DIAGNOSTICS_PATH").map(PathBuf::from);
+    let diagnostics_path = std::env::var_os("BLACKHOLE_SMOKE_DIAGNOSTICS_PATH").map(PathBuf::from);
     std::thread::spawn(move || loop {
         let Some(orb) = app.get_webview_window("orb") else {
             return;

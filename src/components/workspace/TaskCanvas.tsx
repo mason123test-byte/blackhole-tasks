@@ -131,8 +131,8 @@ export function TaskCanvas({ filters, fitRequest, onAdd, onEdit }: TaskCanvasPro
       <span className="overlay-q4"><b>Q4</b>{quadrantLabels.q4}</span>
     </div>
     {visibleTasks.length === 0 && <section className="canvas-empty">
-      <div className="empty-orbit" aria-hidden="true"/>
-      <p>{tasks.length === 0 ? "把第一件事放进四象限" : "没有符合当前筛选的任务"}</p>
+      <p>{tasks.length === 0 ? "四象限目前为空" : "没有符合当前筛选的任务"}</p>
+      {tasks.length === 0 && <small>新增任务后，卡片会出现在对应象限中</small>}
       {tasks.length === 0 && <button className="primary" onClick={onAdd}>＋ 新增任务</button>}
     </section>}
     {denseGraph && <div className="performance-badge">性能模式 · 已隐藏小地图与边动画</div>}
