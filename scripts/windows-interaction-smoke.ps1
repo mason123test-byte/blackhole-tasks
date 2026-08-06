@@ -136,7 +136,7 @@ function Get-AppWindows([int]$ProcessId) {
   return @([BlackHoleWindowProbe]::VisibleWindows($ProcessId))
 }
 
-function Wait-AppWindow([int]$ProcessId, [string]$Title, [bool]$Visible, [int]$TimeoutMilliseconds = 6000) {
+function Wait-AppWindow([int]$ProcessId, [string]$Title, [bool]$Visible, [int]$TimeoutMilliseconds = 30000) {
   $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMilliseconds)
   do {
     $match = @(Get-AppWindows $ProcessId | Where-Object { $_.Title -eq $Title -or ($Title -eq "黑洞任务" -and $_.Title.StartsWith("黑洞任务|")) })

@@ -28,7 +28,8 @@
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "shadow": false,
-        "focus": false
+        "focus": false,
+        "visible": false
       },
       {
         "label": "workspace",

@@ -833,6 +833,9 @@ pub fn run() {
                 let _ = quick_add.hide();
             }
             start_cursor_monitor(app.handle().clone(), settings.hover_open_delay_ms);
+            if let Some(orb) = app.get_webview_window("orb") {
+                orb.show()?;
+            }
             if let Err(error) = setup_tray(app) {
                 log::error!("system tray initialization failed: {error}");
             }
