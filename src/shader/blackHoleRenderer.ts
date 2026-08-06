@@ -300,6 +300,8 @@ export function startBlackHole(
     let measuredFrames = 0;
     let measuredAt = startedAt;
     let needsResize = true;
+    let readbackAttempts = 0;
+    let rendererReady = false;
 
     const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => { needsResize = true; });
     resizeObserver?.observe(canvas);
@@ -309,13 +311,13 @@ export function startBlackHole(
         animationFrame = requestAnimationFrame(render);
       }
     };
-    const render = (now: number) => {
+    const render = (now: number, force = false) => {
       animationFrame = 0;
-      if (disposed || document.hidden) return;
+      if (disposed || (!force && document.hidden)) return;
       const targetHover = getHover();
       const fps = targetHover > 0.01 || getPulse() > 0.01 ? profile.activeFps : profile.idleFps;
       const frameInterval = 1000 / fps;
-      if (nextFrameAt !== 0 && now + 0.5 < nextFrameAt) {
+      if (!force && nextFrameAt !== 0 && now + 0.5 < nextFrameAt) {
         schedule();
         return;
       }
@@ -347,6 +349,23 @@ export function startBlackHole(
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
+      // The orb WebView is created hidden. Some WebView2/CI combinations keep
+      // requestAnimationFrame suspended until focus changes, so prove that a
+      // real geodesic frame exists and expose the result through the native
+      // window title used by the Windows smoke probe.
+      if (!rendererReady && readbackAttempts < 6) {
+        readbackAttempts += 1;
+        const pixels = new Uint8Array(canvas.width * canvas.height * 4);
+        gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        let energy = 0;
+        for (let index = 0; index < pixels.length; index += 4) {
+          if (pixels[index + 3] > 8 && Math.max(pixels[index], pixels[index + 1], pixels[index + 2]) > 48) energy += 1;
+        }
+        canvas.dataset.energy = String(energy);
+        document.title = `黑洞任务|renderer=webgl2|frame=ready|energy=${energy}`;
+        rendererReady = energy > 100;
+      }
+
       measuredFrames += 1;
       if (now - measuredAt >= 1000) {
         canvas.dataset.fps = String(Math.round(measuredFrames * 1000 / (now - measuredAt)));
@@ -376,11 +395,14 @@ export function startBlackHole(
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pageshow", onVisibility);
     canvas.addEventListener("webglcontextlost", onContextLost);
-    schedule();
+    // Draw even while the native window is still hidden, then repeat around
+    // the setup/show boundary. Continuous animation remains visibility-gated.
+    const bootstrapTimers = [0, 300, 1200].map((delay) => window.setTimeout(() => render(performance.now(), true), delay));
 
     return () => {
       disposed = true;
       if (animationFrame) cancelAnimationFrame(animationFrame);
+      bootstrapTimers.forEach((timer) => window.clearTimeout(timer));
       resizeObserver?.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pageshow", onVisibility);
@@ -407,13 +429,14 @@ function startCanvasFallback(
   let disposed = false;
   let lastFrameAt = 0;
   let startedAt = performance.now();
+  let rendererReady = false;
 
   const schedule = () => {
     if (!disposed && !document.hidden && animationFrame === 0) animationFrame = requestAnimationFrame(render);
   };
-  const render = (now: number) => {
+  const render = (now: number, force = false) => {
     animationFrame = 0;
-    if (disposed || document.hidden) return;
+    if (disposed || (!force && document.hidden)) return;
     const active = getHover() > 0.01 || getPulse() > 0.01;
     const fps = Math.min(active ? profile.activeFps : profile.idleFps, 20);
     if (now - lastFrameAt < 1000 / fps) {
@@ -459,6 +482,10 @@ function startCanvasFallback(
     context.arc(0, 0, scale * 0.18, 0, Math.PI * 2);
     context.fill();
     context.restore();
+    if (!rendererReady) {
+      rendererReady = true;
+      document.title = "黑洞任务|renderer=canvas2d|frame=ready|energy=0";
+    }
     schedule();
   };
   const onVisibility = () => {
@@ -472,10 +499,11 @@ function startCanvasFallback(
     }
   };
   document.addEventListener("visibilitychange", onVisibility);
-  schedule();
+  const bootstrapTimers = [0, 300, 1200].map((delay) => window.setTimeout(() => render(performance.now(), true), delay));
   return () => {
     disposed = true;
     if (animationFrame) cancelAnimationFrame(animationFrame);
+    bootstrapTimers.forEach((timer) => window.clearTimeout(timer));
     document.removeEventListener("visibilitychange", onVisibility);
   };
 }

@@ -149,6 +149,25 @@ function Wait-AppWindow([int]$ProcessId, [string]$Title, [bool]$Visible, [int]$T
   throw "Window '$Title' did not reach visible=$Visible within ${TimeoutMilliseconds}ms."
 }
 
+function Wait-OrbRenderReady([int]$ProcessId, [int]$TimeoutMilliseconds = 20000) {
+  $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMilliseconds)
+  $lastTitle = ""
+  do {
+    $match = @(Get-AppWindows $ProcessId | Where-Object { $_.Title.StartsWith("黑洞任务|renderer=") })
+    if ($match.Count -gt 0) {
+      $lastTitle = $match[0].Title
+      if ($lastTitle -match '^黑洞任务\|renderer=webgl2\|frame=ready\|energy=(\d+)$' -and [int]$Matches[1] -gt 100) {
+        return $match[0]
+      }
+      if ($lastTitle -match '^黑洞任务\|renderer=canvas2d\|') {
+        throw "Orb fell back to Canvas2D instead of the reference WebGL2 renderer: $lastTitle"
+      }
+    }
+    Start-Sleep -Milliseconds 50
+  } while ([DateTime]::UtcNow -lt $deadline)
+  throw "Orb did not produce a non-empty WebGL2 frame within ${TimeoutMilliseconds}ms; lastTitle='$lastTitle'."
+}
+
 function Save-DesktopScreenshot([string]$Path) {
   $screen = [System.Windows.Forms.SystemInformation]::VirtualScreen
   $bitmap = [System.Drawing.Bitmap]::new($screen.Width, $screen.Height)
@@ -195,6 +214,7 @@ $env:BLACKHOLE_SMOKE_DIAGNOSTICS = "1"
 $env:BLACKHOLE_SMOKE_DIAGNOSTICS_PATH = $diagnosticPath
 $stdoutPath = Join-Path $OutputDirectory "process-stdout.log"
 $stderrPath = Join-Path $OutputDirectory "process-stderr.log"
+[BlackHoleWindowProbe]::SetCursorPos(1, 1) | Out-Null
 $process = Start-Process -FilePath $resolvedExePath `
   -ArgumentList "--smoke-diagnostics=$diagnosticPath" `
   -RedirectStandardOutput $stdoutPath `
@@ -219,6 +239,7 @@ try {
     }
     throw
   }
+  $orb = Wait-OrbRenderReady $process.Id
   Start-Sleep -Milliseconds 800
   $knownTitles = @("黑洞任务", "黑洞任务工作区", "快速新增任务")
   $initialWindows = @(Get-AppWindows $process.Id | Where-Object { $_.Title -in $knownTitles -or $_.Title.StartsWith("黑洞任务|") })
