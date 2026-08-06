@@ -204,11 +204,13 @@ export const BLACK_HOLE_RENDERER_INFO = Object.freeze({
   integrationSteps: 48,
   reference: "https://github.com/s0xDk/ghostty-blackhole",
 });
+const BLACK_HOLE_STAGE_WIDTH = 240;
+const BLACK_HOLE_STAGE_HEIGHT = 180;
 
-function reportOrbFrame(renderer: "webgl2" | "canvas2d", energy: number) {
-  document.title = `黑洞任务|renderer=${renderer}|frame=ready|energy=${energy}`;
+function reportOrbFrame(renderer: "webgl2" | "canvas2d", energy: number, width: number, height: number) {
+  document.title = `黑洞任务|renderer=${renderer}|frame=ready|energy=${energy}|size=${width}x${height}`;
   if ("__TAURI_INTERNALS__" in window) {
-    void invoke("report_orb_render", { renderer, energy }).catch((error) => {
+    void invoke("report_orb_render", { renderer, energy, width, height }).catch((error) => {
       console.error("无法上报黑洞首帧状态：", error);
     });
   }
@@ -340,8 +342,8 @@ export function startBlackHole(
 
       if (needsResize) {
         const dpr = Math.min(window.devicePixelRatio || 1, profile.pixelRatioCap);
-        const width = Math.max(1, Math.round(canvas.clientWidth * dpr));
-        const height = Math.max(1, Math.round(canvas.clientHeight * dpr));
+        const width = Math.round(Math.max(BLACK_HOLE_STAGE_WIDTH, canvas.clientWidth) * dpr);
+        const height = Math.round(Math.max(BLACK_HOLE_STAGE_HEIGHT, canvas.clientHeight) * dpr);
         if (canvas.width !== width || canvas.height !== height) {
           canvas.width = width;
           canvas.height = height;
@@ -372,7 +374,7 @@ export function startBlackHole(
           if (pixels[index + 3] > 8 && Math.max(pixels[index], pixels[index + 1], pixels[index + 2]) > 48) energy += 1;
         }
         canvas.dataset.energy = String(energy);
-        reportOrbFrame("webgl2", energy);
+        reportOrbFrame("webgl2", energy, canvas.width, canvas.height);
         rendererReady = energy > 100;
       }
 
@@ -455,8 +457,8 @@ function startCanvasFallback(
     }
     lastFrameAt = now;
     const dpr = Math.min(window.devicePixelRatio || 1, profile.pixelRatioCap);
-    const width = Math.max(1, Math.round(canvas.clientWidth * dpr));
-    const height = Math.max(1, Math.round(canvas.clientHeight * dpr));
+    const width = Math.round(Math.max(BLACK_HOLE_STAGE_WIDTH, canvas.clientWidth) * dpr);
+    const height = Math.round(Math.max(BLACK_HOLE_STAGE_HEIGHT, canvas.clientHeight) * dpr);
     if (canvas.width !== width || canvas.height !== height) {
       canvas.width = width;
       canvas.height = height;
@@ -494,7 +496,7 @@ function startCanvasFallback(
     context.restore();
     if (!rendererReady) {
       rendererReady = true;
-      reportOrbFrame("canvas2d", 0);
+      reportOrbFrame("canvas2d", 0, canvas.width, canvas.height);
     }
     schedule();
   };

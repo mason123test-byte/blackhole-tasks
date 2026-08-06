@@ -671,16 +671,24 @@ fn show_orb_menu(_app: tauri::AppHandle) -> AppResult<()> {
 }
 
 #[tauri::command]
-fn report_orb_render(renderer: String, energy: u32, app: tauri::AppHandle) -> AppResult<()> {
+fn report_orb_render(
+    renderer: String,
+    energy: u32,
+    width: u32,
+    height: u32,
+    app: tauri::AppHandle,
+) -> AppResult<()> {
     if renderer != "webgl2" && renderer != "canvas2d" {
         return Err(AppError::Window("未知的黑洞渲染器".into()));
     }
-    let title = format!("黑洞任务|renderer={renderer}|frame=ready|energy={energy}");
+    let title = format!(
+        "黑洞任务|renderer={renderer}|frame=ready|energy={energy}|size={width}x{height}"
+    );
     app.get_webview_window("orb")
         .ok_or_else(|| AppError::Window("黑洞窗口不存在".into()))?
         .set_title(&title)
         .map_err(map_window)?;
-    log::info!("orb frame ready renderer={renderer} energy={energy}");
+    log::info!("orb frame ready renderer={renderer} energy={energy} size={width}x{height}");
     Ok(())
 }
 
