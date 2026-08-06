@@ -742,7 +742,15 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let smoke_diagnostics = std::env::var_os("BLACKHOLE_SMOKE_DIAGNOSTICS_PATH")
+        .map(PathBuf::from)
+        .or_else(diagnostics_path_from_args)
+        .or_else(diagnostics_path_from_marker);
+    if let Some(path) = &smoke_diagnostics {
+        let _ = std::fs::write(path, "build=native-cursor-v5 phase=process-started");
+    }
+    let smoke_mode = smoke_diagnostics.is_some();
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("orb") {
                 let _ = window.show();
@@ -757,42 +765,54 @@ pub fn run() {
         )
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_autostart::Builder::new().build())
-        .plugin(
-            tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, shortcut, event| {
-                    use tauri_plugin_global_shortcut::ShortcutState;
-                    if event.state() != ShortcutState::Pressed {
-                        return;
-                    }
-                    match shortcut.to_string().as_str() {
-                        "Ctrl+Shift+Space" => {
-                            let _ = toggle_workspace(app.clone());
+        .plugin(tauri_plugin_fs::init());
+    let builder = if smoke_mode {
+        builder
+    } else {
+        builder
+            .plugin(tauri_plugin_autostart::Builder::new().build())
+            .plugin(
+                tauri_plugin_global_shortcut::Builder::new()
+                    .with_handler(|app, shortcut, event| {
+                        use tauri_plugin_global_shortcut::ShortcutState;
+                        if event.state() != ShortcutState::Pressed {
+                            return;
                         }
-                        "Ctrl+Shift+N" => {
-                            let _ = open_quick_add(app.clone());
-                        }
-                        "Ctrl+Shift+B" => {
-                            if let Some(db) = app.try_state::<Database>() {
-                                if let Ok(settings) = db.get_settings() {
-                                    let _ = set_click_through(
-                                        !settings.orb_click_through,
-                                        app.clone(),
-                                        db,
-                                    );
+                        match shortcut.to_string().as_str() {
+                            "Ctrl+Shift+Space" => {
+                                let _ = toggle_workspace(app.clone());
+                            }
+                            "Ctrl+Shift+N" => {
+                                let _ = open_quick_add(app.clone());
+                            }
+                            "Ctrl+Shift+B" => {
+                                if let Some(db) = app.try_state::<Database>() {
+                                    if let Ok(settings) = db.get_settings() {
+                                        let _ = set_click_through(
+                                            !settings.orb_click_through,
+                                            app.clone(),
+                                            db,
+                                        );
+                                    }
                                 }
                             }
+                            _ => {}
                         }
-                        _ => {}
-                    }
-                })
-                .build(),
-        )
-        .setup(|app| {
+                    })
+                    .build(),
+            )
+    };
+    builder
+        .setup(move |app| {
+            if let Some(path) = &smoke_diagnostics {
+                let _ = std::fs::write(path, "build=native-cursor-v5 phase=setup-entered");
+            }
             let data_dir = app.path().app_data_dir()?;
             let db = Database::open(&data_dir)
                 .map_err(|e| Box::<dyn std::error::Error>::from(e.to_string()))?;
+            if let Some(path) = &smoke_diagnostics {
+                let _ = std::fs::write(path, "build=native-cursor-v5 phase=database-opened");
+            }
             let settings = db.get_settings().unwrap_or_default();
             app.manage(db);
             app.manage(WindowState {
@@ -836,13 +856,15 @@ pub fn run() {
             if let Some(orb) = app.get_webview_window("orb") {
                 orb.show()?;
             }
-            if let Err(error) = setup_tray(app) {
-                log::error!("system tray initialization failed: {error}");
-            }
-            use tauri_plugin_global_shortcut::GlobalShortcutExt;
-            for shortcut in ["Ctrl+Shift+Space", "Ctrl+Shift+B", "Ctrl+Shift+N"] {
-                if let Err(error) = app.global_shortcut().register(shortcut) {
-                    log::warn!("global shortcut {shortcut} unavailable: {error}");
+            if !smoke_mode {
+                if let Err(error) = setup_tray(app) {
+                    log::error!("system tray initialization failed: {error}");
+                }
+                use tauri_plugin_global_shortcut::GlobalShortcutExt;
+                for shortcut in ["Ctrl+Shift+Space", "Ctrl+Shift+B", "Ctrl+Shift+N"] {
+                    if let Err(error) = app.global_shortcut().register(shortcut) {
+                        log::warn!("global shortcut {shortcut} unavailable: {error}");
+                    }
                 }
             }
             Ok(())
