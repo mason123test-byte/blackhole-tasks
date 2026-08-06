@@ -21,9 +21,7 @@ export function WorkspaceApp() {
 
   useEffect(() => {
     void loadAll();
-    void backend.listTags().then(setTags);
-    void backend.window("set_workspace_hovered", { hovered: true });
-    return () => { void backend.window("set_workspace_hovered", { hovered: false }); };
+    void backend.listTags().then(setTags).catch(() => setTags([]));
   }, [loadAll]);
   const close = useCallback(() => void backend.window("hide_workspace"), []);
   useEffect(() => {

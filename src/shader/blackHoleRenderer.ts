@@ -80,7 +80,7 @@ vec3 stars(vec3 direction) {
   return tint * spark * twinkle * ((seed - 0.955) / 0.045);
 }
 
-void main() {
+void rayTracedReference() {
   float aspect = u_resolution.x / max(u_resolution.y, 1.0);
   vec2 screen = (v_uv - 0.5) * vec2(aspect, 1.0);
 
@@ -189,6 +189,76 @@ void main() {
   float alpha = captured ? 0.997 : clamp(max(lightAlpha, diskOpacity), 0.0, 0.97);
   alpha = max(alpha, max(max(pulseLight.r, pulseLight.g), pulseLight.b));
   outColor = vec4(clamp(color, 0.0, 1.0), alpha);
+}
+
+// The reference shader is designed to lens a full terminal texture. In a
+// transparent 96px desktop window there is no background texture to lens, and
+// tracing dozens of geodesic steps per pixel only produces a clipped bright
+// wedge. This compact composition keeps the same visual vocabulary while
+// remaining legible and inexpensive at icon scale.
+void main() {
+  float aspect = u_resolution.x / max(u_resolution.y, 1.0);
+  vec2 p = (v_uv - 0.5) * 2.0;
+  p.x *= aspect;
+  float energy = 1.0 + 0.035 * sin(u_time * 1.25) + 0.075 * u_hover;
+  p /= energy;
+
+  vec2 diskPoint = rotate2(p, -0.10);
+  float radius = length(p);
+  float ellipse = length(vec2(diskPoint.x, diskPoint.y / 0.235));
+  float angle = atan(diskPoint.y / 0.235, diskPoint.x);
+
+  float inner = smoothstep(0.29, 0.35, ellipse);
+  float outer = 1.0 - smoothstep(0.74, 0.91, ellipse);
+  float disk = inner * outer;
+  float spiral = 0.64
+    + 0.24 * sin(angle * 14.0 - ellipse * 24.0 - u_time * 1.8)
+    + 0.12 * sin(angle * 31.0 + ellipse * 38.0 + u_time * 0.85);
+  spiral = mix(0.82, spiral, u_detail);
+  float hotInner = 1.0 - smoothstep(0.34, 0.72, ellipse);
+  float approaching = smoothstep(-0.78, 0.62, diskPoint.x);
+  vec3 ember = mix(vec3(0.68, 0.075, 0.012), vec3(1.0, 0.31, 0.055), approaching);
+  vec3 hot = mix(vec3(1.0, 0.39, 0.075), vec3(1.0, 0.93, 0.72), hotInner);
+  vec3 diskColor = mix(ember, hot, 0.38 + hotInner * 0.62);
+  float diskLight = disk * max(spiral, 0.12) * mix(0.82, 1.18, approaching);
+
+  // A thin circular photon ring and vertically lensed disk echoes keep the
+  // horizon readable even on a dark desktop.
+  float photon = exp(-pow(abs(radius - 0.235) * 90.0, 1.35));
+  float lensArc = exp(-pow(abs(radius - 0.285) * 42.0, 1.35))
+    * smoothstep(0.02, 0.24, abs(p.y))
+    * (1.0 - smoothstep(0.23, 0.48, abs(p.y)));
+  float halo = exp(-pow(max(radius - 0.22, 0.0) * 7.2, 1.45))
+    * (1.0 - smoothstep(0.26, 0.68, radius));
+
+  vec2 starGrid = floor((p + vec2(u_time * 0.006, 0.0)) * 38.0);
+  float starSeed = hash21(starGrid);
+  float star = step(0.982, starSeed)
+    * (1.0 - smoothstep(0.0, 0.034, length(fract(p * 38.0) - 0.5)))
+    * (1.0 - smoothstep(0.48, 0.82, radius))
+    * 0.52 * u_detail;
+
+  vec3 color = diskColor * diskLight;
+  color += vec3(1.0, 0.79, 0.48) * photon * 0.90;
+  color += vec3(1.0, 0.24, 0.035) * lensArc * 0.44;
+  color += vec3(0.18, 0.36, 0.52) * halo * 0.20;
+  color += mix(vec3(1.0, 0.62, 0.31), vec3(0.58, 0.77, 1.0), starSeed) * star;
+
+  float horizon = 1.0 - smoothstep(0.195, 0.218, radius);
+  color *= 1.0 - horizon;
+
+  float pulseRadius = mix(0.29, 0.73, 1.0 - u_pulse);
+  float pulseRing = exp(-pow(abs(radius - pulseRadius) * 46.0, 1.45)) * u_pulse;
+  color += vec3(1.0, 0.34, 0.07) * pulseRing;
+
+  float alpha = max(diskLight, photon * 0.94);
+  alpha = max(alpha, lensArc * 0.62);
+  alpha = max(alpha, halo * 0.22);
+  alpha = max(alpha, star);
+  alpha = max(alpha, horizon * 0.995);
+  alpha = max(alpha, pulseRing);
+  alpha *= 1.0 - smoothstep(0.82, 0.98, radius);
+  outColor = vec4(clamp(color, 0.0, 1.0), clamp(alpha, 0.0, 1.0));
 }`;
 
 export interface RenderProfile {
