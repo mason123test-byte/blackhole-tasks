@@ -8,11 +8,11 @@ void main() {
   gl_Position = vec4(a_position, 0.0, 1.0);
 }`;
 
-// Standalone approximation inspired by the visual structure of ghostty-blackhole:
-// event horizon, photon ring, inclined accretion disk, lensed upper/lower arcs,
-// Doppler brightness and sparse bent star streaks. It deliberately avoids the
-// reference shader's per-pixel geodesic integration so a 96px always-on-top
-// Windows WebView stays responsive.
+// Adapted for a transparent 96px WebView from s0xDk/ghostty-blackhole's
+// Schwarzschild geodesic tracer (MIT). Unlike the previous painted-ring
+// approximation, the shadow, photon ring and upper/lower disk images all come
+// from integrating the ray path. The Ghostty terminal texture is intentionally
+// omitted because a transparent WebView cannot sample the desktop behind it.
 const fragment = `#version 300 es
 precision highp float;
 in vec2 v_uv;
@@ -25,19 +25,27 @@ uniform float u_pulse;
 uniform float u_detail;
 
 #define PI 3.14159265359
+#define B_CRIT 2.5980762
+#define N_STEPS 48
+
+const float DISK_INNER = 1.8;
+const float DISK_OUTER = 8.0;
+const float DISK_INCL = 1.50;
+const float DISK_ROLL = 0.35;
 
 float hash21(vec2 p) {
-  p = fract(p * vec2(123.34, 456.21));
-  p += dot(p, p + 45.32);
+  p = fract(p * vec2(234.34, 435.345));
+  p += dot(p, p + 34.23);
   return fract(p.x * p.y);
 }
 
-float noise21(vec2 p) {
-  vec2 i = floor(p);
-  vec2 f = fract(p);
+float vnoiseWrapY(vec2 p, float periodY) {
+  vec2 i = floor(p), f = fract(p);
   f = f * f * (3.0 - 2.0 * f);
-  return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x),
-             mix(hash21(i + vec2(0.0, 1.0)), hash21(i + 1.0), f.x), f.y);
+  float y0 = mod(i.y, periodY);
+  float y1 = mod(i.y + 1.0, periodY);
+  return mix(mix(hash21(vec2(i.x, y0)), hash21(vec2(i.x + 1.0, y0)), f.x),
+             mix(hash21(vec2(i.x, y1)), hash21(vec2(i.x + 1.0, y1)), f.x), f.y);
 }
 
 vec2 rotate2(vec2 p, float angle) {
@@ -46,78 +54,141 @@ vec2 rotate2(vec2 p, float angle) {
   return vec2(c * p.x - s * p.y, s * p.x + c * p.y);
 }
 
-float gaussian(float value, float width) {
-  return exp(-value * value * width);
+vec3 blackbody(float temperature) {
+  float t = clamp(temperature, 1500.0, 40000.0) / 100.0;
+  float r = t <= 66.0 ? 1.0 : clamp(1.292936 * pow(t - 60.0, -0.1332047), 0.0, 1.0);
+  float g = t <= 66.0
+    ? clamp(0.3900816 * log(t) - 0.6318414, 0.0, 1.0)
+    : clamp(1.1298909 * pow(t - 60.0, -0.0755148), 0.0, 1.0);
+  float b = t >= 66.0
+    ? 1.0
+    : (t <= 19.0 ? 0.0 : clamp(0.5432068 * log(t - 10.0) - 1.1962540, 0.0, 1.0));
+  return vec3(r, g, b);
+}
+
+vec3 stars(vec3 direction) {
+  vec2 spherical = vec2(atan(direction.x, -direction.z), asin(clamp(direction.y, -1.0, 1.0)));
+  vec2 grid = spherical * 34.0;
+  vec2 cell = floor(grid);
+  float seed = hash21(cell);
+  if (seed < 0.955) return vec3(0.0);
+  vec2 local = fract(grid) - 0.5;
+  vec2 offset = (vec2(hash21(cell + 17.3), hash21(cell + 31.7)) - 0.5) * 0.66;
+  float spark = smoothstep(0.11, 0.0, length(local - offset));
+  float twinkle = 0.78 + 0.22 * sin(u_time * (0.45 + 1.6 * hash21(cell + 5.1)) + 40.0 * seed);
+  vec3 tint = mix(vec3(1.0, 0.78, 0.54), vec3(0.65, 0.78, 1.0), hash21(cell + 2.9));
+  return tint * spark * twinkle * ((seed - 0.955) / 0.045);
 }
 
 void main() {
-  vec2 p = v_uv * 2.0 - 1.0;
-  p.x *= u_resolution.x / max(u_resolution.y, 1.0);
+  float aspect = u_resolution.x / max(u_resolution.y, 1.0);
+  vec2 screen = (v_uv - 0.5) * vec2(aspect, 1.0);
 
-  float time = u_time * mix(0.34, 0.72, u_hover);
-  float breathe = 1.0 + 0.014 * sin(u_time * 1.35) + u_hover * 0.028;
-  p /= breathe;
-  vec2 diskP = rotate2(p, -0.17);
-  float radius = length(p);
-  float horizonRadius = 0.235;
+  // At 96px this gives a ~29px shadow and lets the r=8 disk nearly fill the
+  // window, matching the large Inferno/default reference frame.
+  float breathe = 1.0 + 0.012 * sin(u_time * 1.15) + 0.045 * u_hover;
+  float shadowRadius = 0.150 * breathe;
+  float worldScale = B_CRIT / shadowRadius;
+  vec2 rayPlane = rotate2(vec2(screen.x, -screen.y), DISK_ROLL) * worldScale;
+  float impact = length(rayPlane);
 
-  float horizon = 1.0 - smoothstep(horizonRadius - 0.008, horizonRadius + 0.008, radius);
-  float photonRing = gaussian(radius - horizonRadius * 1.075, 1250.0);
-  float innerHalo = gaussian(radius - horizonRadius * 1.20, 150.0);
-  float outerHalo = gaussian(radius - 0.49, 22.0);
+  // Pixels beyond the physical disk stay transparent. A tiny procedural sky
+  // remains inside the traced region so gravitational bending is still visible
+  // without pretending that we can sample the Windows desktop.
+  if (impact > DISK_OUTER + 2.0) {
+    outColor = vec4(0.0);
+    return;
+  }
 
-  float diskRadius = length(vec2(diskP.x, diskP.y * 4.2));
-  float diskBounds = smoothstep(0.28, 0.36, diskRadius) * (1.0 - smoothstep(0.83, 0.98, diskRadius));
-  float sheetWidth = 0.030 + 0.095 * smoothstep(0.12, 0.82, abs(diskP.x));
-  float sheet = gaussian(diskP.y + 0.018 * sin(diskP.x * 12.0 - time * 2.0), 1.0 / max(sheetWidth * sheetWidth, 0.0004));
-  float frontDisk = diskBounds * sheet;
+  float cameraZ = 14.0;
+  vec3 position = vec3(rayPlane, cameraZ);
+  vec3 velocity = vec3(0.0, 0.0, -1.0);
+  float angularMomentum2 = dot(rayPlane, rayPlane);
 
-  // The far side of the disk is lensed over and under the shadow. This pair
-  // of arcs is the feature that makes the object read as a black hole rather
-  // than a glowing planet or a flat ring.
-  float archHeight = 0.075 + 0.245 * exp(-diskP.x * diskP.x * 8.0);
-  float archDistance = abs(abs(diskP.y) - archHeight);
-  float archMask = (1.0 - smoothstep(0.58, 0.92, abs(diskP.x)))
-                 * smoothstep(horizonRadius * 0.94, horizonRadius * 1.18, radius);
-  float lensedArcs = gaussian(archDistance, 820.0) * archMask;
+  float ci = cos(DISK_INCL), si = sin(DISK_INCL);
+  vec3 diskNormal = vec3(0.0, si, ci);
+  vec3 diskAxis = vec3(0.0, ci, -si);
+  vec3 emission = vec3(0.0);
+  float transmittance = 1.0;
+  bool captured = false;
+  float previousSide = dot(position, diskNormal);
+  vec3 previousPosition = position;
+  int maxSteps = int(mix(24.0, 48.0, u_detail));
+  float patternTime = u_time * mix(0.48, 0.82, u_hover);
 
-  float angle = atan(diskP.y * 4.2, diskP.x);
-  float radialGrain = noise21(vec2(diskRadius * 18.0 - time * 0.7, angle * 8.0 + time * 1.6));
-  float filaments = 0.44 + 0.56 * pow(radialGrain, 2.0);
-  filaments *= 0.78 + 0.22 * sin(angle * 23.0 - diskRadius * 31.0 + time * 3.0);
-  filaments = mix(0.78, filaments, u_detail);
+  for (int i = 0; i < N_STEPS; i++) {
+    if (i >= maxSteps) break;
+    float radius2 = dot(position, position);
+    if (radius2 < 1.0) {
+      captured = true;
+      break;
+    }
+    if (position.z < -cameraZ && velocity.z < 0.0) break;
+    if (radius2 > 4.0 * cameraZ * cameraZ) break;
 
-  float doppler = mix(0.55, 1.48, smoothstep(-0.70, 0.70, -diskP.x));
-  float diskLight = (frontDisk * 1.05 + lensedArcs * 1.20) * filaments * doppler * (1.0 - horizon);
-  vec3 hot = mix(vec3(1.0, 0.31, 0.055), vec3(1.0, 0.91, 0.69), smoothstep(0.2, 1.35, doppler));
-  vec3 diskColor = hot * diskLight * mix(1.25, 1.72, u_hover);
+    float radius = sqrt(radius2);
+    float dt = clamp(0.16 * radius, 0.03, 1.5);
+    vec3 acceleration = -1.5 * angularMomentum2 * position / (radius2 * radius2 * radius);
+    velocity += acceleration * (0.5 * dt);
+    position += velocity * dt;
+    radius2 = max(dot(position, position), 0.0001);
+    radius = sqrt(radius2);
+    acceleration = -1.5 * angularMomentum2 * position / (radius2 * radius2 * radius);
+    velocity += acceleration * (0.5 * dt);
 
-  float coolRim = photonRing * smoothstep(-0.2, 0.8, diskP.x);
-  vec3 ringColor = vec3(1.0, 0.72, 0.34) * photonRing * 1.35
-                 + vec3(0.32, 0.62, 0.92) * coolRim * 0.30;
+    float side = dot(position, diskNormal);
+    if (side * previousSide < 0.0 && transmittance > 0.02) {
+      float crossing = previousSide / (previousSide - side);
+      vec3 diskPoint = mix(previousPosition, position, crossing);
+      float diskRadius = length(diskPoint);
+      if (diskRadius > DISK_INNER && diskRadius < DISK_OUTER) {
+        float band = smoothstep(DISK_INNER, DISK_INNER * 1.25, diskRadius)
+          * (1.0 - smoothstep(DISK_OUTER * 0.70, DISK_OUTER, diskRadius));
+        float phi = atan(dot(diskPoint, diskAxis), diskPoint.x);
+        float turns = phi / (2.0 * PI);
+        float kepler = pow(DISK_INNER / diskRadius, 1.5);
+        float localTime = sqrt(max(1.0 - 1.5 / diskRadius, 0.02));
+        float swirl = diskRadius * 7.0 * 0.12 - patternTime * kepler * 5.0 * localTime;
+        float streaks = vnoiseWrapY(vec2(diskRadius * 2.8, turns * 19.0 + swirl * 3.0), 19.0) * 0.65
+          + vnoiseWrapY(vec2(diskRadius, turns * 9.0 + swirl * 1.5 + 7.0), 9.0) * 0.35;
+        streaks = mix(0.72, 0.35 + 1.6 * streaks * streaks, u_detail);
 
-  vec2 polarGrid = vec2(atan(p.y, p.x) / (2.0 * PI) * 42.0, radius * 62.0 - time * 0.28);
-  float starCell = hash21(floor(polarGrid));
-  float stars = smoothstep(0.965, 0.997, starCell)
-              * gaussian(fract(polarGrid.y) - 0.5, 70.0)
-              * smoothstep(0.30, 0.42, radius)
-              * (1.0 - smoothstep(0.72, 0.98, radius))
-              * u_detail;
-  vec3 starColor = mix(vec3(1.0, 0.56, 0.22), vec3(0.38, 0.66, 1.0), hash21(floor(polarGrid) + 3.7));
+        vec3 gasDirection = normalize(cross(diskNormal, diskPoint));
+        float beta = clamp(inversesqrt(max(2.0 * (diskRadius - 1.0), 0.2)), 0.0, 0.99);
+        float shift = localTime / max(1.0 + beta * dot(gasDirection, normalize(velocity)), 0.05);
+        shift = mix(1.0, shift, 0.60);
+        float profileBase = max(1.0 - sqrt(DISK_INNER / diskRadius), 0.0);
+        float temperatureProfile = pow(DISK_INNER / diskRadius, 0.75) * pow(profileBase, 0.25) / 0.488;
+        vec3 diskColor = blackbody(5500.0 * temperatureProfile * shift);
+        float boost = pow(shift, 2.5);
+        float density = band * streaks;
+        emission += transmittance * diskColor
+          * (4.84 * density * temperatureProfile * temperatureProfile * boost);
+        transmittance *= 1.0 - clamp(0.90 * density, 0.0, 1.0);
+      }
+    }
+    previousSide = side;
+    previousPosition = position;
+  }
 
-  float pulseRing = gaussian(radius - mix(0.30, 0.73, 1.0 - u_pulse), 260.0) * u_pulse;
-  vec3 emission = diskColor + ringColor
-                + vec3(0.93, 0.46, 0.14) * innerHalo * 0.16
-                + vec3(0.18, 0.43, 0.73) * outerHalo * 0.10
-                + starColor * stars * 0.72
-                + vec3(1.0, 0.55, 0.18) * pulseRing * 1.3;
-  emission = vec3(1.0) - exp(-emission * 1.18);
+  if (!captured && dot(position, position) < 4.0) captured = true;
 
-  float lightAlpha = max(max(emission.r, emission.g), emission.b);
-  float alpha = max(horizon * 0.995, clamp(lightAlpha * 1.12, 0.0, 0.94));
-  alpha *= 1.0 - smoothstep(0.82, 1.02, radius);
-  vec3 color = emission * (1.0 - horizon);
-  outColor = vec4(color, alpha);
+  vec3 sky = vec3(0.0);
+  if (!captured) sky = stars(normalize(velocity)) * 0.16 * u_detail;
+  vec3 diskLight = vec3(1.0) - exp(-emission * mix(1.35, 1.60, u_hover));
+
+  float pulseRadius = mix(shadowRadius * 1.18, shadowRadius * 3.0, 1.0 - u_pulse);
+  float pulseDistance = abs(length(screen) - pulseRadius);
+  vec3 pulseLight = vec3(1.0, 0.45, 0.12)
+    * exp(-pulseDistance * pulseDistance * 1800.0) * u_pulse;
+  vec3 color = captured ? vec3(0.0) : diskLight + sky;
+  color += pulseLight;
+
+  float lightAlpha = max(max(color.r, color.g), color.b);
+  float diskOpacity = 1.0 - transmittance;
+  float alpha = captured ? 0.997 : clamp(max(lightAlpha, diskOpacity), 0.0, 0.97);
+  alpha = max(alpha, max(max(pulseLight.r, pulseLight.g), pulseLight.b));
+  outColor = vec4(clamp(color, 0.0, 1.0), alpha);
 }`;
 
 export interface RenderProfile {
