@@ -409,6 +409,33 @@ fn cursor_inside_window(
         && cursor.y < (position.y + size.height as i32) as f64
 }
 
+#[cfg(target_os = "windows")]
+#[repr(C)]
+struct NativePoint {
+    x: i32,
+    y: i32,
+}
+
+#[cfg(target_os = "windows")]
+#[link(name = "user32")]
+extern "system" {
+    #[link_name = "GetCursorPos"]
+    fn get_cursor_position(point: *mut NativePoint) -> i32;
+}
+
+#[cfg(target_os = "windows")]
+fn global_cursor_position(_window: &tauri::WebviewWindow) -> Option<PhysicalPosition<f64>> {
+    let mut point = NativePoint { x: 0, y: 0 };
+    // SAFETY: GetCursorPos only writes to the valid POINT pointer supplied here.
+    let succeeded = unsafe { get_cursor_position(&mut point) };
+    (succeeded != 0).then_some(PhysicalPosition::new(point.x as f64, point.y as f64))
+}
+
+#[cfg(not(target_os = "windows"))]
+fn global_cursor_position(window: &tauri::WebviewWindow) -> Option<PhysicalPosition<f64>> {
+    window.cursor_position().ok()
+}
+
 fn start_cursor_monitor(app: tauri::AppHandle, hover_delay_ms: u64) {
     let diagnostics_enabled = std::env::var_os("BLACKHOLE_SMOKE_DIAGNOSTICS").is_some();
     let diagnostics_path = std::env::var_os("BLACKHOLE_SMOKE_DIAGNOSTICS_PATH").map(PathBuf::from);
@@ -419,7 +446,10 @@ fn start_cursor_monitor(app: tauri::AppHandle, hover_delay_ms: u64) {
         let Some(workspace) = app.get_webview_window("workspace") else {
             return;
         };
-        let Ok(cursor) = orb.cursor_position() else {
+        let Some(cursor) = global_cursor_position(&orb) else {
+            if let Some(path) = &diagnostics_path {
+                let _ = std::fs::write(path, "build=native-cursor-v3 cursor=unavailable");
+            }
             std::thread::sleep(Duration::from_millis(50));
             continue;
         };
@@ -479,7 +509,7 @@ fn start_cursor_monitor(app: tauri::AppHandle, hover_delay_ms: u64) {
             let _ = std::fs::write(
                 path,
                 format!(
-                    "build=native-cursor-v2 exe={executable:?} cursor={cursor:?} inner={position:?},{size:?} inside={orb_inside} workspace_inside={workspace_inside} workspace_visible={workspace_visible} should_show={should_show} should_schedule_close={should_schedule_close}"
+                    "build=native-cursor-v3 exe={executable:?} cursor={cursor:?} inner={position:?},{size:?} inside={orb_inside} workspace_inside={workspace_inside} workspace_visible={workspace_visible} should_show={should_show} should_schedule_close={should_schedule_close}"
                 ),
             );
         }
