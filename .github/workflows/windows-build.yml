@@ -73,6 +73,7 @@ jobs:
             -OutputDirectory "output/windows-smoke"
 
       - name: Upload Windows installers
+        if: always()
         uses: actions/upload-artifact@v5
         with:
           name: blackhole-tasks-windows-${{ github.run_number }}

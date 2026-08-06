@@ -112,7 +112,12 @@ function Get-ColorDistance([System.Drawing.Color]$First, [System.Drawing.Color]$
 $process = Start-Process -FilePath (Resolve-Path $ExePath) -PassThru
 try {
   $orb = Wait-AppWindow $process.Id "黑洞任务" $true
-  $initialWindows = @(Get-AppWindows $process.Id)
+  Start-Sleep -Milliseconds 800
+  $knownTitles = @("黑洞任务", "黑洞任务工作区", "快速新增任务")
+  $initialWindows = @(Get-AppWindows $process.Id | Where-Object { $_.Title -in $knownTitles })
+  $initialWindows | ForEach-Object {
+    "STARTUP_WINDOW title=$($_.Title) rect=$($_.Bounds.Left),$($_.Bounds.Top),$($_.Bounds.Right),$($_.Bounds.Bottom)"
+  }
   if ($initialWindows.Count -ne 1) {
     throw "Expected only the orb at startup, found $($initialWindows.Count) visible app windows."
   }

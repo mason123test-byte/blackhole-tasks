@@ -658,6 +658,7 @@ pub fn run() {
                 }
             }
             if let Some(workspace) = app.get_webview_window("workspace") {
+                let _ = workspace.hide();
                 let app_handle = app.handle().clone();
                 workspace.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -666,6 +667,9 @@ pub fn run() {
                         let _ = hide_workspace_inner(&app_handle);
                     }
                 });
+            }
+            if let Some(quick_add) = app.get_webview_window("quick-add") {
+                let _ = quick_add.hide();
             }
             Ok(())
         })
