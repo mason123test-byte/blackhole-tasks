@@ -437,13 +437,12 @@ fn global_cursor_position(window: &tauri::WebviewWindow) -> Option<PhysicalPosit
 }
 
 fn diagnostics_path_from_args() -> Option<PathBuf> {
-    let mut args = std::env::args_os();
-    while let Some(argument) = args.next() {
-        if argument == "--smoke-diagnostics" {
-            return args.next().map(PathBuf::from);
-        }
-    }
-    None
+    std::env::args_os().find_map(|argument| {
+        argument
+            .to_string_lossy()
+            .strip_prefix("--smoke-diagnostics=")
+            .map(PathBuf::from)
+    })
 }
 
 fn start_cursor_monitor(app: tauri::AppHandle, hover_delay_ms: u64) {
