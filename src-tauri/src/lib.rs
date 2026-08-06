@@ -24,6 +24,7 @@ struct WindowInteraction {
     orb_hovered: bool,
     workspace_hovered: bool,
     pinned: bool,
+    orb_entered_at: Option<Instant>,
     close_deadline: Option<Instant>,
     close_worker_running: bool,
 }
@@ -281,7 +282,10 @@ fn set_orb_hovered(
             .map_err(|_| AppError::Window("窗口状态锁已损坏".into()))?;
         interaction.orb_hovered = hovered;
         if hovered {
+            interaction.orb_entered_at.get_or_insert_with(Instant::now);
             interaction.close_deadline = None;
+        } else {
+            interaction.orb_entered_at = None;
         }
     }
     let _ = app.emit("orb:hover-changed", hovered);
@@ -386,6 +390,78 @@ fn schedule_close(app: tauri::AppHandle) {
             let _ = hide_workspace_inner(&app);
             return;
         }
+    });
+}
+
+fn cursor_inside_window(
+    window: &tauri::WebviewWindow,
+    cursor: tauri::PhysicalPosition<f64>,
+) -> bool {
+    let Ok(position) = window.inner_position() else {
+        return false;
+    };
+    let Ok(size) = window.inner_size() else {
+        return false;
+    };
+    cursor.x >= position.x as f64
+        && cursor.y >= position.y as f64
+        && cursor.x < (position.x + size.width as i32) as f64
+        && cursor.y < (position.y + size.height as i32) as f64
+}
+
+fn start_cursor_monitor(app: tauri::AppHandle, hover_delay_ms: u64) {
+    std::thread::spawn(move || loop {
+        let Some(orb) = app.get_webview_window("orb") else {
+            return;
+        };
+        let Some(workspace) = app.get_webview_window("workspace") else {
+            return;
+        };
+        let Ok(cursor) = orb.cursor_position() else {
+            std::thread::sleep(Duration::from_millis(50));
+            continue;
+        };
+        let workspace_visible = workspace.is_visible().unwrap_or(false);
+        let orb_inside = cursor_inside_window(&orb, cursor);
+        let workspace_inside = workspace_visible && cursor_inside_window(&workspace, cursor);
+        let now = Instant::now();
+        let (should_show, should_schedule_close) = {
+            let Some(state) = app.try_state::<WindowState>() else {
+                return;
+            };
+            let Ok(mut interaction) = state.inner.lock() else {
+                return;
+            };
+            let was_inside = interaction.orb_hovered || interaction.workspace_hovered;
+            interaction.orb_hovered = orb_inside;
+            interaction.workspace_hovered = workspace_inside;
+            if orb_inside {
+                interaction.orb_entered_at.get_or_insert(now);
+            } else {
+                interaction.orb_entered_at = None;
+            }
+            if orb_inside || workspace_inside {
+                interaction.close_deadline = None;
+            }
+            let hover_elapsed = interaction.orb_entered_at.is_some_and(|entered| {
+                now.duration_since(entered) >= Duration::from_millis(hover_delay_ms)
+            });
+            (
+                orb_inside && hover_elapsed && !workspace_visible,
+                was_inside
+                    && !orb_inside
+                    && !workspace_inside
+                    && workspace_visible
+                    && !interaction.pinned,
+            )
+        };
+        if should_show {
+            log::info!("workspace opened by native cursor monitor");
+            let _ = show_workspace_inner(&app, false);
+        } else if should_schedule_close {
+            schedule_close(app.clone());
+        }
+        std::thread::sleep(Duration::from_millis(50));
     });
 }
 
@@ -671,6 +747,7 @@ pub fn run() {
             if let Some(quick_add) = app.get_webview_window("quick-add") {
                 let _ = quick_add.hide();
             }
+            start_cursor_monitor(app.handle().clone(), settings.hover_open_delay_ms);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

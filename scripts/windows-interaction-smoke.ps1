@@ -143,7 +143,12 @@ try {
   $orbCenterX = [int](($orb.Bounds.Left + $orb.Bounds.Right) / 2)
   $orbCenterY = [int](($orb.Bounds.Top + $orb.Bounds.Bottom) / 2)
   [BlackHoleWindowProbe]::SetCursorPos($orbCenterX, $orbCenterY) | Out-Null
-  $workspace = Wait-AppWindow $process.Id "黑洞任务工作区" $true
+  try {
+    $workspace = Wait-AppWindow $process.Id "黑洞任务工作区" $true
+  } catch {
+    Save-DesktopScreenshot (Join-Path $OutputDirectory "02-hover-timeout.png")
+    throw
+  }
 
   $separated = $workspace.Bounds.Right -le $orb.Bounds.Left -or
     $workspace.Bounds.Left -ge $orb.Bounds.Right -or
@@ -188,6 +193,10 @@ try {
 
   "WINDOWS_INTERACTION_SMOKE_OK pid=$($process.Id) threadsDelta=$threadGrowth handlesDelta=$handleGrowth"
 } finally {
+  $diagnosticLog = Join-Path $env:LOCALAPPDATA "com.blackhole.tasks\logs\BlackHole Tasks.log"
+  if (Test-Path $diagnosticLog) {
+    Copy-Item -LiteralPath $diagnosticLog -Destination (Join-Path $OutputDirectory "BlackHole-Tasks.log") -Force
+  }
   if (-not $process.HasExited) {
     Stop-Process -Id $process.Id -Force
     $process.WaitForExit(5000) | Out-Null

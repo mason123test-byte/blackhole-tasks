@@ -88,6 +88,6 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: blackhole-tasks-windows-smoke-${{ github.run_number }}
-          path: output/windows-smoke/*.png
+          path: output/windows-smoke/*
           if-no-files-found: warn
           retention-days: 14
