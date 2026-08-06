@@ -9,7 +9,11 @@ use crate::{
     models::*,
 };
 use serde_json::Value;
-use std::{path::PathBuf, sync::Mutex, time::Duration};
+use std::{
+    path::PathBuf,
+    sync::Mutex,
+    time::{Duration, Instant},
+};
 use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, State};
 
 struct WindowState {
@@ -20,7 +24,8 @@ struct WindowInteraction {
     orb_hovered: bool,
     workspace_hovered: bool,
     pinned: bool,
-    close_generation: u64,
+    close_deadline: Option<Instant>,
+    close_worker_running: bool,
 }
 
 #[tauri::command]
@@ -173,46 +178,78 @@ fn workspace(app: &tauri::AppHandle) -> AppResult<tauri::WebviewWindow> {
     app.get_webview_window("workspace")
         .ok_or_else(|| AppError::Window("工作区窗口不存在".into()))
 }
-fn show_workspace_inner(app: &tauri::AppHandle) -> AppResult<()> {
-    reposition_workspace_inner(app)?;
+fn show_workspace_inner(app: &tauri::AppHandle, focus: bool) -> AppResult<()> {
     let window = workspace(app)?;
-    window.show().map_err(map_window)?;
-    let _ = window.set_focus();
-    let _ = app.emit("workspace:visibility-changed", true);
+    let was_visible = window.is_visible().map_err(map_window)?;
+    if !was_visible {
+        reposition_workspace_inner(app)?;
+        window.show().map_err(map_window)?;
+        let _ = app.emit("workspace:visibility-changed", true);
+    }
+    if focus {
+        window.set_focus().map_err(map_window)?;
+    }
+    if let Some(state) = app.try_state::<WindowState>() {
+        if let Ok(mut interaction) = state.inner.lock() {
+            interaction.close_deadline = None;
+        }
+    }
     Ok(())
 }
 fn hide_workspace_inner(app: &tauri::AppHandle) -> AppResult<()> {
-    workspace(app)?.hide().map_err(map_window)?;
-    let _ = app.emit("workspace:visibility-changed", false);
+    let window = workspace(app)?;
+    if window.is_visible().map_err(map_window)? {
+        window.hide().map_err(map_window)?;
+        let _ = app.emit("workspace:visibility-changed", false);
+    }
+    if let Some(state) = app.try_state::<WindowState>() {
+        if let Ok(mut interaction) = state.inner.lock() {
+            interaction.workspace_hovered = false;
+            interaction.close_deadline = None;
+        }
+    }
     Ok(())
 }
-
-#[tauri::command]
-fn show_workspace(app: tauri::AppHandle) -> AppResult<()> {
-    show_workspace_inner(&app)
-}
-#[tauri::command]
-fn hide_workspace(app: tauri::AppHandle) -> AppResult<()> {
-    hide_workspace_inner(&app)
-}
-#[tauri::command]
-fn toggle_workspace(app: tauri::AppHandle) -> AppResult<()> {
-    if workspace(&app)?.is_visible().map_err(map_window)? {
-        hide_workspace_inner(&app)
-    } else {
-        show_workspace_inner(&app)
-    }
-}
-#[tauri::command]
-fn pin_workspace(pinned: bool, state: State<WindowState>, app: tauri::AppHandle) -> AppResult<()> {
+fn set_workspace_pinned_inner(app: &tauri::AppHandle, pinned: bool) -> AppResult<()> {
+    let state = app
+        .try_state::<WindowState>()
+        .ok_or_else(|| AppError::Window("窗口状态尚未初始化".into()))?;
     state
         .inner
         .lock()
         .map_err(|_| AppError::Window("窗口状态锁已损坏".into()))?
         .pinned = pinned;
     let _ = app.emit("workspace:pin-changed", pinned);
+    Ok(())
+}
+
+#[tauri::command]
+fn show_workspace(app: tauri::AppHandle) -> AppResult<()> {
+    set_workspace_pinned_inner(&app, true)?;
+    show_workspace_inner(&app, true)
+}
+#[tauri::command]
+fn hide_workspace(app: tauri::AppHandle) -> AppResult<()> {
+    set_workspace_pinned_inner(&app, false)?;
+    hide_workspace_inner(&app)
+}
+#[tauri::command]
+fn toggle_workspace(app: tauri::AppHandle) -> AppResult<()> {
+    if workspace(&app)?.is_visible().map_err(map_window)? {
+        set_workspace_pinned_inner(&app, false)?;
+        hide_workspace_inner(&app)
+    } else {
+        set_workspace_pinned_inner(&app, true)?;
+        show_workspace_inner(&app, true)
+    }
+}
+#[tauri::command]
+fn pin_workspace(pinned: bool, _state: State<WindowState>, app: tauri::AppHandle) -> AppResult<()> {
+    set_workspace_pinned_inner(&app, pinned)?;
     if pinned {
-        show_workspace_inner(&app)?
+        show_workspace_inner(&app, true)?
+    } else {
+        schedule_close(app.clone());
     }
     Ok(())
 }
@@ -221,29 +258,37 @@ fn unpin_workspace(state: State<WindowState>, app: tauri::AppHandle) -> AppResul
     pin_workspace(false, state, app)
 }
 #[tauri::command]
+fn toggle_workspace_pin(state: State<WindowState>, app: tauri::AppHandle) -> AppResult<()> {
+    let pinned = {
+        let interaction = state
+            .inner
+            .lock()
+            .map_err(|_| AppError::Window("窗口状态锁已损坏".into()))?;
+        !interaction.pinned
+    };
+    pin_workspace(pinned, state, app)
+}
+#[tauri::command]
 fn set_orb_hovered(
     hovered: bool,
     state: State<WindowState>,
     app: tauri::AppHandle,
 ) -> AppResult<()> {
-    state
-        .inner
-        .lock()
-        .map_err(|_| AppError::Window("窗口状态锁已损坏".into()))?
-        .orb_hovered = hovered;
+    {
+        let mut interaction = state
+            .inner
+            .lock()
+            .map_err(|_| AppError::Window("窗口状态锁已损坏".into()))?;
+        interaction.orb_hovered = hovered;
+        if hovered {
+            interaction.close_deadline = None;
+        }
+    }
     let _ = app.emit("orb:hover-changed", hovered);
     if hovered {
-        show_workspace_inner(&app)
+        show_workspace_inner(&app, false)
     } else {
-        schedule_close(
-            app,
-            state
-                .inner
-                .lock()
-                .map_err(|_| AppError::Window("窗口状态锁已损坏".into()))?
-                .close_generation
-                + 1,
-        );
+        schedule_close(app);
         Ok(())
     }
 }
@@ -253,44 +298,97 @@ fn set_workspace_hovered(
     state: State<WindowState>,
     app: tauri::AppHandle,
 ) -> AppResult<()> {
-    let generation = {
+    {
         let mut s = state
             .inner
             .lock()
             .map_err(|_| AppError::Window("窗口状态锁已损坏".into()))?;
         s.workspace_hovered = hovered;
-        s.close_generation += 1;
-        s.close_generation
-    };
+        if hovered {
+            s.close_deadline = None;
+        }
+    }
     let _ = app.emit("workspace:hover-changed", hovered);
     if !hovered {
-        schedule_close(app, generation)
+        schedule_close(app)
     }
     Ok(())
 }
-fn schedule_close(app: tauri::AppHandle, generation: u64) {
-    if let Some(state) = app.try_state::<WindowState>() {
-        if let Ok(mut s) = state.inner.lock() {
-            s.close_generation = generation;
-        }
+fn schedule_close(app: tauri::AppHandle) {
+    let delay = app
+        .try_state::<Database>()
+        .and_then(|db| db.get_settings().ok())
+        .map(|settings| settings.close_delay_ms)
+        .unwrap_or(350);
+    let Some(state) = app.try_state::<WindowState>() else {
+        return;
+    };
+    let should_start = state
+        .inner
+        .lock()
+        .map(|mut interaction| {
+            interaction.close_deadline = Some(Instant::now() + Duration::from_millis(delay));
+            if interaction.close_worker_running {
+                false
+            } else {
+                interaction.close_worker_running = true;
+                true
+            }
+        })
+        .unwrap_or(false);
+    if !should_start {
+        return;
     }
     std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(350));
-        let Some(state) = app.try_state::<WindowState>() else {
-            return;
-        };
-        let should_close = state
-            .inner
-            .lock()
-            .map(|s| {
-                s.close_generation == generation
-                    && !s.orb_hovered
-                    && !s.workspace_hovered
-                    && !s.pinned
-            })
-            .unwrap_or(false);
-        if should_close {
-            let _ = hide_workspace_inner(&app);
+        loop {
+            let wait_for = {
+                let Some(state) = app.try_state::<WindowState>() else {
+                    return;
+                };
+                let Ok(mut interaction) = state.inner.lock() else {
+                    return;
+                };
+                match interaction.close_deadline {
+                    Some(deadline) => deadline.saturating_duration_since(Instant::now()),
+                    None => {
+                        interaction.close_worker_running = false;
+                        return;
+                    }
+                }
+            };
+            if !wait_for.is_zero() {
+                std::thread::sleep(wait_for);
+            }
+            let should_close = {
+                let Some(state) = app.try_state::<WindowState>() else {
+                    return;
+                };
+                let Ok(mut interaction) = state.inner.lock() else {
+                    return;
+                };
+                let deadline_reached = interaction
+                    .close_deadline
+                    .is_some_and(|deadline| deadline <= Instant::now());
+                if !deadline_reached {
+                    false
+                } else if interaction.orb_hovered
+                    || interaction.workspace_hovered
+                    || interaction.pinned
+                {
+                    interaction.close_deadline = None;
+                    interaction.close_worker_running = false;
+                    return;
+                } else {
+                    interaction.close_deadline = None;
+                    interaction.close_worker_running = false;
+                    true
+                }
+            };
+            if should_close {
+                log::info!("workspace auto-hidden after hover timeout");
+                let _ = hide_workspace_inner(&app);
+                return;
+            }
         }
     });
 }
@@ -313,6 +411,7 @@ fn reposition_workspace_inner(app: &tauri::AppHandle) -> AppResult<()> {
         .ok_or_else(|| AppError::Window("未找到显示器".into()))?;
     let area = monitor.work_area();
     let settings = app.state::<Database>().get_settings()?;
+    let scale = monitor.scale_factor();
     let result = placement::calculate(placement::PlacementInput {
         orb_rect: placement::Rect {
             x: position.x,
@@ -326,9 +425,9 @@ fn reposition_workspace_inner(app: &tauri::AppHandle) -> AppResult<()> {
             width: area.size.width,
             height: area.size.height,
         },
-        preferred_workspace_width: settings.workspace_width,
-        preferred_workspace_height: settings.workspace_height,
-        gap: 8,
+        preferred_workspace_width: (settings.workspace_width as f64 * scale).round() as u32,
+        preferred_workspace_height: (settings.workspace_height as f64 * scale).round() as u32,
+        gap: (8.0 * scale).round() as u32,
     });
     work.set_size(PhysicalSize::new(result.width, result.height))
         .map_err(map_window)?;
@@ -459,7 +558,8 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
         .menu(&menu)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "open" => {
-                let _ = show_workspace_inner(app);
+                let _ = set_workspace_pinned_inner(app, true);
+                let _ = show_workspace_inner(app, true);
             }
             "quick" => {
                 let _ = open_quick_add(app.clone());
@@ -485,7 +585,8 @@ pub fn run() {
             if let Some(window) = app.get_webview_window("orb") {
                 let _ = window.show();
             }
-            let _ = show_workspace_inner(app);
+            let _ = set_workspace_pinned_inner(app, true);
+            let _ = show_workspace_inner(app, true);
         }))
         .plugin(
             tauri_plugin_log::Builder::new()
@@ -535,6 +636,7 @@ pub fn run() {
             app.manage(WindowState {
                 inner: Mutex::new(WindowInteraction::default()),
             });
+            log::info!("application state initialized at {}", data_dir.display());
             setup_tray(app)?;
             use tauri_plugin_global_shortcut::GlobalShortcutExt;
             app.global_shortcut().register("Ctrl+Shift+Space")?;
@@ -547,6 +649,14 @@ pub fn run() {
                         settings.orb_position_x,
                         settings.orb_position_y,
                     ));
+                } else if let Ok(Some(monitor)) = orb.primary_monitor() {
+                    let area = monitor.work_area();
+                    if let Ok(size) = orb.outer_size() {
+                        let margin = (16.0 * monitor.scale_factor()).round() as i32;
+                        let x = area.position.x + area.size.width as i32 - size.width as i32 - margin;
+                        let y = area.position.y + (area.size.height as i32 - size.height as i32) / 2;
+                        let _ = orb.set_position(PhysicalPosition::new(x, y));
+                    }
                 }
             }
             if let Some(workspace) = app.get_webview_window("workspace") {
@@ -554,6 +664,7 @@ pub fn run() {
                 workspace.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                         api.prevent_close();
+                        let _ = set_workspace_pinned_inner(&app_handle, false);
                         let _ = hide_workspace_inner(&app_handle);
                     }
                 });
@@ -591,6 +702,7 @@ pub fn run() {
             toggle_workspace,
             pin_workspace,
             unpin_workspace,
+            toggle_workspace_pin,
             set_orb_hovered,
             set_workspace_hovered,
             save_orb_position,

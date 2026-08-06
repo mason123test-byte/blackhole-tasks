@@ -1,7 +1,7 @@
 :root {
   font-family: "Segoe UI Variable", "Microsoft YaHei", system-ui, sans-serif;
   color: #e8eef5;
-  background: #070a10;
+  background: transparent;
   font-synthesis: none;
   --panel: #101722;
   --line: #27384b;
@@ -18,6 +18,7 @@ body,
   width: 100%;
   height: 100%;
   overflow: hidden;
+  background: transparent;
 }
 button,
 input,
@@ -475,7 +476,7 @@ button.primary {
 .canvas-empty p { margin: 0; color: #afbdcc; font-size: 13px; }
 .empty-orbit { width: 45px; height: 45px; border-radius: 50%; background: radial-gradient(circle, #000 0 31%, #ffe0a7 34% 38%, #d87534 44%, rgba(65, 104, 132, 0.45) 55%, transparent 66%); filter: drop-shadow(0 0 11px rgba(216, 112, 51, 0.27)); }
 .performance-badge { position: absolute; z-index: 5; left: 50%; bottom: 16px; transform: translateX(-50%); padding: 5px 9px; border: 1px solid #34495e; border-radius: 20px; background: rgba(9, 15, 24, 0.88); color: #8194a8; font-size: 10px; pointer-events: none; }
-.task-card { min-height: 112px; padding: 11px 12px; background: linear-gradient(145deg, rgba(25, 38, 54, 0.97), rgba(13, 21, 31, 0.98)); border-color: #334a61; border-left-width: 3px; border-radius: 11px; box-shadow: 0 9px 26px rgba(0, 0, 0, 0.4); transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease; }
+.task-card { min-height: 96px; padding: 11px 12px; background: linear-gradient(145deg, rgba(25, 38, 54, 0.97), rgba(13, 21, 31, 0.98)); border-color: #334a61; border-left-width: 3px; border-radius: 11px; box-shadow: 0 9px 26px rgba(0, 0, 0, 0.4); transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease; }
 .task-card:focus-visible { outline: 2px solid #f2a55f; outline-offset: 3px; }
 .task-card.selected { transform: translateY(-1px); border-color: #e9a160; box-shadow: 0 0 0 2px rgba(231, 154, 85, 0.2), 0 13px 32px rgba(0, 0, 0, 0.5); }
 .task-card.status-done { opacity: 0.74; }

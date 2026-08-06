@@ -65,27 +65,12 @@ jobs:
       - name: Build Tauri installers
         run: npm run tauri build
 
-      - name: Smoke-test native Windows app
+      - name: Interaction-test native Windows app
         shell: pwsh
         run: |
-          $exe = Resolve-Path "src-tauri\target\release\blackhole-tasks.exe"
-          $process = Start-Process -FilePath $exe -PassThru
-          try {
-            Start-Sleep -Seconds 8
-            $process.Refresh()
-            if ($process.HasExited) {
-              throw "BlackHole Tasks exited during the native Windows smoke test with code $($process.ExitCode)."
-            }
-            if ($process.MainWindowHandle -ne 0 -and -not $process.Responding) {
-              throw "BlackHole Tasks created a window but stopped responding."
-            }
-            "WINDOWS_NATIVE_SMOKE_OK pid=$($process.Id) window=$($process.MainWindowHandle)"
-          } finally {
-            if (-not $process.HasExited) {
-              Stop-Process -Id $process.Id -Force
-              $process.WaitForExit(5000)
-            }
-          }
+          ./scripts/windows-interaction-smoke.ps1 `
+            -ExePath "src-tauri/target/release/blackhole-tasks.exe" `
+            -OutputDirectory "output/windows-smoke"
 
       - name: Upload Windows installers
         uses: actions/upload-artifact@v5
@@ -95,4 +80,13 @@ jobs:
             src-tauri/target/release/bundle/nsis/*.exe
             src-tauri/target/release/bundle/msi/*.msi
           if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Windows interaction screenshots
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: blackhole-tasks-windows-smoke-${{ github.run_number }}
+          path: output/windows-smoke/*.png
+          if-no-files-found: warn
           retention-days: 14

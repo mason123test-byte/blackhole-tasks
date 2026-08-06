@@ -96,8 +96,8 @@ npm run tauri build
 成功后安装包位于：
 
 ```text
-C:\codex\HDDB\src-tauri\target\release\bundle\nsis\BlackHole Tasks_0.1.2_x64-setup.exe
-C:\codex\HDDB\src-tauri\target\release\bundle\msi\BlackHole Tasks_0.1.2_x64_en-US.msi
+C:\codex\HDDB\src-tauri\target\release\bundle\nsis\BlackHole Tasks_0.1.3_x64-setup.exe
+C:\codex\HDDB\src-tauri\target\release\bundle\msi\BlackHole Tasks_0.1.3_x64_en-US.msi
 ```
 
 实际文件名可能包含 Tauri 根据平台生成的架构或语言后缀；构建脚本会在结束时列出真实路径。
