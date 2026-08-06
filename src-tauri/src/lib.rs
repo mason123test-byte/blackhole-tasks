@@ -410,6 +410,7 @@ fn cursor_inside_window(
 }
 
 fn start_cursor_monitor(app: tauri::AppHandle, hover_delay_ms: u64) {
+    let diagnostics_enabled = std::env::var_os("BLACKHOLE_SMOKE_DIAGNOSTICS").is_some();
     std::thread::spawn(move || loop {
         let Some(orb) = app.get_webview_window("orb") else {
             return;
@@ -424,6 +425,14 @@ fn start_cursor_monitor(app: tauri::AppHandle, hover_delay_ms: u64) {
         let workspace_visible = workspace.is_visible().unwrap_or(false);
         let orb_inside = cursor_inside_window(&orb, cursor);
         let workspace_inside = workspace_visible && cursor_inside_window(&workspace, cursor);
+        if diagnostics_enabled {
+            let position = orb.inner_position().ok();
+            let size = orb.inner_size().ok();
+            let _ = orb.set_title(&format!(
+                "黑洞任务|cursor={:.0},{:.0}|inner={:?},{:?}|inside={}|workspace={}",
+                cursor.x, cursor.y, position, size, orb_inside, workspace_inside
+            ));
+        }
         let now = Instant::now();
         let (should_show, should_schedule_close) = {
             let Some(state) = app.try_state::<WindowState>() else {

@@ -28,11 +28,19 @@ public static class BlackHoleWindowProbe
         public int Bottom;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Point
+    {
+        public int X;
+        public int Y;
+    }
+
     public sealed class WindowInfo
     {
         public IntPtr Handle { get; set; }
         public string Title { get; set; }
         public Rect Bounds { get; set; }
+        public Rect ClientBounds { get; set; }
     }
 
     [DllImport("user32.dll")]
@@ -51,6 +59,12 @@ public static class BlackHoleWindowProbe
     private static extern bool GetWindowRect(IntPtr window, out Rect rect);
 
     [DllImport("user32.dll")]
+    private static extern bool GetClientRect(IntPtr window, out Rect rect);
+
+    [DllImport("user32.dll")]
+    private static extern bool ClientToScreen(IntPtr window, ref Point point);
+
+    [DllImport("user32.dll")]
     public static extern bool SetCursorPos(int x, int y);
 
     public static WindowInfo[] VisibleWindows(int expectedProcessId)
@@ -63,9 +77,17 @@ public static class BlackHoleWindowProbe
             if (processId != expectedProcessId || !IsWindowVisible(window)) return true;
             Rect rect;
             if (!GetWindowRect(window, out rect)) return true;
+            Rect clientRect;
+            Point clientOrigin = new Point();
+            GetClientRect(window, out clientRect);
+            ClientToScreen(window, ref clientOrigin);
+            clientRect.Right = clientOrigin.X + clientRect.Right;
+            clientRect.Bottom = clientOrigin.Y + clientRect.Bottom;
+            clientRect.Left = clientOrigin.X;
+            clientRect.Top = clientOrigin.Y;
             var title = new StringBuilder(256);
             GetWindowText(window, title, title.Capacity);
-            result.Add(new WindowInfo { Handle = window, Title = title.ToString(), Bounds = rect });
+            result.Add(new WindowInfo { Handle = window, Title = title.ToString(), Bounds = rect, ClientBounds = clientRect });
             return true;
         }, IntPtr.Zero);
         return result.ToArray();
@@ -80,7 +102,7 @@ function Get-AppWindows([int]$ProcessId) {
 function Wait-AppWindow([int]$ProcessId, [string]$Title, [bool]$Visible, [int]$TimeoutMilliseconds = 6000) {
   $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMilliseconds)
   do {
-    $match = @(Get-AppWindows $ProcessId | Where-Object Title -EQ $Title)
+    $match = @(Get-AppWindows $ProcessId | Where-Object { $_.Title -eq $Title -or ($Title -eq "黑洞任务" -and $_.Title.StartsWith("黑洞任务|")) })
     if (($match.Count -gt 0) -eq $Visible) {
       if ($Visible) { return $match[0] }
       return $null
@@ -109,14 +131,15 @@ function Get-ColorDistance([System.Drawing.Color]$First, [System.Drawing.Color]$
     [Math]::Abs([int]$First.B - [int]$Second.B)
 }
 
+$env:BLACKHOLE_SMOKE_DIAGNOSTICS = "1"
 $process = Start-Process -FilePath (Resolve-Path $ExePath) -PassThru
 try {
   $orb = Wait-AppWindow $process.Id "黑洞任务" $true
   Start-Sleep -Milliseconds 800
   $knownTitles = @("黑洞任务", "黑洞任务工作区", "快速新增任务")
-  $initialWindows = @(Get-AppWindows $process.Id | Where-Object { $_.Title -in $knownTitles })
+  $initialWindows = @(Get-AppWindows $process.Id | Where-Object { $_.Title -in $knownTitles -or $_.Title.StartsWith("黑洞任务|") })
   $initialWindows | ForEach-Object {
-    "STARTUP_WINDOW title=$($_.Title) rect=$($_.Bounds.Left),$($_.Bounds.Top),$($_.Bounds.Right),$($_.Bounds.Bottom)"
+    "STARTUP_WINDOW title=$($_.Title) outer=$($_.Bounds.Left),$($_.Bounds.Top),$($_.Bounds.Right),$($_.Bounds.Bottom) client=$($_.ClientBounds.Left),$($_.ClientBounds.Top),$($_.ClientBounds.Right),$($_.ClientBounds.Bottom)"
   }
   if ($initialWindows.Count -ne 1) {
     throw "Expected only the orb at startup, found $($initialWindows.Count) visible app windows."
@@ -140,12 +163,15 @@ try {
     $bitmap.Dispose()
   }
 
-  $orbCenterX = [int](($orb.Bounds.Left + $orb.Bounds.Right) / 2)
-  $orbCenterY = [int](($orb.Bounds.Top + $orb.Bounds.Bottom) / 2)
+  $orbCenterX = [int](($orb.ClientBounds.Left + $orb.ClientBounds.Right) / 2)
+  $orbCenterY = [int](($orb.ClientBounds.Top + $orb.ClientBounds.Bottom) / 2)
   [BlackHoleWindowProbe]::SetCursorPos($orbCenterX, $orbCenterY) | Out-Null
   try {
     $workspace = Wait-AppWindow $process.Id "黑洞任务工作区" $true
   } catch {
+    Get-AppWindows $process.Id | ForEach-Object {
+      "HOVER_TIMEOUT_WINDOW title=$($_.Title) client=$($_.ClientBounds.Left),$($_.ClientBounds.Top),$($_.ClientBounds.Right),$($_.ClientBounds.Bottom)"
+    }
     Save-DesktopScreenshot (Join-Path $OutputDirectory "02-hover-timeout.png")
     throw
   }
@@ -193,12 +219,13 @@ try {
 
   "WINDOWS_INTERACTION_SMOKE_OK pid=$($process.Id) threadsDelta=$threadGrowth handlesDelta=$handleGrowth"
 } finally {
-  $diagnosticLog = Join-Path $env:LOCALAPPDATA "com.blackhole.tasks\logs\BlackHole Tasks.log"
-  if (Test-Path $diagnosticLog) {
-    Copy-Item -LiteralPath $diagnosticLog -Destination (Join-Path $OutputDirectory "BlackHole-Tasks.log") -Force
-  }
+  Remove-Item Env:BLACKHOLE_SMOKE_DIAGNOSTICS -ErrorAction SilentlyContinue
   if (-not $process.HasExited) {
     Stop-Process -Id $process.Id -Force
     $process.WaitForExit(5000) | Out-Null
+  }
+  $diagnosticLog = Join-Path $env:LOCALAPPDATA "com.blackhole.tasks\logs\BlackHole Tasks.log"
+  if (Test-Path $diagnosticLog) {
+    Copy-Item -LiteralPath $diagnosticLog -Destination (Join-Path $OutputDirectory "BlackHole-Tasks.log") -Force
   }
 }
