@@ -169,9 +169,12 @@ function Get-ColorDistance([System.Drawing.Color]$First, [System.Drawing.Color]$
 }
 
 $diagnosticPath = Join-Path $env:TEMP "blackhole-tasks-native-cursor-diagnostics.txt"
+$resolvedExePath = (Resolve-Path $ExePath).Path
+$diagnosticMarkerPath = [System.IO.Path]::ChangeExtension($resolvedExePath, ".smoke-diagnostics")
+Set-Content -LiteralPath $diagnosticMarkerPath -Value $diagnosticPath -NoNewline
 $env:BLACKHOLE_SMOKE_DIAGNOSTICS = "1"
 $env:BLACKHOLE_SMOKE_DIAGNOSTICS_PATH = $diagnosticPath
-$process = Start-Process -FilePath (Resolve-Path $ExePath) -ArgumentList "--smoke-diagnostics=$diagnosticPath" -PassThru
+$process = Start-Process -FilePath $resolvedExePath -ArgumentList "--smoke-diagnostics=$diagnosticPath" -PassThru
 try {
   $orb = Wait-AppWindow $process.Id "黑洞任务" $true
   Start-Sleep -Milliseconds 800

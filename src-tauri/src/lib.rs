@@ -448,10 +448,20 @@ fn diagnostics_path_from_args() -> Option<PathBuf> {
     })
 }
 
+fn diagnostics_path_from_marker() -> Option<PathBuf> {
+    let marker_path = std::env::current_exe()
+        .ok()?
+        .with_extension("smoke-diagnostics");
+    let configured_path = std::fs::read_to_string(marker_path).ok()?;
+    let configured_path = configured_path.trim();
+    (!configured_path.is_empty()).then(|| PathBuf::from(configured_path))
+}
+
 fn start_cursor_monitor(app: tauri::AppHandle, hover_delay_ms: u64) {
     let diagnostics_path = std::env::var_os("BLACKHOLE_SMOKE_DIAGNOSTICS_PATH")
         .map(PathBuf::from)
-        .or_else(diagnostics_path_from_args);
+        .or_else(diagnostics_path_from_args)
+        .or_else(diagnostics_path_from_marker);
     let diagnostics_enabled =
         diagnostics_path.is_some() || std::env::var_os("BLACKHOLE_SMOKE_DIAGNOSTICS").is_some();
     if let Some(path) = &diagnostics_path {
