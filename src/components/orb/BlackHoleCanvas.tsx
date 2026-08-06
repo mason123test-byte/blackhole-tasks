@@ -6,5 +6,5 @@ export function BlackHoleCanvas({ hovered, pulse, quality, lowPowerMode }: { hov
   const ref = useRef<HTMLCanvasElement>(null); const hoverRef=useRef(0); const pulseRef=useRef(0);
   useEffect(() => { hoverRef.current = hovered ? 1 : 0; pulseRef.current = pulse; }, [hovered, pulse]);
   useEffect(() => { if (!ref.current) return; return startBlackHole(ref.current, () => hoverRef.current, () => pulseRef.current, { quality, lowPowerMode }); }, [lowPowerMode, quality]);
-  return <canvas ref={ref} className="black-hole-canvas" aria-label="黑洞任务悬浮球" />;
+  return <canvas ref={ref} className="black-hole-canvas" aria-label="黑洞任务悬浮窗" />;
 }

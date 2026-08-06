@@ -57,8 +57,8 @@ button.primary {
   user-select: none;
 }
 .black-hole-canvas {
-  width: 96px;
-  height: 96px;
+  width: 240px;
+  height: 180px;
   display: block;
 }
 .orb-hint {
@@ -101,13 +101,8 @@ button.primary {
   border-radius: 50%;
   margin-right: 8px;
   vertical-align: -3px;
-  background: radial-gradient(
-    circle,
-    #000 35%,
-    #ef8438 46%,
-    #316d91 68%,
-    transparent 72%
-  );
+  background: #05070a;
+  border: 2px solid #dc8147;
 }
 .toolbar > input {
   min-width: 180px;
@@ -413,8 +408,9 @@ button.primary {
   width: 25px;
   height: 25px;
   margin: 0;
-  background: radial-gradient(circle, #010205 0 31%, #ffe0a7 34% 38%, #df762f 43%, #45708d 56%, transparent 67%);
-  filter: drop-shadow(0 0 7px rgba(225, 119, 50, 0.32));
+  background: #020306;
+  border: 2px solid #db824b;
+  box-shadow: inset 5px -3px 9px rgba(0, 0, 0, 0.92), 0 0 8px rgba(225, 119, 50, 0.30);
 }
 .search-field { position: relative; display: flex; align-items: center; flex: 1; min-width: 220px; max-width: 430px; }
 .search-field > span { position: absolute; left: 12px; z-index: 1; color: #7790aa; font-size: 19px; pointer-events: none; }

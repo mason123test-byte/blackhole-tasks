@@ -162,6 +162,25 @@ function Save-DesktopScreenshot([string]$Path) {
   }
 }
 
+function Save-ScreenRegion([string]$Path, $Bounds, [int]$Padding = 0) {
+  $screen = [System.Windows.Forms.SystemInformation]::VirtualScreen
+  $left = [Math]::Max($screen.Left, $Bounds.Left - $Padding)
+  $top = [Math]::Max($screen.Top, $Bounds.Top - $Padding)
+  $right = [Math]::Min($screen.Right, $Bounds.Right + $Padding)
+  $bottom = [Math]::Min($screen.Bottom, $Bounds.Bottom + $Padding)
+  $width = [Math]::Max(1, $right - $left)
+  $height = [Math]::Max(1, $bottom - $top)
+  $bitmap = [System.Drawing.Bitmap]::new($width, $height)
+  $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+  try {
+    $graphics.CopyFromScreen($left, $top, 0, 0, $bitmap.Size)
+    $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
+  } finally {
+    $graphics.Dispose()
+    $bitmap.Dispose()
+  }
+}
+
 function Get-ColorDistance([System.Drawing.Color]$First, [System.Drawing.Color]$Second) {
   return [Math]::Abs([int]$First.R - [int]$Second.R) +
     [Math]::Abs([int]$First.G - [int]$Second.G) +
@@ -189,6 +208,7 @@ try {
 
   $initialScreenshot = Join-Path $OutputDirectory "01-orb-only.png"
   Save-DesktopScreenshot $initialScreenshot
+  Save-ScreenRegion (Join-Path $OutputDirectory "01-orb-closeup.png") $orb.ClientBounds 16
   $bitmap = [System.Drawing.Bitmap]::FromFile((Resolve-Path $initialScreenshot))
   try {
     $screen = [System.Windows.Forms.SystemInformation]::VirtualScreen
@@ -238,6 +258,7 @@ try {
     throw "Workspace client area overlaps the orb: orb=$($orb.ClientBounds.Left),$($orb.ClientBounds.Top),$($orb.ClientBounds.Right),$($orb.ClientBounds.Bottom) workspace=$($workspace.ClientBounds.Left),$($workspace.ClientBounds.Top),$($workspace.ClientBounds.Right),$($workspace.ClientBounds.Bottom)."
   }
   Save-DesktopScreenshot (Join-Path $OutputDirectory "02-hover-open.png")
+  Save-ScreenRegion (Join-Path $OutputDirectory "02-workspace-closeup.png") $workspace.ClientBounds 8
 
   [BlackHoleWindowProbe]::SetCursorPos(1, 1) | Out-Null
   Wait-AppWindow $process.Id "黑洞任务工作区" $false | Out-Null

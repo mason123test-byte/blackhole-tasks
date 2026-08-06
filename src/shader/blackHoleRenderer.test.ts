@@ -1,14 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { getRenderProfile } from "./blackHoleRenderer";
+import { BLACK_HOLE_RENDERER_INFO, getRenderProfile } from "./blackHoleRenderer";
 
 describe("black-hole render profiles", () => {
   it("matches the requested idle and active frame-rate tiers", () => {
-    expect(getRenderProfile("low")).toMatchObject({ idleFps: 15, activeFps: 30 });
-    expect(getRenderProfile("balanced")).toMatchObject({ idleFps: 24, activeFps: 45 });
-    expect(getRenderProfile("high")).toMatchObject({ idleFps: 30, activeFps: 60 });
+    expect(getRenderProfile("low")).toMatchObject({ idleFps: 12, activeFps: 24, pixelRatioCap: 1 });
+    expect(getRenderProfile("balanced")).toMatchObject({ idleFps: 18, activeFps: 30, pixelRatioCap: 1.25 });
+    expect(getRenderProfile("high")).toMatchObject({ idleFps: 24, activeFps: 40, pixelRatioCap: 1.5 });
   });
 
   it("forces the low-cost profile when low-power mode is enabled", () => {
     expect(getRenderProfile("high", true)).toEqual(getRenderProfile("low"));
+  });
+
+  it("uses the reference Schwarzschild geodesic model", () => {
+    expect(BLACK_HOLE_RENDERER_INFO).toMatchObject({
+      model: "schwarzschild-geodesic",
+      integrationSteps: 48,
+    });
   });
 });

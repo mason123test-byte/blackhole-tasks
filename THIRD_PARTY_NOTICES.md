@@ -1,10 +1,13 @@
-# Third-party notices
+# Third-Party Notices
 
 ## ghostty-blackhole
 
-The Schwarzschild geodesic integration and accretion-disk rendering in
-`src/shader/blackHoleRenderer.ts` are adapted from
-[s0xDk/ghostty-blackhole](https://github.com/s0xDk/ghostty-blackhole).
+The BlackHole Tasks renderer contains an adaptation of the Schwarzschild
+geodesic tracer and accretion-disk shading from:
+
+https://github.com/s0xDk/ghostty-blackhole
+
+Reference revision: `b49fa0ab2eaf0644a690f4cb386d70c21eb9f969`
 
 MIT License
 

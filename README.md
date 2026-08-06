@@ -96,8 +96,8 @@ npm run tauri build
 成功后安装包位于：
 
 ```text
-C:\codex\HDDB\src-tauri\target\release\bundle\nsis\BlackHole Tasks_0.1.3_x64-setup.exe
-C:\codex\HDDB\src-tauri\target\release\bundle\msi\BlackHole Tasks_0.1.3_x64_en-US.msi
+C:\codex\HDDB\src-tauri\target\release\bundle\nsis\BlackHole Tasks_0.1.4_x64-setup.exe
+C:\codex\HDDB\src-tauri\target\release\bundle\msi\BlackHole Tasks_0.1.4_x64_en-US.msi
 ```
 
 实际文件名可能包含 Tauri 根据平台生成的架构或语言后缀；构建脚本会在结束时列出真实路径。
@@ -173,10 +173,10 @@ HDDB/
 已实际通过：
 
 - `npm run typecheck`：通过
-- `npm run test`：3 个测试文件、6 项测试全部通过
+- `npm run test`：4 个测试文件、9 项测试全部通过
 - `npm run lint`：通过，0 warning
 - `npm run build`：通过
-- 真实 `96×96` Chromium/WebGL2 视觉检查：平衡模式静止 24 FPS、悬停 45 FPS，控制台 0 error
+- 真实 `240×180` Chromium/WebGL2 视觉检查：平衡模式静止 18 FPS、悬停 30 FPS，控制台 0 error
 - 四象限初始视图、任务新增、鼠标拖动和象限持久化：通过
 - 500 节点/800 关系负载：约 1.4 秒装载；密集模式只保留可见节点、最多绘制 160 条优先关系且关闭连线动画
 - 500 节点搜索：约 36ms，命中任务自动适应视图并保持可见
@@ -186,7 +186,7 @@ HDDB/
 
 ## 黑洞视觉参考
 
-黑洞的视觉结构参考了 [s0xDk/ghostty-blackhole](https://github.com/s0xDk/ghostty-blackhole) 的事件视界、光子环、倾斜吸积盘和上下引力透镜弧线。当前实现是针对 `96×96` 透明 Windows WebView 独立编写的低成本近似，不直接运行 Ghostty 的逐像素测地线积分，以避免常驻悬浮窗造成 GPU 卡顿。参考项目采用 MIT License。
+黑洞渲染器基于 [s0xDk/ghostty-blackhole](https://github.com/s0xDk/ghostty-blackhole) 的 Schwarzschild 光子测地线积分进行适配：实际运行路径逐像素执行 leapfrog 积分，由光线与倾斜吸积盘的多次交点自然产生事件视界、光子环、上下引力透镜像、温度色彩与相对论多普勒增亮。Windows 透明 WebView 无法读取桌面背后的像素，因此这里只对程序星空进行弯曲，不声称可以透镜化桌面内容。为兼顾常驻稳定性，`240×180` 舞台按画质档限制像素比、步数和帧率。完整第三方许可见 `THIRD_PARTY_NOTICES.md`。
 
 ## 已知问题
 
