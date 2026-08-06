@@ -40,6 +40,11 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   },
   async deleteRelation(id) { await backend.deleteRelation(id); set((state) => ({ relations: state.relations.filter((item) => item.id !== id) })); },
   selectTask(id, append = false) { set((state) => ({ selectedTaskIds: append ? [...new Set([...state.selectedTaskIds, id])] : [id] })); },
-  selectTasks(ids) { set({ selectedTaskIds: ids }); }, clearSelection() { set({ selectedTaskIds: [] }); },
+  selectTasks(ids) {
+    const next = [...new Set(ids)];
+    set((state) => state.selectedTaskIds.length === next.length && state.selectedTaskIds.every((id, index) => id === next[index])
+      ? state
+      : { selectedTaskIds: next });
+  },
+  clearSelection() { set((state) => state.selectedTaskIds.length === 0 ? state : { selectedTaskIds: [] }); },
 }));
-

@@ -9,3 +9,4 @@ src-tauri/target/
 .vscode/
 .learnings/
 output/
+.playwright-cli/

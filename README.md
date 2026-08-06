@@ -96,8 +96,8 @@ npm run tauri build
 成功后安装包位于：
 
 ```text
-C:\codex\HDDB\src-tauri\target\release\bundle\nsis\BlackHole Tasks_0.1.0_x64-setup.exe
-C:\codex\HDDB\src-tauri\target\release\bundle\msi\BlackHole Tasks_0.1.0_x64_en-US.msi
+C:\codex\HDDB\src-tauri\target\release\bundle\nsis\BlackHole Tasks_0.1.1_x64-setup.exe
+C:\codex\HDDB\src-tauri\target\release\bundle\msi\BlackHole Tasks_0.1.1_x64_en-US.msi
 ```
 
 实际文件名可能包含 Tauri 根据平台生成的架构或语言后缀；构建脚本会在结束时列出真实路径。
@@ -170,24 +170,23 @@ HDDB/
 
 ## 验证状态
 
-已在本机实际通过：
+已实际通过：
 
-- `npm install`：成功，0 个已知漏洞
 - `npm run typecheck`：通过
-- `npm run test`：2 个测试文件、4 项测试全部通过
+- `npm run test`：3 个测试文件、6 项测试全部通过
 - `npm run lint`：通过，0 warning
 - `npm run build`：通过
-- Vite 页面 HTTP 存活检查：200
-- Tauri 图标生成：成功
+- 真实 `96×96` Chromium/WebGL2 视觉检查：平衡模式静止 24 FPS、悬停 45 FPS，控制台 0 error
+- 四象限初始视图、任务新增、鼠标拖动和象限持久化：通过
+- 500 节点/800 关系负载：约 1.4 秒装载；密集模式只保留可见节点、最多绘制 160 条优先关系且关闭连线动画
+- 500 节点搜索：约 36ms，命中任务自动适应视图并保持可见
+- GitHub Actions Windows Runner：`cargo fmt --check`、Clippy、Rust 测试、Tauri NSIS/MSI 构建均已通过；工作流现增加原生 EXE 启动/响应冒烟检查
 
-尚未执行：
+仍需在真实多显示器和不同 DPI 桌面上做手工验收；自动化不能完全替代透明窗口、桌面合成和鼠标跨窗口体验检查。
 
-- `cargo fmt --check`、`cargo clippy`、`cargo test`
-- `npm run tauri build`
-- NSIS/MSI 干净 Windows 安装验收
-- 多显示器和不同 DPI 的桌面手工验收
+## 黑洞视觉参考
 
-原因：当前机器没有 Rust/Cargo。源码不能在未编译时视作 Rust 检查已通过。
+黑洞的视觉结构参考了 [s0xDk/ghostty-blackhole](https://github.com/s0xDk/ghostty-blackhole) 的事件视界、光子环、倾斜吸积盘和上下引力透镜弧线。当前实现是针对 `96×96` 透明 Windows WebView 独立编写的低成本近似，不直接运行 Ghostty 的逐像素测地线积分，以避免常驻悬浮窗造成 GPU 卡顿。参考项目采用 MIT License。
 
 ## 已知问题
 
@@ -196,5 +195,3 @@ HDDB/
 - 标签后端和筛选已实现，标签维护/任务标签编辑 UI 仍待补充。
 - 导入和备份 Command 已实现，设置页中的文件选择与恢复确认 UI 仍待补充。
 - 黑洞右键入口已预留，当前完整菜单主要由系统托盘提供。
-- Playwright CLI 首次启动在当前环境超时，因此尚无自动化视觉截图结论。
-

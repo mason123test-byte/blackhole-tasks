@@ -2,7 +2,7 @@ import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { Task } from "../../types/task";
 
-export const TaskNode = memo(({ data, selected }: NodeProps) => {
+const TaskNodeView = ({ data, selected }: NodeProps) => {
   const task = data.task as Task; const complete = data.complete as (id: string) => void; const edit = data.edit as (id: string) => void; const collapse=data.collapse as (id:string,value:boolean)=>void;
   return <article className={`task-card priority-${task.priority} ${selected ? "selected" : ""} ${task.status === "blocked" ? "blocked" : ""}`} onDoubleClick={() => edit(task.id)}>
     <Handle type="target" position={Position.Left} aria-label="关系入口" />
@@ -11,6 +11,12 @@ export const TaskNode = memo(({ data, selected }: NodeProps) => {
     <footer><span>优先级 {task.priority}</span><span>{task.dueAt ? new Date(task.dueAt).toLocaleDateString() : "无截止时间"}</span><span>{task.progress}%</span></footer>
     <Handle type="source" position={Position.Right} aria-label="关系出口" />
   </article>;
-});
-TaskNode.displayName = "TaskNode";
+};
 
+export const TaskNode = memo(TaskNodeView, (previous, next) =>
+  previous.selected === next.selected
+  && previous.data.task === next.data.task
+  && previous.data.complete === next.data.complete
+  && previous.data.edit === next.data.edit
+  && previous.data.collapse === next.data.collapse);
+TaskNode.displayName = "TaskNode";
