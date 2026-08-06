@@ -193,9 +193,32 @@ $diagnosticMarkerPath = [System.IO.Path]::ChangeExtension($resolvedExePath, ".sm
 Set-Content -LiteralPath $diagnosticMarkerPath -Value $diagnosticPath -NoNewline
 $env:BLACKHOLE_SMOKE_DIAGNOSTICS = "1"
 $env:BLACKHOLE_SMOKE_DIAGNOSTICS_PATH = $diagnosticPath
-$process = Start-Process -FilePath $resolvedExePath -ArgumentList "--smoke-diagnostics=$diagnosticPath" -PassThru
+$stdoutPath = Join-Path $OutputDirectory "process-stdout.log"
+$stderrPath = Join-Path $OutputDirectory "process-stderr.log"
+$process = Start-Process -FilePath $resolvedExePath `
+  -ArgumentList "--smoke-diagnostics=$diagnosticPath" `
+  -RedirectStandardOutput $stdoutPath `
+  -RedirectStandardError $stderrPath `
+  -PassThru
 try {
-  $orb = Wait-AppWindow $process.Id "黑洞任务" $true
+  try {
+    # WebView2's first cold start on a fresh GitHub runner can exceed 30 seconds
+    # immediately after the release linker and installer builders finish.
+    $orb = Wait-AppWindow $process.Id "黑洞任务" $true 90000
+  } catch {
+    $process.Refresh()
+    "STARTUP_TIMEOUT pid=$($process.Id) exited=$($process.HasExited) exitCode=$(if ($process.HasExited) { $process.ExitCode } else { 'running' })"
+    if (Test-Path $diagnosticPath) {
+      "STARTUP_DIAGNOSTICS $(Get-Content -LiteralPath $diagnosticPath -Raw)"
+    }
+    if (Test-Path $stdoutPath) {
+      "STARTUP_STDOUT $(Get-Content -LiteralPath $stdoutPath -Raw)"
+    }
+    if (Test-Path $stderrPath) {
+      "STARTUP_STDERR $(Get-Content -LiteralPath $stderrPath -Raw)"
+    }
+    throw
+  }
   Start-Sleep -Milliseconds 800
   $knownTitles = @("黑洞任务", "黑洞任务工作区", "快速新增任务")
   $initialWindows = @(Get-AppWindows $process.Id | Where-Object { $_.Title -in $knownTitles -or $_.Title.StartsWith("黑洞任务|") })
