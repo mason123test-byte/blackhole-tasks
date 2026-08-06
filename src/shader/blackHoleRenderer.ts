@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import type { RenderQuality } from "../types/settings";
 
 const vertex = `#version 300 es
@@ -204,6 +205,15 @@ export const BLACK_HOLE_RENDERER_INFO = Object.freeze({
   reference: "https://github.com/s0xDk/ghostty-blackhole",
 });
 
+function reportOrbFrame(renderer: "webgl2" | "canvas2d", energy: number) {
+  document.title = `黑洞任务|renderer=${renderer}|frame=ready|energy=${energy}`;
+  if ("__TAURI_INTERNALS__" in window) {
+    void invoke("report_orb_render", { renderer, energy }).catch((error) => {
+      console.error("无法上报黑洞首帧状态：", error);
+    });
+  }
+}
+
 export interface RenderProfile {
   idleFps: number;
   activeFps: number;
@@ -362,7 +372,7 @@ export function startBlackHole(
           if (pixels[index + 3] > 8 && Math.max(pixels[index], pixels[index + 1], pixels[index + 2]) > 48) energy += 1;
         }
         canvas.dataset.energy = String(energy);
-        document.title = `黑洞任务|renderer=webgl2|frame=ready|energy=${energy}`;
+        reportOrbFrame("webgl2", energy);
         rendererReady = energy > 100;
       }
 
@@ -484,7 +494,7 @@ function startCanvasFallback(
     context.restore();
     if (!rendererReady) {
       rendererReady = true;
-      document.title = "黑洞任务|renderer=canvas2d|frame=ready|energy=0";
+      reportOrbFrame("canvas2d", 0);
     }
     schedule();
   };

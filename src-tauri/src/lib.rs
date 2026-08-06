@@ -671,6 +671,20 @@ fn show_orb_menu(_app: tauri::AppHandle) -> AppResult<()> {
 }
 
 #[tauri::command]
+fn report_orb_render(renderer: String, energy: u32, app: tauri::AppHandle) -> AppResult<()> {
+    if renderer != "webgl2" && renderer != "canvas2d" {
+        return Err(AppError::Window("未知的黑洞渲染器".into()));
+    }
+    let title = format!("黑洞任务|renderer={renderer}|frame=ready|energy={energy}");
+    app.get_webview_window("orb")
+        .ok_or_else(|| AppError::Window("黑洞窗口不存在".into()))?
+        .set_title(&title)
+        .map_err(map_window)?;
+    log::info!("orb frame ready renderer={renderer} energy={energy}");
+    Ok(())
+}
+
+#[tauri::command]
 fn export_data(db: State<Database>) -> AppResult<String> {
     db.export_json()
 }
@@ -911,6 +925,7 @@ pub fn run() {
             open_quick_add,
             hide_quick_add,
             show_orb_menu,
+            report_orb_render,
             export_data,
             import_data,
             create_backup,
