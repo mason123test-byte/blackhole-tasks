@@ -320,6 +320,53 @@ function Save-ScreenRegion([string]$Path, $Bounds, [int]$Padding = 0) {
   }
 }
 
+function Write-BlackHoleColorEvidence(
+  [string]$ScreenshotPath,
+  $Window,
+  [string]$Label,
+  [string]$EvidencePath
+) {
+  $bitmap = [System.Drawing.Bitmap]::FromFile((Resolve-Path $ScreenshotPath))
+  try {
+    $screen = [System.Windows.Forms.SystemInformation]::VirtualScreen
+    $centerX = [int](($Window.ClientBounds.Left + $Window.ClientBounds.Right) / 2) - $screen.Left
+    $centerY = [int](($Window.ClientBounds.Top + $Window.ClientBounds.Bottom) / 2) - $screen.Top
+    $left = [Math]::Max(0, $centerX - 120)
+    $top = [Math]::Max(0, $centerY - 90)
+    $right = [Math]::Min($bitmap.Width - 1, $centerX + 119)
+    $bottom = [Math]::Min($bitmap.Height - 1, $centerY + 89)
+    $warm = 0
+    $neutralBright = 0
+    $dark = 0
+    $luminous = 0
+    for ($y = $top; $y -le $bottom; $y += 2) {
+      for ($x = $left; $x -le $right; $x += 2) {
+        $pixel = $bitmap.GetPixel($x, $y)
+        if ($pixel.R -gt 96 -or $pixel.G -gt 96 -or $pixel.B -gt 96) {
+          $luminous++
+        }
+        if ($pixel.R -ge 120 -and
+            $pixel.R -gt $pixel.G + 15 -and
+            $pixel.G -gt $pixel.B + 15) {
+          $warm++
+        }
+        if ($pixel.R -ge 210 -and $pixel.G -ge 210 -and $pixel.B -ge 210 -and
+            ([Math]::Max($pixel.R, [Math]::Max($pixel.G, $pixel.B)) -
+             [Math]::Min($pixel.R, [Math]::Min($pixel.G, $pixel.B))) -lt 18) {
+          $neutralBright++
+        }
+        if ($pixel.R -lt 35 -and $pixel.G -lt 35 -and $pixel.B -lt 35) {
+          $dark++
+        }
+      }
+    }
+    "label=$Label luminous=$luminous warm=$warm neutralBright=$neutralBright dark=$dark crop=$left,$top,$right,$bottom" |
+      Add-Content -LiteralPath $EvidencePath
+  } finally {
+    $bitmap.Dispose()
+  }
+}
+
 function Get-ColorDistance([System.Drawing.Color]$First, [System.Drawing.Color]$Second) {
   return [Math]::Abs([int]$First.R - [int]$Second.R) +
     [Math]::Abs([int]$First.G - [int]$Second.G) +
@@ -341,6 +388,8 @@ $env:BLACKHOLE_SMOKE_DIAGNOSTICS = "1"
 $env:BLACKHOLE_SMOKE_DIAGNOSTICS_PATH = $diagnosticPath
 $stdoutPath = Join-Path $OutputDirectory "process-stdout.log"
 $stderrPath = Join-Path $OutputDirectory "process-stderr.log"
+$colorEvidencePath = Join-Path $OutputDirectory "black-hole-color-evidence.txt"
+Set-Content -LiteralPath $colorEvidencePath -Value "" -NoNewline
 [BlackHoleWindowProbe]::SetCursorPos(1, 1) | Out-Null
 $process = Start-Process -FilePath $resolvedExePath `
   -ArgumentList "--smoke-diagnostics=$diagnosticPath" `
@@ -382,6 +431,7 @@ try {
   $initialScreenshot = Join-Path $OutputDirectory "01-orb-only.png"
   Save-DesktopScreenshot $initialScreenshot
   Save-ScreenRegion (Join-Path $OutputDirectory "01-orb-closeup.png") $orb.ClientBounds 16
+  Write-BlackHoleColorEvidence $initialScreenshot $orb "compact" $colorEvidencePath
   $bitmap = [System.Drawing.Bitmap]::FromFile((Resolve-Path $initialScreenshot))
   try {
     $screen = [System.Windows.Forms.SystemInformation]::VirtualScreen
@@ -415,8 +465,10 @@ try {
   if ($expandedWindows.Count -ne 1) {
     throw "Expansion created another native window; expected 1, found $($expandedWindows.Count)."
   }
-  Save-DesktopScreenshot (Join-Path $OutputDirectory "02-single-scene-expanded.png")
+  $expandedScreenshot = Join-Path $OutputDirectory "02-single-scene-expanded.png"
+  Save-DesktopScreenshot $expandedScreenshot
   Save-ScreenRegion (Join-Path $OutputDirectory "02-single-scene-closeup.png") $expanded.ClientBounds 8
+  Write-BlackHoleColorEvidence $expandedScreenshot $expanded "expanded" $colorEvidencePath
 
   Invoke-SceneCloseClick $expanded "initial"
   try {
