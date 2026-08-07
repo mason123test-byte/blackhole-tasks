@@ -831,15 +831,57 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum SmokeCommand {
+    Toggle(u64),
+    Snapshot(u64),
+}
+
+fn parse_smoke_command(command: &str) -> Option<SmokeCommand> {
+    let (name, sequence) = command.trim().split_once(':')?;
+    let sequence = sequence.parse::<u64>().ok()?;
+    match name {
+        "toggle" => Some(SmokeCommand::Toggle(sequence)),
+        "snapshot" => Some(SmokeCommand::Snapshot(sequence)),
+        _ => None,
+    }
+}
+
 fn start_smoke_command_monitor(app: tauri::AppHandle, command_path: PathBuf) {
+    let snapshot_path = command_path.with_extension("snapshot.json");
     std::thread::spawn(move || {
         let mut last_command = String::new();
         loop {
-            if let Ok(command) = std::fs::read_to_string(&command_path) {
-                if command != last_command && command.starts_with("toggle:") {
-                    last_command = command;
-                    if let Err(error) = toggle_scene_inner(&app) {
-                        log::error!("smoke toggle command failed: {error}");
+            if let Ok(raw_command) = std::fs::read_to_string(&command_path) {
+                if raw_command != last_command {
+                    if let Some(command) = parse_smoke_command(&raw_command) {
+                        last_command = raw_command;
+                        match command {
+                            SmokeCommand::Toggle(_) => {
+                                if let Err(error) = toggle_scene_inner(&app) {
+                                    log::error!("smoke toggle command failed: {error}");
+                                }
+                            }
+                            SmokeCommand::Snapshot(sequence) => {
+                                let snapshot = app.state::<Database>().list_tasks().and_then(|tasks| {
+                                    serde_json::to_vec_pretty(&serde_json::json!({
+                                        "sequence": sequence,
+                                        "tasks": tasks,
+                                    }))
+                                    .map_err(AppError::from)
+                                });
+                                match snapshot {
+                                    Ok(snapshot) => {
+                                        if let Err(error) = std::fs::write(&snapshot_path, snapshot) {
+                                            log::error!("smoke snapshot write failed: {error}");
+                                        }
+                                    }
+                                    Err(error) => {
+                                        log::error!("smoke snapshot failed: {error}");
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
