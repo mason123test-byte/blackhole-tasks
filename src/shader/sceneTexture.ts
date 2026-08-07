@@ -15,6 +15,8 @@ export interface SceneTextureSnapshot {
   tasks: SceneTextureTask[];
 }
 
+export type SceneTextureState = Omit<SceneTextureSnapshot, "width" | "height">;
+
 const QUADRANTS: Quadrant[] = ["q1", "q2", "q3", "q4"];
 const QUADRANT_LABELS: Record<Quadrant, string> = {
   q1: "重要且紧急",
