@@ -884,7 +884,10 @@ button.primary {
     repeating-linear-gradient(0deg, transparent 0 3px, rgb(150 190 198 / 0.012) 3px 4px),
     radial-gradient(circle at 50% 50%, rgb(18 31 37 / 0.26), transparent 58%);
 }
-.gravity-app.is-expanded .black-hole-canvas { z-index: 1; }
+.gravity-app.is-expanded .black-hole-canvas {
+  z-index: 4;
+  pointer-events: none;
+}
 .gravity-app.is-expanded .gravity-toolbar {
   top: 13px;
   width: min(560px, calc(100% - 64px));
@@ -932,9 +935,11 @@ button.primary {
   background: linear-gradient(transparent, rgb(115 145 156 / 0.24) 9%, rgb(115 145 156 / 0.24) 39%, transparent 45% 55%, rgb(115 145 156 / 0.24) 61%, rgb(115 145 156 / 0.24) 91%, transparent);
 }
 .gravity-app.is-expanded .gravity-quadrants {
-  z-index: 3;
+  z-index: 5;
   inset: 56px 26px 24px;
   gap: 0;
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 0 18%, rgb(0 0 0 / 0.18) 29%, #000 43%);
+  mask-image: radial-gradient(circle at 50% 50%, transparent 0 18%, rgb(0 0 0 / 0.18) 29%, #000 43%);
 }
 .gravity-app.is-expanded .gravity-quadrant {
   --quadrant-accent: #89aeb8;
@@ -1074,7 +1079,7 @@ button.primary {
 .gravity-app.is-expanded .gravity-editor-actions .gravity-delete { color: #f07178; }
 .gravity-app.is-expanded .gravity-add { grid-template-columns: minmax(0, 1fr) 26px; gap: 2px; }
 .gravity-app.is-expanded .gravity-center-control {
-  z-index: 4;
+  z-index: 6;
   width: 210px;
   height: 148px;
   padding-bottom: 0;
