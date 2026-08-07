@@ -14,6 +14,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 
 public static class BlackHoleWindowProbe
 {
@@ -131,6 +132,28 @@ public static class BlackHoleWindowProbe
     {
         if (!SetCursorPos(x, y)) return false;
         mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
+        mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+        return true;
+    }
+
+    public static bool DragFromTo(int startX, int startY, int endX, int endY)
+    {
+        if (!SetCursorPos(startX, startY)) return false;
+        mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
+        Thread.Sleep(80);
+        const int steps = 18;
+        for (var step = 1; step <= steps; step++)
+        {
+            var progress = (double)step / steps;
+            var x = (int)Math.Round(startX + (endX - startX) * progress);
+            var y = (int)Math.Round(startY + (endY - startY) * progress);
+            if (!SetCursorPos(x, y))
+            {
+                mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+                return false;
+            }
+            Thread.Sleep(30);
+        }
         mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
         return true;
     }
@@ -375,11 +398,59 @@ function Get-ColorDistance([System.Drawing.Color]$First, [System.Drawing.Color]$
 
 $diagnosticPath = Join-Path $env:TEMP "blackhole-tasks-native-cursor-diagnostics.txt"
 $smokeCommandPath = [System.IO.Path]::ChangeExtension($diagnosticPath, ".command")
+$smokeSnapshotPath = [System.IO.Path]::ChangeExtension($diagnosticPath, ".snapshot.json")
 $smokeToggleSequence = 0
+$smokeSnapshotSequence = 0
 Set-Content -LiteralPath $smokeCommandPath -Value "" -NoNewline
 function Invoke-SmokeToggle {
   $script:smokeToggleSequence += 1
   Set-Content -LiteralPath $smokeCommandPath -Value "toggle:$script:smokeToggleSequence" -NoNewline
+}
+function Get-SmokeTaskSnapshot([int]$TimeoutMilliseconds = 5000) {
+  $script:smokeSnapshotSequence += 1
+  $expectedSequence = $script:smokeSnapshotSequence
+  Set-Content -LiteralPath $smokeCommandPath -Value "snapshot:$expectedSequence" -NoNewline
+  $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMilliseconds)
+  do {
+    if (Test-Path $smokeSnapshotPath) {
+      try {
+        $snapshot = Get-Content -LiteralPath $smokeSnapshotPath -Raw | ConvertFrom-Json
+        if ([int]$snapshot.sequence -eq $expectedSequence) { return $snapshot }
+      } catch {
+        # The monitor replaces this small JSON file without locking. Retry if a
+        # read lands between truncate and write.
+      }
+    }
+    Start-Sleep -Milliseconds 50
+  } while ([DateTime]::UtcNow -lt $deadline)
+  throw "Smoke snapshot $expectedSequence was not written within ${TimeoutMilliseconds}ms."
+}
+function Wait-SmokeTaskState(
+  [string]$Title,
+  [bool]$Exists,
+  [string]$Quadrant = "",
+  [string]$Status = "",
+  [int]$TimeoutMilliseconds = 10000
+) {
+  $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMilliseconds)
+  $lastState = "missing"
+  do {
+    $snapshot = Get-SmokeTaskSnapshot
+    $matches = @($snapshot.tasks | Where-Object { $_.title -eq $Title })
+    if ($matches.Count -gt 0) {
+      $lastState = ($matches | ForEach-Object { "$($_.quadrant)/$($_.status)" }) -join ","
+    } else {
+      $lastState = "missing"
+    }
+    if (-not $Exists -and $matches.Count -eq 0) { return $snapshot }
+    if ($Exists -and $matches.Count -eq 1 -and
+        (!$Quadrant -or $matches[0].quadrant -eq $Quadrant) -and
+        (!$Status -or $matches[0].status -eq $Status)) {
+      return $snapshot
+    }
+    Start-Sleep -Milliseconds 75
+  } while ([DateTime]::UtcNow -lt $deadline)
+  throw "Task '$Title' did not reach exists=$Exists quadrant='$Quadrant' status='$Status'; lastState=$lastState."
 }
 $resolvedExePath = (Resolve-Path $ExePath).Path
 $diagnosticMarkerPath = [System.IO.Path]::ChangeExtension($resolvedExePath, ".smoke-diagnostics")
@@ -469,6 +540,91 @@ try {
   Save-DesktopScreenshot $expandedScreenshot
   Save-ScreenRegion (Join-Path $OutputDirectory "02-single-scene-closeup.png") $expanded.ClientBounds 8
   Write-BlackHoleColorEvidence $expandedScreenshot $expanded "expanded" $colorEvidencePath
+
+  # Exercise the real DOM controls with Win32 input, then verify each async
+  # mutation against a Rust-side database snapshot. This keeps the test black
+  # box at the UI boundary without relying on stale pixel coordinates alone.
+  $smokeTaskTitle = "smoke-ui-$($process.Id)"
+  Wait-SmokeTaskState $smokeTaskTitle $false | Out-Null
+  $clientWidth = $expanded.ClientBounds.Right - $expanded.ClientBounds.Left
+  $clientHeight = $expanded.ClientBounds.Bottom - $expanded.ClientBounds.Top
+  $gridLeft = $expanded.ClientBounds.Left + 26
+  $gridTop = $expanded.ClientBounds.Top + 56
+  $cellWidth = [int](($clientWidth - 52) / 2)
+  $cellHeight = [int](($clientHeight - 80) / 2)
+  $q1ContentLeft = $gridLeft + 14
+  $q1ContentRight = $gridLeft + $cellWidth - 150
+  $q2ContentLeft = $gridLeft + $cellWidth + 150
+  $q2ContentRight = $gridLeft + (2 * $cellWidth) - 14
+  $taskY = $gridTop + 12 + 27 + 4 + 17
+  $addX = $q1ContentRight - 12
+  $addY = $gridTop + 12 + 13
+  if (-not [BlackHoleWindowProbe]::ClickAt($addX, $addY)) {
+    throw "Failed to click the Q1 add control at $addX,$addY."
+  }
+  Start-Sleep -Milliseconds 200
+  [System.Windows.Forms.SendKeys]::SendWait($smokeTaskTitle)
+  [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+  Wait-SmokeTaskState $smokeTaskTitle $true "q1" "todo" | Out-Null
+  Start-Sleep -Milliseconds 200
+  Save-DesktopScreenshot (Join-Path $OutputDirectory "03-task-created-q1.png")
+
+  $dragStartX = [int](($q1ContentLeft + $q1ContentRight) / 2)
+  $dragTargetX = [int](($q2ContentLeft + $q2ContentRight) / 2)
+  $dragTargetY = $gridTop + [int]($cellHeight / 2)
+  if (-not [BlackHoleWindowProbe]::DragFromTo($dragStartX, $taskY, $dragTargetX, $dragTargetY)) {
+    throw "Failed to drag task from Q1 $dragStartX,$taskY to Q2 $dragTargetX,$dragTargetY."
+  }
+  Wait-SmokeTaskState $smokeTaskTitle $true "q2" "todo" | Out-Null
+  Start-Sleep -Milliseconds 200
+  Save-DesktopScreenshot (Join-Path $OutputDirectory "04-task-dragged-q2.png")
+
+  $q2CheckX = $q2ContentLeft + 24
+  if (-not [BlackHoleWindowProbe]::ClickAt($q2CheckX, $taskY)) {
+    throw "Failed to click the Q2 completion control at $q2CheckX,$taskY."
+  }
+  Wait-SmokeTaskState $smokeTaskTitle $true "q2" "done" | Out-Null
+  Start-Sleep -Milliseconds 200
+  Save-DesktopScreenshot (Join-Path $OutputDirectory "05-task-completed-q2.png")
+
+  Invoke-SceneCloseClick $expanded "persistence"
+  try {
+    $orb = Wait-SceneCompact $process.Id 300 230 5000
+  } catch {
+    "RETRY_COLLAPSE persistence click was not observed by the transparent WebView"
+    $expanded = Wait-SceneSize $process.Id 800 600 5000
+    Invoke-SceneCloseClick $expanded "persistence-retry"
+    $orb = Wait-SceneCompact $process.Id 300 230 10000
+  }
+  $orbCenterX = [int](($orb.ClientBounds.Left + $orb.ClientBounds.Right) / 2)
+  $orbCenterY = [int](($orb.ClientBounds.Top + $orb.ClientBounds.Bottom) / 2)
+  if (-not [BlackHoleWindowProbe]::ClickAt($orbCenterX, $orbCenterY)) {
+    throw "Failed to reopen the compact scene at $orbCenterX,$orbCenterY."
+  }
+  $expanded = Wait-SceneSize $process.Id 800 600 10000
+  $expanded = Ensure-WindowOnVirtualScreen $process.Id $expanded
+  Wait-SmokeTaskState $smokeTaskTitle $true "q2" "done" | Out-Null
+  Start-Sleep -Milliseconds 200
+  Save-DesktopScreenshot (Join-Path $OutputDirectory "06-task-persisted-after-reopen.png")
+
+  $clientWidth = $expanded.ClientBounds.Right - $expanded.ClientBounds.Left
+  $gridLeft = $expanded.ClientBounds.Left + 26
+  $gridTop = $expanded.ClientBounds.Top + 56
+  $cellWidth = [int](($clientWidth - 52) / 2)
+  $q2ContentLeft = $gridLeft + $cellWidth + 150
+  $taskY = $gridTop + 12 + 27 + 4 + 17
+  $q2TaskBodyX = $q2ContentLeft + 90
+  if (-not [BlackHoleWindowProbe]::ClickAt($q2TaskBodyX, $taskY)) {
+    throw "Failed to open the Q2 task editor at $q2TaskBodyX,$taskY."
+  }
+  Start-Sleep -Milliseconds 250
+  [System.Windows.Forms.SendKeys]::SendWait("{TAB}{TAB}{TAB}{ENTER}")
+  Start-Sleep -Milliseconds 250
+  [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+  Wait-SmokeTaskState $smokeTaskTitle $false | Out-Null
+  Start-Sleep -Milliseconds 200
+  Save-DesktopScreenshot (Join-Path $OutputDirectory "07-task-deleted.png")
+  "TASK_INTERACTION_OK title=$smokeTaskTitle created=q1/todo dragged=q2/todo completed=q2/done persisted=q2/done deleted=true"
 
   Invoke-SceneCloseClick $expanded "initial"
   try {
