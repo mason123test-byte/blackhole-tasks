@@ -224,6 +224,8 @@ export const BLACK_HOLE_RENDERER_INFO = Object.freeze({
 });
 const BLACK_HOLE_STAGE_WIDTH = 240;
 const BLACK_HOLE_STAGE_HEIGHT = 180;
+const MAX_RENDER_WIDTH = 480;
+const MAX_RENDER_HEIGHT = 360;
 
 function reportOrbFrame(renderer: "webgl2", energy: number, width: number, height: number, diagnostic = "") {
   const diagnosticSuffix = diagnostic ? `|diag=${diagnostic}` : "";
@@ -413,8 +415,14 @@ export function startBlackHole(
 
       if (needsResize) {
         const dpr = Math.min(window.devicePixelRatio || 1, profile.pixelRatioCap);
-        const width = Math.round(Math.max(BLACK_HOLE_STAGE_WIDTH, canvas.clientWidth) * dpr);
-        const height = Math.round(Math.max(BLACK_HOLE_STAGE_HEIGHT, canvas.clientHeight) * dpr);
+        const desiredWidth = Math.max(BLACK_HOLE_STAGE_WIDTH, canvas.clientWidth) * dpr;
+        const desiredHeight = Math.max(BLACK_HOLE_STAGE_HEIGHT, canvas.clientHeight) * dpr;
+        // The editable DOM remains at native window resolution. Only cap the
+        // ray-traced backing buffer so a 920x700 scene cannot multiply the
+        // geodesic workload enough to reset WebView2's GPU process.
+        const renderScale = Math.min(1, MAX_RENDER_WIDTH / desiredWidth, MAX_RENDER_HEIGHT / desiredHeight);
+        const width = Math.round(desiredWidth * renderScale);
+        const height = Math.round(desiredHeight * renderScale);
         if (canvas.width !== width || canvas.height !== height) {
           canvas.width = width;
           canvas.height = height;

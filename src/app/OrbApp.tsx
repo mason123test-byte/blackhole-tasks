@@ -180,7 +180,12 @@ export function OrbApp() {
   const settings = useSettingsStore((state) => state.settings);
   const loadSettings = useSettingsStore((state) => state.load);
   const { tasks, error, loadAll, updateTask } = useTaskStore();
-  const [expanded, setExpanded] = useState(() => !("__TAURI_INTERNALS__" in window) && new URLSearchParams(location.search).get("compact") !== "1");
+  const [expanded, setExpanded] = useState(() => {
+    const persisted = sessionStorage.getItem("blackhole-scene-expanded");
+    if (persisted !== null) return persisted === "1";
+    if (!("__TAURI_INTERNALS__" in window)) return new URLSearchParams(location.search).get("compact") !== "1";
+    return false;
+  });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addingQuadrant, setAddingQuadrant] = useState<Quadrant | null>(null);
   const [query, setQuery] = useState("");
@@ -196,13 +201,22 @@ export function OrbApp() {
     let pulseTimer: number | undefined;
     const cleanups = [
       listen("orb:render-pulse", () => { setPulse(1); window.clearTimeout(pulseTimer); pulseTimer = window.setTimeout(() => setPulse(0), 420); }),
-      listen("scene:expanded-changed", (event) => setExpanded(Boolean(event.payload))),
-      listen("scene:quick-add", () => { setExpanded(true); setAddingQuadrant("q1"); }),
+      listen("scene:expanded-changed", (event) => {
+        const next = Boolean(event.payload);
+        sessionStorage.setItem("blackhole-scene-expanded", next ? "1" : "0");
+        setExpanded(next);
+      }),
+      listen("scene:quick-add", () => {
+        sessionStorage.setItem("blackhole-scene-expanded", "1");
+        setExpanded(true);
+        setAddingQuadrant("q1");
+      }),
     ];
     return () => { window.clearTimeout(pulseTimer); cleanups.forEach((cleanup) => void cleanup.then((fn) => fn())); };
   }, []);
 
   const setSceneExpanded = async (next: boolean) => {
+    sessionStorage.setItem("blackhole-scene-expanded", next ? "1" : "0");
     setExpanded(next);
     if (!next) { setEditingId(null); setAddingQuadrant(null); }
     await backend.window("set_scene_expanded", { expanded: next });
@@ -243,7 +257,7 @@ export function OrbApp() {
       onPointerCancel={() => { down.current = null; }}
     >
       <BlackHoleCanvas
-        hovered={expanded}
+        hovered={false}
         expanded={expanded}
         pulse={pulse}
         quality={settings.renderQuality}
