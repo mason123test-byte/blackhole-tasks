@@ -342,6 +342,29 @@ export function startBlackHole(
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
     gl.uniform1i(uniforms.sceneTexture, 0);
 
+    // Render into an explicit texture-backed framebuffer first. WebView2's
+    // transparent DirectComposition default framebuffer can return zeroes from
+    // readPixels even when the submitted frame is visible. The explicit target
+    // gives both the native smoke probe and the compositor the same shader
+    // output: validate it here, then blit it to the window surface below.
+    const outputTexture = gl.createTexture();
+    const outputFramebuffer = gl.createFramebuffer();
+    if (!outputTexture || !outputFramebuffer) throw new Error("无法创建黑洞输出帧缓冲");
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, outputTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, outputFramebuffer);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, outputTexture, 0);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+      throw new Error("黑洞输出帧缓冲不完整");
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.activeTexture(gl.TEXTURE0);
+
     canvas.dataset.renderer = "webgl2";
     canvas.dataset.model = BLACK_HOLE_RENDERER_INFO.model;
     canvas.dataset.quality = options.lowPowerMode ? "low-power" : (options.quality ?? "balanced");
@@ -390,10 +413,15 @@ export function startBlackHole(
         if (canvas.width !== width || canvas.height !== height) {
           canvas.width = width;
           canvas.height = height;
+          gl.activeTexture(gl.TEXTURE1);
+          gl.bindTexture(gl.TEXTURE_2D, outputTexture);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+          gl.activeTexture(gl.TEXTURE0);
         }
         needsResize = false;
       }
 
+      gl.bindFramebuffer(gl.FRAMEBUFFER, outputFramebuffer);
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.uniform2f(uniforms.resolution, canvas.width, canvas.height);
       gl.uniform1f(uniforms.time, (now - startedAt) / 1000);
@@ -436,6 +464,16 @@ export function startBlackHole(
         reportOrbFrame("webgl2", energy, canvas.width, canvas.height);
         rendererReady = energy > 100;
       }
+
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, outputFramebuffer);
+      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+      gl.blitFramebuffer(
+        0, 0, canvas.width, canvas.height,
+        0, 0, canvas.width, canvas.height,
+        gl.COLOR_BUFFER_BIT,
+        gl.NEAREST,
+      );
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
       measuredFrames += 1;
       if (now - measuredAt >= 1000) {
@@ -480,6 +518,8 @@ export function startBlackHole(
       canvas.removeEventListener("webglcontextlost", onContextLost);
       gl.deleteBuffer(buffer);
       gl.deleteTexture(sceneTexture);
+      gl.deleteFramebuffer(outputFramebuffer);
+      gl.deleteTexture(outputTexture);
       gl.deleteProgram(program);
     };
   } catch (error) {
