@@ -8,7 +8,7 @@ BlackHole Tasks 是一个 Windows 优先、本地优先的四象限桌面任务�
 
 - 透明、无边框、置顶的 WebGL2 黑洞；WebGL2 不可用时明确报错，不渲染等价替代效果
 - 同一个原生窗口围绕黑洞中心在 `240×180` 收起态和 `920×700` 任务态之间伸缩
-- 黑洞只由 WebGL2 测地线 Shader 渲染；四象限、任务和编辑框始终是可交互 DOM，不经过 Canvas2D
+- 黑洞由 WebGL2 测地线 Shader 渲染；非编辑态场景通过 SVG → `createImageBitmap` 直接上传为 GPU 输入纹理，四象限、任务和编辑框仍是可交互 DOM，全程不使用 Canvas2D
 - 在象限中直接新增，在任务原位置直接编辑，不打开工作区、快速新增或详情窗口
 - 任务卡可直接拖入任意象限并立即更新；完成和删除均可原地操作
 - 父子、依赖、普通关联模型与循环检测；折叠父任务时隐藏后代及相关边
@@ -168,7 +168,7 @@ HDDB/
 已实际通过：
 
 - `npm run typecheck`：通过
-- `npm run test`：5 个测试文件、10 项测试全部通过
+- `npm run test`：6 个测试文件、12 项测试全部通过
 - `npm run lint`：通过，0 warning
 - `npm run build`：通过
 - 真实 Chrome/WebGL2 收起态 `240×180`：像素能量 2034，控制台 0 error
@@ -176,15 +176,15 @@ HDDB/
 - 同一场景内从 Q1 新增任务、直接拖入 Q4、原地编辑：通过；编辑器仅保留标题、备注、保存和删除
 - 主动制造 `WEBGL_lose_context` 后自动重建：展开状态、4 个象限和 WebGL2 像素能量均保持
 - 禁用 WebGL2 时显示明确错误，`canvas2d` 渲染器数量为 0
-- GitHub Windows CI `31156086168`：前端、Rustfmt、Clippy、Rust 测试、Tauri 安装包构建和原生交互测试全部通过
-- Windows Server 2025/WebView2 首帧：`renderer=webgl2`，像素能量 5747，WebGL 错误码 0，帧缓冲完整
-- Windows 单窗口连续 12 次展开/收起：`threadsDelta=0`、`handlesDelta=0`
+- GitHub Windows CI `31186685252`：前端类型检查/Lint/测试/构建、Rustfmt、Clippy、Rust 测试、Tauri 安装包构建和原生交互测试全部通过
+- Windows Server 2025/WebView2 首帧：`renderer=webgl2`，像素能量 6173，帧缓冲完整
+- Windows 单窗口展开/关闭闭环：工具栏实测范围 `284,23–844,54`，关闭点击命中 `826,37`；结束时 `threadsDelta=0`、`handlesDelta=2`
 
 剩余人工验收项：在真实多显示器及不同 DPI 桌面上检查透明窗口的锚点伸缩和跨屏移动。
 
 ## 黑洞视觉参考
 
-黑洞渲染器基于 [s0xDk/ghostty-blackhole](https://github.com/s0xDk/ghostty-blackhole) 的 Schwarzschild 光子测地线积分进行适配：实际运行路径逐像素执行 leapfrog 积分，由光线与倾斜吸积盘的多次交点自然产生事件视界、光子环、上下引力透镜像、温度色彩与相对论多普勒增亮。参考项目把终端画面作为 `iChannel0`；本项目不上传任务纹理，也不建立 Canvas2D 路径，而是在同一个近黑终端式表面上叠加真实 DOM 四象限和任务行，从而保证任务能直接编辑、完成和跨象限拖动。完整第三方许可见 `THIRD_PARTY_NOTICES.md`。
+黑洞渲染器基于 [s0xDk/ghostty-blackhole](https://github.com/s0xDk/ghostty-blackhole) 的 Schwarzschild 光子测地线积分进行适配：实际运行路径逐像素执行 leapfrog 积分，由光线与倾斜吸积盘的多次交点自然产生事件视界、光子环、上下引力透镜像、温度色彩与相对论多普勒增亮。参考项目采样 Ghostty 提供的终端 `iChannel0`；本项目对应地把非编辑态四象限与任务行序列化为 SVG，经 `createImageBitmap` 解码后直接上传为 WebGL2 场景纹理，远场弱透镜与近场逃逸光线均会采样该纹理。真实 DOM 仍负责输入、编辑、完成和 Pointer Events 跨象限拖动，正在编辑的任务不会进入纹理快照；项目没有 Canvas2D 路径。完整第三方许可见 `THIRD_PARTY_NOTICES.md`。
 
 ## 已知问题
 
