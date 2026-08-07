@@ -6,6 +6,7 @@ const sourceFiles = [
   "../app/OrbApp.tsx",
   "../components/orb/BlackHoleCanvas.tsx",
   "./blackHoleRenderer.ts",
+  "./referenceBlackHoleShader.ts",
   "./sceneTexture.ts",
 ];
 
