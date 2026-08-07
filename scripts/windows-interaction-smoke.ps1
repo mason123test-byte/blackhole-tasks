@@ -322,6 +322,7 @@ try {
   }
   "SCRIPT_CURSOR requested=$orbCenterX,$orbCenterY actual=$($actualCursor.X),$($actualCursor.Y)"
   $expanded = Wait-SceneSize $process.Id 800 600
+  Start-Sleep -Milliseconds 800
   $expandedWindows = @(Get-AppWindows $process.Id | Where-Object { $_.Title -eq "黑洞任务" -or $_.Title.StartsWith("黑洞任务|") })
   if ($expandedWindows.Count -ne 1) {
     throw "Expansion created another native window; expected 1, found $($expandedWindows.Count)."
@@ -344,10 +345,12 @@ try {
     $compactCenterY = [int](($orb.ClientBounds.Top + $orb.ClientBounds.Bottom) / 2)
     [BlackHoleWindowProbe]::ClickAt($compactCenterX, $compactCenterY) | Out-Null
     $expanded = Wait-SceneSize $process.Id 800 600 10000
+    Start-Sleep -Milliseconds 350
     $collapseX = $expanded.ClientBounds.Left + [int](($expanded.ClientBounds.Right - $expanded.ClientBounds.Left) * 0.74)
     $collapseY = $expanded.ClientBounds.Top + 45
     [BlackHoleWindowProbe]::ClickAt($collapseX, $collapseY) | Out-Null
     $orb = Wait-SceneCompact $process.Id 300 230 10000
+    Start-Sleep -Milliseconds 250
   }
   Start-Sleep -Milliseconds 750
   $process.Refresh()

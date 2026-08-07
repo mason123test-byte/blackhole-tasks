@@ -219,6 +219,10 @@ export function OrbApp() {
     sessionStorage.setItem("blackhole-scene-expanded", next ? "1" : "0");
     setExpanded(next);
     if (!next) { setEditingId(null); setAddingQuadrant(null); }
+    // Let React commit the matching controls before the transparent native
+    // window changes size; otherwise a fast Win32 probe (and real users on a
+    // busy GPU) can briefly interact with the previous compact layout.
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     await backend.window("set_scene_expanded", { expanded: next });
   };
 
