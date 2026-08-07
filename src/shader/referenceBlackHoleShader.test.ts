@@ -27,6 +27,18 @@ describe("reference-faithful black-hole shader", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("stars(escapedDirection)");
   });
 
+  it("keeps the near-field projection continuous and attenuates it once", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "vec2 sampledScreen = mix(screen, escapedScreen, lensWindow);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "sceneColor = texture(u_scene_texture, sampledUv).rgb;",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain(
+      "sceneColor = texture(u_scene_texture, sampledUv).rgb * towardScene;",
+    );
+  });
+
   it("outputs premultiplied coverage without straight-alpha division", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "outColor = vec4(min(premultiplied, vec3(coverage)), coverage);",
