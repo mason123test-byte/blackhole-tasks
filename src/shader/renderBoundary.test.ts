@@ -5,17 +5,21 @@ import { describe, expect, it } from "vitest";
 const sourceFiles = [
   "../app/OrbApp.tsx",
   "../components/orb/BlackHoleCanvas.tsx",
-  "../components/orb/GravitySceneTexture.tsx",
   "./blackHoleRenderer.ts",
+  "./sceneTexture.ts",
 ];
 
+const readSource = (relativePath: string) =>
+  readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), "utf8");
+
 describe("black-hole surface boundary", () => {
-  it("never uses a Canvas2D task or fallback path", () => {
+  it("feeds a scene texture into WebGL without any Canvas2D path", () => {
     for (const relativePath of sourceFiles) {
-      const source = readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), "utf8");
+      const source = readSource(relativePath);
       expect(source, relativePath).not.toMatch(/getContext\s*\(\s*["']2d["']/);
       expect(source, relativePath).not.toContain("CanvasRenderingContext2D");
-      expect(source, relativePath).not.toContain("u_scene_texture");
     }
+
+    expect(readSource("./blackHoleRenderer.ts")).toContain("u_scene_texture");
   });
 });
