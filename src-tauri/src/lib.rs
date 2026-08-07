@@ -863,16 +863,18 @@ fn start_smoke_command_monitor(app: tauri::AppHandle, command_path: PathBuf) {
                                 }
                             }
                             SmokeCommand::Snapshot(sequence) => {
-                                let snapshot = app.state::<Database>().list_tasks().and_then(|tasks| {
-                                    serde_json::to_vec_pretty(&serde_json::json!({
-                                        "sequence": sequence,
-                                        "tasks": tasks,
-                                    }))
-                                    .map_err(AppError::from)
-                                });
+                                let snapshot =
+                                    app.state::<Database>().list_tasks().and_then(|tasks| {
+                                        serde_json::to_vec_pretty(&serde_json::json!({
+                                            "sequence": sequence,
+                                            "tasks": tasks,
+                                        }))
+                                        .map_err(AppError::from)
+                                    });
                                 match snapshot {
                                     Ok(snapshot) => {
-                                        if let Err(error) = std::fs::write(&snapshot_path, snapshot) {
+                                        if let Err(error) = std::fs::write(&snapshot_path, snapshot)
+                                        {
                                             log::error!("smoke snapshot write failed: {error}");
                                         }
                                     }
