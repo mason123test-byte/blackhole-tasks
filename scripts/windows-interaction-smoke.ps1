@@ -208,6 +208,33 @@ function Wait-SceneCompact([int]$ProcessId, [int]$MaximumWidth = 300, [int]$Maxi
   throw "Single scene did not return below ${MaximumWidth}x${MaximumHeight} within ${TimeoutMilliseconds}ms."
 }
 
+function Get-SceneClosePoint($Window) {
+  $clientWidth = $Window.ClientBounds.Right - $Window.ClientBounds.Left
+  $toolbarWidth = [Math]::Min(560, [Math]::Max(1, $clientWidth - 64))
+  $toolbarLeft = $Window.ClientBounds.Left + [int](($clientWidth - $toolbarWidth) / 2)
+  $toolbarRight = $toolbarLeft + $toolbarWidth
+  return [PSCustomObject]@{
+    X = $toolbarRight - 18
+    Y = $Window.ClientBounds.Top + 27
+    Left = $toolbarLeft
+    Top = $Window.ClientBounds.Top + 13
+    Right = $toolbarRight
+    Bottom = $Window.ClientBounds.Top + 44
+  }
+}
+
+function Invoke-SceneCloseClick($Window, [string]$Attempt) {
+  $target = Get-SceneClosePoint $Window
+  if (-not [BlackHoleWindowProbe]::ClickAt($target.X, $target.Y)) {
+    throw "Failed to click the in-scene close control at $($target.X),$($target.Y)."
+  }
+  $actual = [BlackHoleWindowProbe+Point]::new()
+  if (-not [BlackHoleWindowProbe]::GetCursorPos([ref]$actual)) {
+    throw "GetCursorPos failed after clicking the in-scene close control."
+  }
+  "CLOSE_TARGET attempt=$Attempt toolbar=$($target.Left),$($target.Top),$($target.Right),$($target.Bottom) requested=$($target.X),$($target.Y) actual=$($actual.X),$($actual.Y)"
+}
+
 function Save-DesktopScreenshot([string]$Path) {
   $screen = [System.Windows.Forms.SystemInformation]::VirtualScreen
   $bitmap = [System.Drawing.Bitmap]::new($screen.Width, $screen.Height)
@@ -337,17 +364,14 @@ try {
   Save-DesktopScreenshot (Join-Path $OutputDirectory "02-single-scene-expanded.png")
   Save-ScreenRegion (Join-Path $OutputDirectory "02-single-scene-closeup.png") $expanded.ClientBounds 8
 
-  $collapseX = $expanded.ClientBounds.Left + [int](($expanded.ClientBounds.Right - $expanded.ClientBounds.Left) * 0.74)
-  $collapseY = $expanded.ClientBounds.Top + 45
-  if (-not [BlackHoleWindowProbe]::ClickAt($collapseX, $collapseY)) {
-    throw "Failed to click the in-scene collapse control."
-  }
+  Invoke-SceneCloseClick $expanded "initial"
   try {
     $orb = Wait-SceneCompact $process.Id 300 230 5000
   } catch {
     "RETRY_COLLAPSE initial click was not observed by the transparent WebView"
     Start-Sleep -Milliseconds 500
-    [BlackHoleWindowProbe]::ClickAt($collapseX, $collapseY) | Out-Null
+    $expanded = Wait-SceneSize $process.Id 800 600 5000
+    Invoke-SceneCloseClick $expanded "retry"
     $orb = Wait-SceneCompact $process.Id 300 230 10000
   }
 
