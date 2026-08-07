@@ -1,4 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
+import {
+  REFERENCE_BLACK_HOLE_FRAGMENT,
+  REFERENCE_BLACK_HOLE_INFO,
+  REFERENCE_BLACK_HOLE_VERTEX,
+} from "./referenceBlackHoleShader";
 import type { RenderQuality } from "../types/settings";
 import {
   buildSceneTextureSignature,
@@ -7,252 +12,7 @@ import {
   type SceneTextureSnapshot,
 } from "./sceneTexture";
 
-const vertex = `#version 300 es
-in vec2 a_position;
-out vec2 v_uv;
-void main() {
-  v_uv = a_position * 0.5 + 0.5;
-  gl_Position = vec4(a_position, 0.0, 1.0);
-}`;
-
-// Adapted for a transparent desktop WebView from s0xDk/ghostty-blackhole's
-// Schwarzschild geodesic tracer (MIT). Unlike the previous painted-ring
-// approximation, the shadow, photon ring and upper/lower disk images all come
-// from integrating the ray path. An SVG snapshot uploaded directly to a WebGL
-// texture supplies the iChannel0-equivalent scene without any Canvas2D path.
-const fragment = `#version 300 es
-precision highp float;
-in vec2 v_uv;
-out vec4 outColor;
-
-uniform vec2 u_resolution;
-uniform float u_time;
-uniform float u_hover;
-uniform float u_pulse;
-uniform float u_detail;
-uniform float u_expanded;
-uniform sampler2D u_scene_texture;
-uniform float u_scene_ready;
-
-#define PI 3.14159265359
-#define B_CRIT 2.5980762
-#define N_STEPS 48
-
-const float DISK_INNER = 1.8;
-const float DISK_OUTER = 8.0;
-const float DISK_INCL = 1.50;
-const float DISK_ROLL = 0.35;
-
-float hash21(vec2 p) {
-  p = fract(p * vec2(234.34, 435.345));
-  p += dot(p, p + 34.23);
-  return fract(p.x * p.y);
-}
-
-float vnoiseWrapY(vec2 p, float periodY) {
-  vec2 i = floor(p), f = fract(p);
-  f = f * f * (3.0 - 2.0 * f);
-  float y0 = mod(i.y, periodY);
-  float y1 = mod(i.y + 1.0, periodY);
-  return mix(mix(hash21(vec2(i.x, y0)), hash21(vec2(i.x + 1.0, y0)), f.x),
-             mix(hash21(vec2(i.x, y1)), hash21(vec2(i.x + 1.0, y1)), f.x), f.y);
-}
-
-vec2 rotate2(vec2 p, float angle) {
-  float c = cos(angle);
-  float s = sin(angle);
-  return vec2(c * p.x - s * p.y, s * p.x + c * p.y);
-}
-
-vec2 mirrorUV(vec2 value) {
-  return 1.0 - abs(1.0 - mod(value, 2.0));
-}
-
-vec3 blackbody(float temperature) {
-  float t = clamp(temperature, 1500.0, 40000.0) / 100.0;
-  float r = t <= 66.0 ? 1.0 : clamp(1.292936 * pow(t - 60.0, -0.1332047), 0.0, 1.0);
-  float g = t <= 66.0
-    ? clamp(0.3900816 * log(t) - 0.6318414, 0.0, 1.0)
-    : clamp(1.1298909 * pow(t - 60.0, -0.0755148), 0.0, 1.0);
-  float b = t >= 66.0
-    ? 1.0
-    : (t <= 19.0 ? 0.0 : clamp(0.5432068 * log(t - 10.0) - 1.1962540, 0.0, 1.0));
-  return vec3(r, g, b);
-}
-
-vec3 stars(vec3 direction) {
-  vec2 spherical = vec2(atan(direction.x, -direction.z), asin(clamp(direction.y, -1.0, 1.0)));
-  vec2 grid = spherical * 34.0;
-  vec2 cell = floor(grid);
-  float seed = hash21(cell);
-  if (seed < 0.955) return vec3(0.0);
-  vec2 local = fract(grid) - 0.5;
-  vec2 offset = (vec2(hash21(cell + 17.3), hash21(cell + 31.7)) - 0.5) * 0.66;
-  float spark = smoothstep(0.11, 0.0, length(local - offset));
-  float twinkle = 0.78 + 0.22 * sin(u_time * (0.45 + 1.6 * hash21(cell + 5.1)) + 40.0 * seed);
-  vec3 tint = mix(vec3(1.0, 0.78, 0.54), vec3(0.65, 0.78, 1.0), hash21(cell + 2.9));
-  return tint * spark * twinkle * ((seed - 0.955) / 0.045);
-}
-
-void rayTracedReference() {
-  float aspect = u_resolution.x / max(u_resolution.y, 1.0);
-  vec2 screen = (v_uv - 0.5) * vec2(aspect, 1.0);
-
-  // On the 240x180 transparent stage this gives a ~54px shadow and lets the
-  // r=8 disk nearly fill the height, matching the reference composition.
-  float breathe = 1.0 + 0.012 * sin(u_time * 1.15) + 0.045 * u_hover;
-  float shadowRadius = mix(0.150, 0.085, u_expanded) * breathe;
-  float worldScale = B_CRIT / shadowRadius;
-  vec2 rayPlane = rotate2(vec2(screen.x, -screen.y), DISK_ROLL) * worldScale;
-  float impact = length(rayPlane);
-  float screenDistance = length(screen);
-  float lensWindow = exp(-pow(screenDistance / (7.0 * shadowRadius), 2.0));
-  float traceLimit = DISK_OUTER + 2.0;
-  float cameraZ = 14.0;
-
-  // Match the reference shader's finite-camera weak-field handoff. Ghostty
-  // samples iChannel0 here; this build samples the GPU-uploaded scene texture.
-  if (impact >= traceLimit) {
-    if (u_scene_ready < 0.5 || lensWindow < 0.01) {
-      outColor = vec4(0.0);
-      return;
-    }
-    float finiteCamera = cameraZ * inversesqrt(cameraZ * cameraZ + impact * impact);
-    float deflection = (2.0 / (worldScale * worldScale)) / max(screenDistance, 0.0001)
-      * (1.29 * finiteCamera + 0.07)
-      * max(13.0 - 2.14 * finiteCamera + 0.75, 0.0)
-      * lensWindow;
-    vec2 direction = screen / max(screenDistance, 0.00001);
-    vec2 sampledScreen = screen - direction * deflection;
-    vec2 sampledUv = mirrorUV(vec2(0.5) + sampledScreen / vec2(aspect, 1.0));
-    vec3 scene = texture(u_scene_texture, sampledUv).rgb;
-    float alpha = smoothstep(0.02, 0.22, lensWindow) * u_scene_ready;
-    outColor = vec4(scene, alpha);
-    return;
-  }
-  vec3 position = vec3(rayPlane, cameraZ);
-  vec3 velocity = vec3(0.0, 0.0, -1.0);
-  float angularMomentum2 = dot(rayPlane, rayPlane);
-
-  float ci = cos(DISK_INCL), si = sin(DISK_INCL);
-  vec3 diskNormal = vec3(0.0, si, ci);
-  vec3 diskAxis = vec3(0.0, ci, -si);
-  vec3 emission = vec3(0.0);
-  float transmittance = 1.0;
-  bool captured = false;
-  float previousSide = dot(position, diskNormal);
-  vec3 previousPosition = position;
-  int maxSteps = int(mix(24.0, 48.0, u_detail));
-  float patternTime = u_time * mix(0.48, 0.82, u_hover);
-
-  for (int i = 0; i < N_STEPS; i++) {
-    if (i >= maxSteps) break;
-    float radius2 = dot(position, position);
-    if (radius2 < 1.0) {
-      captured = true;
-      break;
-    }
-    if (position.z < -cameraZ && velocity.z < 0.0) break;
-    if (radius2 > 4.0 * cameraZ * cameraZ) break;
-
-    float radius = sqrt(radius2);
-    float dt = clamp(0.16 * radius, 0.03, 1.5);
-    vec3 acceleration = -1.5 * angularMomentum2 * position / (radius2 * radius2 * radius);
-    velocity += acceleration * (0.5 * dt);
-    position += velocity * dt;
-    radius2 = max(dot(position, position), 0.0001);
-    radius = sqrt(radius2);
-    acceleration = -1.5 * angularMomentum2 * position / (radius2 * radius2 * radius);
-    velocity += acceleration * (0.5 * dt);
-
-    float side = dot(position, diskNormal);
-    if (side * previousSide < 0.0 && transmittance > 0.02) {
-      float crossing = previousSide / (previousSide - side);
-      vec3 diskPoint = mix(previousPosition, position, crossing);
-      float diskRadius = length(diskPoint);
-      if (diskRadius > DISK_INNER && diskRadius < DISK_OUTER) {
-        float band = smoothstep(DISK_INNER, DISK_INNER * 1.25, diskRadius)
-          * (1.0 - smoothstep(DISK_OUTER * 0.70, DISK_OUTER, diskRadius));
-        float phi = atan(dot(diskPoint, diskAxis), diskPoint.x);
-        float turns = phi / (2.0 * PI);
-        float kepler = pow(DISK_INNER / diskRadius, 1.5);
-        float localTime = sqrt(max(1.0 - 1.5 / diskRadius, 0.02));
-        float swirl = diskRadius * 7.0 * 0.12 - patternTime * kepler * 5.0 * localTime;
-        float streaks = vnoiseWrapY(vec2(diskRadius * 2.8, turns * 19.0 + swirl * 3.0), 19.0) * 0.65
-          + vnoiseWrapY(vec2(diskRadius, turns * 9.0 + swirl * 1.5 + 7.0), 9.0) * 0.35;
-        streaks = mix(0.72, 0.35 + 1.6 * streaks * streaks, u_detail);
-
-        vec3 gasDirection = normalize(cross(diskNormal, diskPoint));
-        float beta = clamp(inversesqrt(max(2.0 * (diskRadius - 1.0), 0.2)), 0.0, 0.99);
-        float shift = localTime / max(1.0 + beta * dot(gasDirection, normalize(velocity)), 0.05);
-        shift = mix(1.0, shift, 0.60);
-        float profileBase = max(1.0 - sqrt(DISK_INNER / diskRadius), 0.0);
-        float temperatureProfile = pow(DISK_INNER / diskRadius, 0.75) * pow(profileBase, 0.25) / 0.488;
-        vec3 diskColor = blackbody(5500.0 * temperatureProfile * shift);
-        float boost = pow(shift, 2.5);
-        float density = band * streaks;
-        emission += transmittance * diskColor
-          * (4.84 * density * temperatureProfile * temperatureProfile * boost);
-        transmittance *= 1.0 - clamp(0.90 * density, 0.0, 1.0);
-      }
-    }
-    previousSide = side;
-    previousPosition = position;
-  }
-
-  if (!captured && dot(position, position) < 4.0) captured = true;
-
-  vec3 additiveSky = vec3(0.0);
-  vec3 sceneColor = vec3(0.0);
-  float sceneAlpha = 0.0;
-  if (!captured) {
-    vec3 escapedDirection = normalize(velocity);
-    additiveSky = stars(escapedDirection) * 0.16 * u_detail;
-    if (u_scene_ready > 0.5 && escapedDirection.z < -0.05) {
-      float projection = (-13.0 - position.z) / escapedDirection.z;
-      vec3 hit = position + escapedDirection * projection;
-      vec2 unrolled = rotate2(hit.xy, -DISK_ROLL) / worldScale;
-      vec2 sampledScreen = vec2(unrolled.x, -unrolled.y);
-      vec2 sampledUv = mirrorUV(vec2(0.5) + sampledScreen / vec2(aspect, 1.0));
-      float towardScene = smoothstep(0.05, 0.35, -escapedDirection.z);
-      sceneColor = texture(u_scene_texture, sampledUv).rgb * towardScene;
-      sceneAlpha = smoothstep(0.02, 0.22, lensWindow) * towardScene * u_scene_ready;
-    }
-  }
-  vec3 diskLight = vec3(1.0) - exp(-emission * mix(1.35, 1.60, u_hover));
-
-  float pulseRadius = mix(shadowRadius * 1.18, shadowRadius * 3.0, 1.0 - u_pulse);
-  float pulseDistance = abs(length(screen) - pulseRadius);
-  vec3 pulseLight = vec3(1.0, 0.45, 0.12)
-    * exp(-pulseDistance * pulseDistance * 1800.0) * u_pulse;
-  // Keep disk emission in front of both escaped and captured rays. Captured
-  // rays remove only the background; dropping their accumulated emission was
-  // the reason earlier builds rendered a clipped bright wedge.
-  // Build the physical premultiplied result first, then convert to straight
-  // alpha for WebView2. Returning the dim emission as straight RGB directly
-  // would multiply it by alpha a second time and erase the reference filaments.
-  vec3 premultiplied = sceneColor * sceneAlpha * transmittance
-    + additiveSky + diskLight + pulseLight;
-  float additiveAlpha = max(max(additiveSky.r, additiveSky.g), additiveSky.b);
-  float diskAlpha = max(max(diskLight.r, diskLight.g), diskLight.b);
-  diskAlpha = max(diskAlpha, 1.0 - transmittance);
-  float pulseAlpha = max(max(pulseLight.r, pulseLight.g), pulseLight.b);
-  float alpha = captured ? 0.997 : clamp(max(sceneAlpha, max(additiveAlpha, diskAlpha)), 0.0, 0.97);
-  alpha = max(alpha, pulseAlpha);
-  vec3 straightColor = alpha > 0.0001 ? premultiplied / alpha : vec3(0.0);
-  outColor = vec4(clamp(straightColor, 0.0, 1.0), alpha);
-}
-
-void main() {
-  rayTracedReference();
-}`;
-
-export const BLACK_HOLE_RENDERER_INFO = Object.freeze({
-  model: "schwarzschild-geodesic",
-  integrationSteps: 48,
-  reference: "https://github.com/s0xDk/ghostty-blackhole",
-  sceneInput: "svg-gpu-texture",
-});
+export const BLACK_HOLE_RENDERER_INFO = REFERENCE_BLACK_HOLE_INFO;
 const BLACK_HOLE_STAGE_WIDTH = 240;
 const BLACK_HOLE_STAGE_HEIGHT = 180;
 const MAX_RENDER_WIDTH = 480;
@@ -305,7 +65,7 @@ export function startBlackHole(
     antialias: false,
     depth: false,
     stencil: false,
-    premultipliedAlpha: false,
+    premultipliedAlpha: true,
     // WebView2 can create this transparent surface while its native window is
     // still hidden. Preserve the submitted frame until the first visible
     // compositor/readback handshake has proved that real pixels exist.
@@ -333,8 +93,8 @@ export function startBlackHole(
   };
 
   try {
-    const vertexShader = compile(gl.VERTEX_SHADER, vertex);
-    const fragmentShader = compile(gl.FRAGMENT_SHADER, fragment);
+    const vertexShader = compile(gl.VERTEX_SHADER, REFERENCE_BLACK_HOLE_VERTEX);
+    const fragmentShader = compile(gl.FRAGMENT_SHADER, REFERENCE_BLACK_HOLE_FRAGMENT);
     const program = gl.createProgram();
     if (!program) throw new Error("无法创建黑洞渲染程序");
     gl.attachShader(program, vertexShader);
@@ -358,9 +118,6 @@ export function startBlackHole(
     const uniforms = {
       resolution: gl.getUniformLocation(program, "u_resolution"),
       time: gl.getUniformLocation(program, "u_time"),
-      hover: gl.getUniformLocation(program, "u_hover"),
-      pulse: gl.getUniformLocation(program, "u_pulse"),
-      detail: gl.getUniformLocation(program, "u_detail"),
       expanded: gl.getUniformLocation(program, "u_expanded"),
       sceneTexture: gl.getUniformLocation(program, "u_scene_texture"),
       sceneReady: gl.getUniformLocation(program, "u_scene_ready"),
@@ -412,7 +169,6 @@ export function startBlackHole(
     let lastFrameAt = 0;
     let nextFrameAt = 0;
     let startedAt = performance.now();
-    let hoverValue = getHover();
     let measuredFrames = 0;
     let measuredAt = startedAt;
     let needsResize = true;
@@ -476,12 +232,10 @@ export function startBlackHole(
         schedule();
         return;
       }
-      const delta = Math.min(1, (now - lastFrameAt) / 1000);
       lastFrameAt = now;
       nextFrameAt = nextFrameAt === 0 || now - nextFrameAt > frameInterval * 3
         ? now + frameInterval
         : nextFrameAt + frameInterval;
-      hoverValue += (targetHover - hoverValue) * Math.min(1, delta * 9);
 
       if (needsResize) {
         const dpr = Math.min(window.devicePixelRatio || 1, profile.pixelRatioCap);
@@ -524,10 +278,7 @@ export function startBlackHole(
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.uniform2f(uniforms.resolution, canvas.width, canvas.height);
       gl.uniform1f(uniforms.time, (now - startedAt) / 1000);
-      gl.uniform1f(uniforms.hover, hoverValue);
-      gl.uniform1f(uniforms.pulse, getPulse());
       refreshSceneTexture();
-      gl.uniform1f(uniforms.detail, profile.detail);
       gl.uniform1f(uniforms.expanded, getExpanded());
       gl.uniform1f(uniforms.sceneReady, sceneReady ? 1 : 0);
       gl.clearColor(0, 0, 0, 0);
