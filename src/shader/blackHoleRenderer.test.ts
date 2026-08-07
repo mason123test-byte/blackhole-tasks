@@ -16,7 +16,10 @@ describe("black-hole render profiles", () => {
     expect(BLACK_HOLE_RENDERER_INFO).toMatchObject({
       model: "schwarzschild-geodesic",
       integrationSteps: 48,
+      tracePadding: 3,
+      starGain: 0,
       sceneInput: "svg-gpu-texture",
+      alphaMode: "premultiplied-coverage",
     });
   });
 });
