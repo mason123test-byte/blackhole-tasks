@@ -25,8 +25,6 @@ uniform float u_hover;
 uniform float u_pulse;
 uniform float u_detail;
 uniform float u_expanded;
-uniform sampler2D u_scene_texture;
-uniform float u_has_scene;
 
 #define PI 3.14159265359
 #define B_CRIT 2.5980762
@@ -178,21 +176,9 @@ void rayTracedReference() {
   if (!captured && dot(position, position) < 4.0) captured = true;
 
   vec3 sky = vec3(0.0);
-  float sceneAlpha = 0.0;
   if (!captured) {
     vec3 escapedDirection = normalize(velocity);
     sky = stars(escapedDirection) * 0.16 * u_detail;
-    if (u_has_scene > 0.5 && escapedDirection.z < -0.05) {
-      float projection = (-13.0 - position.z) / escapedDirection.z;
-      vec3 scenePoint = position + escapedDirection * projection;
-      vec2 unrolled = rotate2(scenePoint.xy, -DISK_ROLL) / worldScale;
-      vec2 sceneUv = 0.5 + vec2(unrolled.x, -unrolled.y) / vec2(aspect, 1.0);
-      if (all(greaterThanEqual(sceneUv, vec2(0.0))) && all(lessThanEqual(sceneUv, vec2(1.0)))) {
-        vec4 taskLayer = texture(u_scene_texture, sceneUv);
-        sky += taskLayer.rgb * taskLayer.a;
-        sceneAlpha = taskLayer.a;
-      }
-    }
   }
   vec3 diskLight = vec3(1.0) - exp(-emission * mix(1.35, 1.60, u_hover));
 
@@ -208,7 +194,7 @@ void rayTracedReference() {
 
   float lightAlpha = max(max(color.r, color.g), color.b);
   float diskOpacity = 1.0 - transmittance;
-  float alpha = captured ? 0.997 : clamp(max(max(lightAlpha, diskOpacity), sceneAlpha * transmittance), 0.0, 0.97);
+  float alpha = captured ? 0.997 : clamp(max(lightAlpha, diskOpacity), 0.0, 0.97);
   alpha = max(alpha, max(max(pulseLight.r, pulseLight.g), pulseLight.b));
   outColor = vec4(clamp(color, 0.0, 1.0), alpha);
 }
@@ -265,7 +251,6 @@ export function startBlackHole(
   getHover: () => number,
   getPulse: () => number,
   getExpanded: () => number,
-  getSceneTexture: () => HTMLCanvasElement | null,
   options: RendererOptions = {},
 ) {
   const profile = getRenderProfile(options.quality ?? "balanced", options.lowPowerMode);
@@ -331,19 +316,7 @@ export function startBlackHole(
       pulse: gl.getUniformLocation(program, "u_pulse"),
       detail: gl.getUniformLocation(program, "u_detail"),
       expanded: gl.getUniformLocation(program, "u_expanded"),
-      sceneTexture: gl.getUniformLocation(program, "u_scene_texture"),
-      hasScene: gl.getUniformLocation(program, "u_has_scene"),
     };
-    const sceneTexture = gl.createTexture();
-    if (!sceneTexture) throw new Error("无法创建四象限场景纹理");
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, sceneTexture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
-    gl.uniform1i(uniforms.sceneTexture, 0);
 
     // Render into an explicit texture-backed framebuffer first. WebView2's
     // transparent DirectComposition default framebuffer can return zeroes from
@@ -384,7 +357,6 @@ export function startBlackHole(
     let needsResize = true;
     let readbackAttempts = 0;
     let rendererReady = false;
-    let uploadedSceneVersion = "";
     let contextLost = false;
     let bootstrapTimers: number[] = [];
 
@@ -458,20 +430,6 @@ export function startBlackHole(
       gl.uniform1f(uniforms.pulse, getPulse());
       gl.uniform1f(uniforms.detail, profile.detail);
       gl.uniform1f(uniforms.expanded, getExpanded());
-      const sceneSource = getSceneTexture();
-      if (sceneSource && sceneSource.width > 0 && sceneSource.height > 0) {
-        const sceneVersion = `${sceneSource.width}x${sceneSource.height}:${sceneSource.dataset.version ?? "0"}`;
-        if (sceneVersion !== uploadedSceneVersion) {
-          gl.activeTexture(gl.TEXTURE0);
-          gl.bindTexture(gl.TEXTURE_2D, sceneTexture);
-          gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sceneSource);
-          uploadedSceneVersion = sceneVersion;
-        }
-        gl.uniform1f(uniforms.hasScene, getExpanded());
-      } else {
-        gl.uniform1f(uniforms.hasScene, 0);
-      }
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -574,7 +532,6 @@ export function startBlackHole(
       canvas.removeEventListener("webglcontextlost", onContextLost);
       canvas.removeEventListener("webglcontextrestored", onContextRestored);
       gl.deleteBuffer(buffer);
-      gl.deleteTexture(sceneTexture);
       gl.deleteFramebuffer(outputFramebuffer);
       gl.deleteTexture(outputTexture);
       gl.deleteProgram(program);

@@ -871,3 +871,245 @@ button.primary {
   .gravity-quadrant > header { padding-inline: 7px; }
   .gravity-center-control { width: 146px; }
 }
+
+/* Ghostty-style single surface: a near-black terminal field, ray-traced
+   WebGL2 core, and real DOM task rows. No task content is rasterized. */
+.gravity-app.is-expanded {
+  background: rgb(2 5 8 / 0.97);
+  border: 1px solid rgb(125 160 174 / 0.18);
+}
+.gravity-app.is-expanded::before {
+  z-index: 0;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 3px, rgb(150 190 198 / 0.012) 3px 4px),
+    radial-gradient(circle at 50% 50%, rgb(18 31 37 / 0.26), transparent 58%);
+}
+.gravity-app.is-expanded .black-hole-canvas { z-index: 1; }
+.gravity-app.is-expanded .gravity-toolbar {
+  top: 13px;
+  width: min(560px, calc(100% - 64px));
+  gap: 8px;
+  padding: 0 2px 7px;
+  border: 0;
+  border-bottom: 1px solid rgb(127 164 176 / 0.24);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  color: #78909c;
+  font-family: "Cascadia Mono", "Consolas", monospace;
+}
+.gravity-app.is-expanded .gravity-toolbar label { padding: 0; color: #80cbc4; }
+.gravity-app.is-expanded .gravity-toolbar input {
+  padding: 5px 8px;
+  color: #c7d4d8;
+  font-family: inherit;
+  font-size: 11px;
+}
+.gravity-app.is-expanded .gravity-toolbar input::placeholder { color: #52646c; }
+.gravity-app.is-expanded .gravity-toolbar button,
+.gravity-app.is-expanded .gravity-quadrant > header button {
+  padding: 3px 5px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #607d8b;
+  font-family: inherit;
+  font-size: 10px;
+}
+.gravity-app.is-expanded .gravity-toolbar button:hover,
+.gravity-app.is-expanded .gravity-quadrant > header button:hover { color: #c3e88d; background: transparent; }
+.gravity-app.is-expanded .gravity-count { color: #546e7a; font-family: inherit; }
+.gravity-app.is-expanded .gravity-axis { z-index: 2; opacity: 1; }
+.gravity-app.is-expanded .gravity-axis-x {
+  left: 26px;
+  right: 26px;
+  background: linear-gradient(90deg, transparent, rgb(115 145 156 / 0.24) 9%, rgb(115 145 156 / 0.24) 42%, transparent 46% 54%, rgb(115 145 156 / 0.24) 58%, rgb(115 145 156 / 0.24) 91%, transparent);
+}
+.gravity-app.is-expanded .gravity-axis-y {
+  top: 56px;
+  bottom: 24px;
+  background: linear-gradient(transparent, rgb(115 145 156 / 0.24) 9%, rgb(115 145 156 / 0.24) 39%, transparent 45% 55%, rgb(115 145 156 / 0.24) 61%, rgb(115 145 156 / 0.24) 91%, transparent);
+}
+.gravity-app.is-expanded .gravity-quadrants {
+  z-index: 3;
+  inset: 56px 26px 24px;
+  gap: 0;
+}
+.gravity-app.is-expanded .gravity-quadrant {
+  --quadrant-accent: #89aeb8;
+  overflow: visible;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  transition: background 100ms linear;
+}
+.gravity-app.is-expanded .gravity-q1 { --quadrant-accent: #f07178; padding-right: 150px; padding-bottom: 96px; }
+.gravity-app.is-expanded .gravity-q2 { --quadrant-accent: #c3e88d; padding-left: 150px; padding-bottom: 96px; }
+.gravity-app.is-expanded .gravity-q3 { --quadrant-accent: #ffcb6b; padding-right: 150px; padding-top: 96px; }
+.gravity-app.is-expanded .gravity-q4 { --quadrant-accent: #82aaff; padding-left: 150px; padding-top: 96px; }
+.gravity-app.is-expanded .gravity-quadrant:hover,
+.gravity-app.is-expanded .gravity-quadrant:focus-within { background: rgb(115 150 160 / 0.018); }
+.gravity-app.is-expanded .gravity-quadrant.is-drop-target {
+  background: rgb(128 203 196 / 0.08);
+  box-shadow: inset 0 0 0 1px rgb(128 203 196 / 0.38);
+}
+.gravity-app.is-expanded .gravity-quadrant > header {
+  min-height: 27px;
+  padding: 0 0 6px;
+  border: 0;
+  border-bottom: 1px dashed rgb(120 151 161 / 0.18);
+  color: #647982;
+  font-family: "Cascadia Mono", "Consolas", monospace;
+}
+.gravity-app.is-expanded .gravity-quadrant > header span { gap: 8px; }
+.gravity-app.is-expanded .gravity-quadrant > header b {
+  color: var(--quadrant-accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.gravity-app.is-expanded .gravity-quadrant > header em {
+  color: #6e8087;
+  font-size: 10px;
+  font-style: normal;
+}
+.gravity-app.is-expanded .gravity-task-list {
+  gap: 0;
+  padding: 4px 0 0;
+  scrollbar-color: rgb(96 125 139 / 0.45) transparent;
+}
+.gravity-app.is-expanded .gravity-card {
+  min-height: 34px;
+  align-items: center;
+  overflow: visible;
+  border: 0;
+  border-bottom: 1px solid rgb(112 141 151 / 0.10);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #b8c6ca;
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  cursor: grab;
+  touch-action: none;
+  transition: color 80ms linear, background 80ms linear, opacity 80ms linear;
+}
+.gravity-app.is-expanded .gravity-card::before {
+  content: ">";
+  padding-left: 2px;
+  color: var(--quadrant-accent);
+  opacity: 0.7;
+  font-size: 10px;
+}
+.gravity-app.is-expanded .gravity-card:hover,
+.gravity-app.is-expanded .gravity-card:focus-within {
+  border-color: rgb(112 141 151 / 0.16);
+  background: rgb(136 170 180 / 0.045);
+  transform: none;
+  color: #e2ecee;
+}
+.gravity-app.is-expanded .gravity-card.is-dragging { opacity: 0.22; cursor: grabbing; }
+.gravity-app.is-expanded .gravity-card.status-done { opacity: 0.46; text-decoration: line-through; }
+.gravity-app.is-expanded .gravity-card-body {
+  min-width: 0;
+  gap: 1px;
+  padding: 5px 3px;
+  background: transparent;
+  pointer-events: none;
+}
+.gravity-app.is-expanded .gravity-card-body strong {
+  color: inherit;
+  font-size: 11px;
+  font-weight: 400;
+}
+.gravity-app.is-expanded .gravity-card-body span { color: #4f626a; font-size: 8px; }
+.gravity-app.is-expanded .gravity-check {
+  flex: 0 0 15px;
+  width: 15px;
+  height: 15px;
+  margin: 0 4px 0 6px;
+  padding: 0;
+  border: 1px solid rgb(125 158 168 / 0.36);
+  border-radius: 1px;
+  background: transparent;
+  color: #c3e88d;
+  font-size: 10px;
+  line-height: 12px;
+}
+.gravity-app.is-expanded .gravity-card-editing {
+  gap: 5px;
+  padding: 6px;
+  border: 1px solid rgb(128 203 196 / 0.38);
+  background: rgb(4 9 12 / 0.96);
+  cursor: default;
+}
+.gravity-app.is-expanded .gravity-card-editing::before { display: none; }
+.gravity-app.is-expanded .gravity-card-editing input,
+.gravity-app.is-expanded .gravity-card-editing textarea,
+.gravity-app.is-expanded .gravity-add input {
+  padding: 5px 4px;
+  border: 0;
+  border-bottom: 1px solid rgb(121 151 160 / 0.28);
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  color: #d8e2e4;
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-size: 10px;
+}
+.gravity-app.is-expanded .gravity-editor-actions { justify-content: flex-end; }
+.gravity-app.is-expanded .gravity-editor-actions button,
+.gravity-app.is-expanded .gravity-add button {
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 0;
+  background: rgb(94 124 133 / 0.12);
+  color: #8ba2aa;
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-size: 9px;
+}
+.gravity-app.is-expanded .gravity-editor-actions .gravity-delete { color: #f07178; }
+.gravity-app.is-expanded .gravity-add { grid-template-columns: minmax(0, 1fr) 26px; gap: 2px; }
+.gravity-app.is-expanded .gravity-center-control {
+  z-index: 4;
+  width: 210px;
+  height: 148px;
+  padding-bottom: 0;
+  border: 0;
+  background: transparent;
+  color: rgb(183 203 207 / 0.52);
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  text-shadow: 0 1px 5px #000;
+  pointer-events: auto;
+}
+.gravity-app.is-expanded .gravity-center-control:hover { background: transparent; }
+.gravity-app.is-expanded .gravity-center-control span { font-size: 8px; letter-spacing: 0.22em; }
+.gravity-app.is-expanded .gravity-center-control small { color: rgb(114 139 146 / 0.55); font-size: 8px; }
+.gravity-drag-ghost {
+  position: fixed;
+  z-index: 40;
+  max-width: 270px;
+  transform: translate(12px, 12px);
+  overflow: hidden;
+  padding: 7px 10px;
+  border: 1px solid rgb(195 232 141 / 0.62);
+  background: rgb(3 9 12 / 0.94);
+  box-shadow: 0 7px 24px rgb(0 0 0 / 0.48);
+  color: #dce7e9;
+  font: 11px "Cascadia Mono", "Consolas", monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.gravity-drag-ghost span { margin-right: 7px; color: #c3e88d; }
+
+@media (max-width: 760px), (max-height: 560px) {
+  .gravity-app.is-expanded .gravity-quadrants { inset: 54px 14px 16px; gap: 0; }
+  .gravity-app.is-expanded .gravity-q1 { padding-right: 105px; padding-bottom: 70px; }
+  .gravity-app.is-expanded .gravity-q2 { padding-left: 105px; padding-bottom: 70px; }
+  .gravity-app.is-expanded .gravity-q3 { padding-right: 105px; padding-top: 70px; }
+  .gravity-app.is-expanded .gravity-q4 { padding-left: 105px; padding-top: 70px; }
+}

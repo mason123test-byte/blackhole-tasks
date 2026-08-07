@@ -2,11 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { BlackHoleCanvas } from "../components/orb/BlackHoleCanvas";
-import { GravitySceneTexture } from "../components/orb/GravitySceneTexture";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useTaskStore } from "../stores/taskStore";
 import { backend } from "../services/backend";
-import type { Quadrant, Task, TaskPriority, TaskStatus } from "../types/task";
+import type { Quadrant, Task, TaskStatus } from "../types/task";
 import { quadrantLabels } from "../utils/quadrant";
 
 const QUADRANTS: Quadrant[] = ["q1", "q2", "q3", "q4"];
@@ -17,6 +16,20 @@ const statusLabels: Record<TaskStatus, string> = {
   done: "完成",
   archived: "归档",
 };
+
+interface TaskDragSession {
+  task: Task;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  x: number;
+  y: number;
+  active: boolean;
+  target: Quadrant | null;
+}
+
+const isQuadrant = (value: string | undefined): value is Quadrant =>
+  value !== undefined && QUADRANTS.includes(value as Quadrant);
 
 function InlineAdd({ quadrant, onDone }: { quadrant: Quadrant; onDone(): void }) {
   const createTask = useTaskStore((state) => state.createTask);
@@ -78,25 +91,14 @@ function InlineTaskEditor({ task, onClose }: { task: Task; onClose(): void }) {
       />
       <textarea
         aria-label="任务描述"
-        placeholder="补充描述…"
+        placeholder="备注（可选）"
         rows={2}
         value={description}
         onChange={(event) => setDescription(event.target.value)}
         onBlur={saveText}
       />
-      <div className="gravity-fields">
-        <select aria-label="任务状态" value={task.status} onChange={(event) => void updateTask(task.id, { status: event.target.value as TaskStatus })}>
-          {Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
-        <select aria-label="任务象限" value={task.quadrant} onChange={(event) => void updateTask(task.id, { quadrant: event.target.value as Quadrant })}>
-          {QUADRANTS.map((quadrant) => <option key={quadrant} value={quadrant}>{quadrant.toUpperCase()}</option>)}
-        </select>
-        <select aria-label="任务优先级" value={task.priority} onChange={(event) => void updateTask(task.id, { priority: Number(event.target.value) as TaskPriority })}>
-          {[0, 1, 2, 3, 4].map((priority) => <option key={priority} value={priority}>P{priority}</option>)}
-        </select>
-      </div>
       <div className="gravity-editor-actions">
-        <button type="button" onClick={onClose}>完成编辑</button>
+        <button type="button" onClick={() => { saveText(); onClose(); }}>保存</button>
         <button
           type="button"
           className="gravity-delete"
@@ -109,16 +111,33 @@ function InlineTaskEditor({ task, onClose }: { task: Task; onClose(): void }) {
   );
 }
 
-function GravityTaskCard({ task, onEdit, onDragStart }: { task: Task; onEdit(): void; onDragStart(): void }) {
+function GravityTaskCard({
+  task,
+  dragging,
+  onEdit,
+  onPointerDown,
+  onPointerMove,
+  onPointerEnd,
+}: {
+  task: Task;
+  dragging: boolean;
+  onEdit(): void;
+  onPointerDown(event: React.PointerEvent<HTMLElement>, task: Task): void;
+  onPointerMove(event: React.PointerEvent<HTMLElement>): void;
+  onPointerEnd(event: React.PointerEvent<HTMLElement>): void;
+}) {
   const completeTask = useTaskStore((state) => state.completeTask);
   return (
     <article
-      className={`gravity-card status-${task.status}`}
-      draggable
+      className={`gravity-card status-${task.status}${dragging ? " is-dragging" : ""}`}
       tabIndex={0}
+      aria-grabbed={dragging}
       aria-label={`${task.title}，${statusLabels[task.status]}`}
-      onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/task-id", task.id); onDragStart(); }}
-      onDoubleClick={onEdit}
+      onPointerDown={(event) => onPointerDown(event, task)}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerEnd}
+      onPointerCancel={onPointerEnd}
+      onClick={(event) => { if (!(event.target as HTMLElement).closest("button")) onEdit(); }}
       onKeyDown={(event) => { if (event.key === "Enter") onEdit(); }}
     >
       <button
@@ -127,10 +146,10 @@ function GravityTaskCard({ task, onEdit, onDragStart }: { task: Task; onEdit(): 
         aria-label={`完成 ${task.title}`}
         onClick={(event) => { event.stopPropagation(); void completeTask(task.id); }}
       >{task.status === "done" ? "✓" : ""}</button>
-      <button type="button" className="gravity-card-body" onClick={onEdit}>
+      <div className="gravity-card-body">
         <strong>{task.title}</strong>
-        <span>{statusLabels[task.status]} · P{task.priority}{task.dueAt ? ` · ${task.dueAt.slice(5, 10)}` : ""}</span>
-      </button>
+        <span>{task.status === "todo" ? "拖动到其他象限" : statusLabels[task.status]}</span>
+      </div>
     </article>
   );
 }
@@ -143,7 +162,11 @@ function QuadrantZone({
   onAdd,
   onAddDone,
   onEdit,
-  onDropTask,
+  dropTarget,
+  draggingId,
+  onTaskPointerDown,
+  onTaskPointerMove,
+  onTaskPointerEnd,
 }: {
   quadrant: Quadrant;
   tasks: Task[];
@@ -152,25 +175,35 @@ function QuadrantZone({
   onAdd(): void;
   onAddDone(): void;
   onEdit(id: string | null): void;
-  onDropTask(id: string): void;
+  dropTarget: boolean;
+  draggingId: string | null;
+  onTaskPointerDown(event: React.PointerEvent<HTMLElement>, task: Task): void;
+  onTaskPointerMove(event: React.PointerEvent<HTMLElement>): void;
+  onTaskPointerEnd(event: React.PointerEvent<HTMLElement>): void;
 }) {
   return (
     <section
-      className={`gravity-quadrant gravity-${quadrant}`}
+      className={`gravity-quadrant gravity-${quadrant}${dropTarget ? " is-drop-target" : ""}`}
+      data-quadrant={quadrant}
       aria-label={`${quadrant.toUpperCase()} ${quadrantLabels[quadrant]}`}
-      onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }}
-      onDrop={(event) => { event.preventDefault(); const id = event.dataTransfer.getData("text/task-id"); if (id) onDropTask(id); }}
     >
       <header>
-        <span><b>{quadrant.toUpperCase()}</b>{quadrantLabels[quadrant]}</span>
-        <button type="button" aria-label={`在 ${quadrant.toUpperCase()} 新增任务`} onClick={onAdd}>＋</button>
+        <span><b>{quadrant}</b><em>{quadrantLabels[quadrant]}</em></span>
+        <button type="button" aria-label={`在 ${quadrant.toUpperCase()} 新增任务`} onClick={onAdd}>+ task</button>
       </header>
       <div className="gravity-task-list">
         {adding && <InlineAdd quadrant={quadrant} onDone={onAddDone}/>}
         {tasks.map((task) => editingId === task.id
           ? <InlineTaskEditor key={task.id} task={task} onClose={() => onEdit(null)}/>
-          : <GravityTaskCard key={task.id} task={task} onEdit={() => onEdit(task.id)} onDragStart={() => undefined}/>) }
-        {!adding && tasks.length === 0 && <button type="button" className="gravity-empty" onClick={onAdd}>在引力场中创建任务</button>}
+          : <GravityTaskCard
+              key={task.id}
+              task={task}
+              dragging={draggingId === task.id}
+              onEdit={() => onEdit(task.id)}
+              onPointerDown={onTaskPointerDown}
+              onPointerMove={onTaskPointerMove}
+              onPointerEnd={onTaskPointerEnd}
+            />) }
       </div>
     </section>
   );
@@ -191,9 +224,11 @@ export function OrbApp() {
   const [query, setQuery] = useState("");
   const [pulse, setPulse] = useState(0);
   const [renderError, setRenderError] = useState<string | null>(null);
+  const [taskDrag, setTaskDrag] = useState<TaskDragSession | null>(null);
   const down = useRef<{ x: number; y: number } | null>(null);
   const dragged = useRef(false);
-  const sceneTextureRef = useRef<HTMLCanvasElement>(null);
+  const taskDragRef = useRef<TaskDragSession | null>(null);
+  const suppressEditUntil = useRef(0);
 
   useEffect(() => { void loadSettings(); void loadAll(); }, [loadAll, loadSettings]);
   useEffect(() => {
@@ -231,6 +266,61 @@ export function OrbApp() {
     return tasks.filter((task) => task.status !== "archived" && (!normalized || `${task.title} ${task.description}`.toLocaleLowerCase().includes(normalized)));
   }, [query, tasks]);
 
+  const startTaskDrag = (event: React.PointerEvent<HTMLElement>, task: Task) => {
+    if (event.button !== 0 || (event.target as HTMLElement).closest("button,input,textarea")) return;
+    const session: TaskDragSession = {
+      task,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      x: event.clientX,
+      y: event.clientY,
+      active: false,
+      target: null,
+    };
+    taskDragRef.current = session;
+    setTaskDrag(session);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const moveTaskDrag = (event: React.PointerEvent<HTMLElement>) => {
+    const session = taskDragRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    const distance = Math.hypot(event.clientX - session.startX, event.clientY - session.startY);
+    if (!session.active && distance < 6) return;
+    event.preventDefault();
+    const zone = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-quadrant]");
+    const value = zone?.dataset.quadrant;
+    const next: TaskDragSession = {
+      ...session,
+      x: event.clientX,
+      y: event.clientY,
+      active: true,
+      target: isQuadrant(value) ? value : null,
+    };
+    taskDragRef.current = next;
+    setTaskDrag(next);
+  };
+
+  const endTaskDrag = (event: React.PointerEvent<HTMLElement>) => {
+    const session = taskDragRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    taskDragRef.current = null;
+    setTaskDrag(null);
+    if (!session.active) return;
+    suppressEditUntil.current = performance.now() + 300;
+    if (session.target && session.target !== session.task.quadrant) {
+      void updateTask(session.task.id, { quadrant: session.target });
+    }
+  };
+
+  const editTask = (id: string | null) => {
+    if (performance.now() < suppressEditUntil.current) return;
+    setAddingQuadrant(null);
+    setEditingId(id);
+  };
+
   const startMove = (event: React.PointerEvent) => {
     const target = event.target as HTMLElement;
     const blockedControl = target.closest("input,textarea,select,.gravity-quadrant")
@@ -266,10 +356,8 @@ export function OrbApp() {
         pulse={pulse}
         quality={settings.renderQuality}
         lowPowerMode={settings.lowPowerMode}
-        sceneTextureRef={sceneTextureRef}
         onError={setRenderError}
       />
-      <GravitySceneTexture ref={sceneTextureRef} expanded={expanded} tasks={visibleTasks.filter((task) => task.id !== editingId)}/>
 
       {renderError && <div className="gravity-render-error" role="alert"><strong>无法启动 WebGL2 黑洞</strong><span>{renderError}</span></div>}
 
@@ -287,9 +375,9 @@ export function OrbApp() {
           <div className="gravity-axis gravity-axis-x" aria-hidden="true"/>
           <div className="gravity-axis gravity-axis-y" aria-hidden="true"/>
           <header className="gravity-toolbar">
-            <label><span aria-hidden="true">⌕</span><input aria-label="搜索任务" placeholder="搜索引力场…" value={query} onChange={(event) => setQuery(event.target.value)}/></label>
-            <span className="gravity-count">{visibleTasks.length} 个任务</span>
-            <button type="button" onClick={() => void setSceneExpanded(false)}>收起</button>
+            <label><span aria-hidden="true">$</span><input aria-label="搜索任务" placeholder="filter tasks" value={query} onChange={(event) => setQuery(event.target.value)}/></label>
+            <span className="gravity-count">{String(visibleTasks.length).padStart(2, "0")}</span>
+            <button type="button" onClick={() => void setSceneExpanded(false)}>close</button>
           </header>
           <div className="gravity-quadrants">
             {QUADRANTS.map((quadrant) => (
@@ -301,13 +389,24 @@ export function OrbApp() {
                 editingId={editingId}
                 onAdd={() => { setEditingId(null); setAddingQuadrant(quadrant); }}
                 onAddDone={() => setAddingQuadrant(null)}
-                onEdit={(id) => { setAddingQuadrant(null); setEditingId(id); }}
-                onDropTask={(id) => { const task = tasks.find((item) => item.id === id); if (task && task.quadrant !== quadrant) void updateTask(id, { quadrant }); }}
+                onEdit={editTask}
+                dropTarget={Boolean(taskDrag?.active && taskDrag.target === quadrant)}
+                draggingId={taskDrag?.active ? taskDrag.task.id : null}
+                onTaskPointerDown={startTaskDrag}
+                onTaskPointerMove={moveTaskDrag}
+                onTaskPointerEnd={endTaskDrag}
               />
             ))}
           </div>
+          {taskDrag?.active && (
+            <div
+              className="gravity-drag-ghost"
+              data-testid="task-drag-preview"
+              style={{ left: taskDrag.x, top: taskDrag.y }}
+            ><span>›</span>{taskDrag.task.title}</div>
+          )}
           <button type="button" className="gravity-center-control" aria-label="黑洞中心，点击产生引力脉冲" onClick={() => { setPulse(1); window.setTimeout(() => setPulse(0), 420); }}>
-            <span>BLACKHOLE</span><small>直接编辑 · 拖动换象限</small>
+            <span>BLACKHOLE</span><small>drag task → quadrant</small>
           </button>
           {error && <div className="gravity-data-error" role="alert">{error}</div>}
         </>
