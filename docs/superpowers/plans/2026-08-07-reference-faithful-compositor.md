@@ -173,8 +173,47 @@ for (int i = 0; i < N_STEPS; i++) {
   acceleration = -1.5 * angularMomentum2 * position
     / (radius2 * radius2 * radius);
   velocity += acceleration * (0.5 * dt);
-  // Keep the reference thin-disk crossing, temperature, Doppler,
-  // beaming, opacity, and multiple-crossing accumulation equations here.
+  float side = dot(position, diskNormal);
+  if (side * previousSide < 0.0 && transmittance > 0.02) {
+    float crossing = previousSide / (previousSide - side);
+    vec3 diskPoint = mix(previousPosition, position, crossing);
+    float diskRadius = length(diskPoint);
+    if (diskRadius > DISK_INNER && diskRadius < DISK_OUTER) {
+      float band = smoothstep(DISK_INNER, DISK_INNER * 1.25, diskRadius)
+        * (1.0 - smoothstep(DISK_OUTER * 0.70, DISK_OUTER, diskRadius));
+      float phi = atan(dot(diskPoint, diskAxis), diskPoint.x);
+      float turns = phi / (2.0 * PI);
+      float kepler = pow(DISK_INNER / diskRadius, 1.5);
+      float localTime = sqrt(max(1.0 - 1.5 / diskRadius, 0.02));
+      float swirl = diskRadius * DISK_WIND * 0.12
+        - u_time * kepler * DISK_SPEED * localTime;
+      float streaks =
+        vnoiseWrapY(vec2(diskRadius * 2.8, turns * 19.0 + swirl * 3.0), 19.0) * 0.65
+        + vnoiseWrapY(vec2(diskRadius, turns * 9.0 + swirl * 1.5 + 7.0), 9.0) * 0.35;
+      streaks = 0.35 + DISK_CONTRAST * streaks * streaks;
+      vec3 gasDirection = normalize(cross(diskNormal, diskPoint));
+      float beta = clamp(
+        inversesqrt(max(2.0 * (diskRadius - 1.0), 0.2)),
+        0.0,
+        0.99
+      );
+      float shift = localTime
+        / max(1.0 + beta * dot(gasDirection, normalize(velocity)), 0.05);
+      shift = mix(1.0, shift, DOPPLER_MIX);
+      float profileBase = max(1.0 - sqrt(DISK_INNER / diskRadius), 0.0);
+      float temperatureProfile =
+        pow(DISK_INNER / diskRadius, 0.75) * pow(profileBase, 0.25) / 0.488;
+      vec3 diskColor = blackbody(DISK_TEMP * temperatureProfile * shift);
+      float boost = pow(shift, DISK_BEAM);
+      float density = band * streaks;
+      emission += transmittance * diskColor
+        * (DISK_GAIN * 2.2 * density
+          * temperatureProfile * temperatureProfile * boost);
+      transmittance *= 1.0 - clamp(DISK_OPACITY * density, 0.0, 1.0);
+    }
+  }
+  previousSide = side;
+  previousPosition = position;
 }
 ```
 
