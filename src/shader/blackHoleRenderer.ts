@@ -225,10 +225,11 @@ export const BLACK_HOLE_RENDERER_INFO = Object.freeze({
 const BLACK_HOLE_STAGE_WIDTH = 240;
 const BLACK_HOLE_STAGE_HEIGHT = 180;
 
-function reportOrbFrame(renderer: "webgl2", energy: number, width: number, height: number) {
-  document.title = `黑洞任务|renderer=${renderer}|frame=ready|energy=${energy}|size=${width}x${height}`;
+function reportOrbFrame(renderer: "webgl2", energy: number, width: number, height: number, diagnostic = "") {
+  const diagnosticSuffix = diagnostic ? `|diag=${diagnostic}` : "";
+  document.title = `黑洞任务|renderer=${renderer}|frame=ready|energy=${energy}|size=${width}x${height}${diagnosticSuffix}`;
   if ("__TAURI_INTERNALS__" in window) {
-    void invoke("report_orb_render", { renderer, energy, width, height }).catch((error) => {
+    void invoke("report_orb_render", { renderer, energy, width, height, diagnostic }).catch((error) => {
       console.error("无法上报黑洞首帧状态：", error);
     });
   }
@@ -457,11 +458,23 @@ export function startBlackHole(
         const pixels = new Uint8Array(canvas.width * canvas.height * 4);
         gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
         let energy = 0;
+        let alphaEnergy = 0;
+        let maxChannel = 0;
+        let maxAlpha = 0;
         for (let index = 0; index < pixels.length; index += 4) {
-          if (pixels[index + 3] > 8 && Math.max(pixels[index], pixels[index + 1], pixels[index + 2]) > 48) energy += 1;
+          const channel = Math.max(pixels[index], pixels[index + 1], pixels[index + 2]);
+          const alpha = pixels[index + 3];
+          if (alpha > 8) alphaEnergy += 1;
+          if (alpha > 8 && channel > 48) energy += 1;
+          maxChannel = Math.max(maxChannel, channel);
+          maxAlpha = Math.max(maxAlpha, alpha);
         }
+        const glError = gl.getError();
+        const framebufferStatus = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+        const diagnostic = `a${alphaEnergy}-m${maxChannel}-am${maxAlpha}-e${glError}-f${framebufferStatus}`;
         canvas.dataset.energy = String(energy);
-        reportOrbFrame("webgl2", energy, canvas.width, canvas.height);
+        canvas.dataset.diagnostic = diagnostic;
+        reportOrbFrame("webgl2", energy, canvas.width, canvas.height, diagnostic);
         rendererReady = energy > 100;
       }
 

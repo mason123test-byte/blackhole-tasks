@@ -167,7 +167,7 @@ function Wait-OrbRenderReady([int]$ProcessId, [int]$TimeoutMilliseconds = 20000)
     $match = @(Get-AppWindows $ProcessId | Where-Object { $_.Title.StartsWith("黑洞任务|renderer=") })
     if ($match.Count -gt 0) {
       $lastTitle = $match[0].Title
-      if ($lastTitle -match '^黑洞任务\|renderer=webgl2\|frame=ready\|energy=(\d+)\|size=(\d+)x(\d+)$' -and
+      if ($lastTitle -match '^黑洞任务\|renderer=webgl2\|frame=ready\|energy=(\d+)\|size=(\d+)x(\d+)(?:\|diag=.*)?$' -and
         [int]$Matches[1] -gt 100 -and [int]$Matches[2] -ge 240 -and [int]$Matches[3] -ge 180) {
         return $match[0]
       }
@@ -279,6 +279,9 @@ try {
     }
     throw
   }
+  Start-Sleep -Milliseconds 1000
+  Save-DesktopScreenshot (Join-Path $OutputDirectory "00-before-render-check.png")
+  Save-ScreenRegion (Join-Path $OutputDirectory "00-before-render-closeup.png") $orb.ClientBounds 16
   $orb = Wait-OrbRenderReady $process.Id
   Start-Sleep -Milliseconds 800
   $initialWindows = @(Get-AppWindows $process.Id | Where-Object { $_.Title -eq "黑洞任务" -or $_.Title.StartsWith("黑洞任务|") })
