@@ -855,42 +855,41 @@ pub fn run() {
         )
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init());
+        .plugin(tauri_plugin_fs::init())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, shortcut, event| {
+                    use tauri_plugin_global_shortcut::ShortcutState;
+                    if event.state() != ShortcutState::Pressed {
+                        return;
+                    }
+                    match shortcut.to_string().as_str() {
+                        "Ctrl+Shift+Space" => {
+                            let _ = toggle_scene_inner(app);
+                        }
+                        "Ctrl+Shift+N" => {
+                            let _ = open_scene_quick_add(app);
+                        }
+                        "Ctrl+Shift+B" => {
+                            if let Some(db) = app.try_state::<Database>() {
+                                if let Ok(settings) = db.get_settings() {
+                                    let _ = set_click_through(
+                                        !settings.orb_click_through,
+                                        app.clone(),
+                                        db,
+                                    );
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                })
+                .build(),
+        );
     let builder = if smoke_mode {
         builder
     } else {
-        builder
-            .plugin(tauri_plugin_autostart::Builder::new().build())
-            .plugin(
-                tauri_plugin_global_shortcut::Builder::new()
-                    .with_handler(|app, shortcut, event| {
-                        use tauri_plugin_global_shortcut::ShortcutState;
-                        if event.state() != ShortcutState::Pressed {
-                            return;
-                        }
-                        match shortcut.to_string().as_str() {
-                            "Ctrl+Shift+Space" => {
-                                let _ = toggle_scene_inner(app);
-                            }
-                            "Ctrl+Shift+N" => {
-                                let _ = open_scene_quick_add(app);
-                            }
-                            "Ctrl+Shift+B" => {
-                                if let Some(db) = app.try_state::<Database>() {
-                                    if let Ok(settings) = db.get_settings() {
-                                        let _ = set_click_through(
-                                            !settings.orb_click_through,
-                                            app.clone(),
-                                            db,
-                                        );
-                                    }
-                                }
-                            }
-                            _ => {}
-                        }
-                    })
-                    .build(),
-            )
+        builder.plugin(tauri_plugin_autostart::Builder::new().build())
     };
     builder
         .setup(move |app| {
@@ -932,11 +931,16 @@ pub fn run() {
                 if let Err(error) = setup_tray(app) {
                     log::error!("system tray initialization failed: {error}");
                 }
-                use tauri_plugin_global_shortcut::GlobalShortcutExt;
-                for shortcut in ["Ctrl+Shift+Space", "Ctrl+Shift+B", "Ctrl+Shift+N"] {
-                    if let Err(error) = app.global_shortcut().register(shortcut) {
-                        log::warn!("global shortcut {shortcut} unavailable: {error}");
-                    }
+            }
+            use tauri_plugin_global_shortcut::GlobalShortcutExt;
+            let shortcuts: &[&str] = if smoke_mode {
+                &["Ctrl+Shift+Space"]
+            } else {
+                &["Ctrl+Shift+Space", "Ctrl+Shift+B", "Ctrl+Shift+N"]
+            };
+            for shortcut in shortcuts {
+                if let Err(error) = app.global_shortcut().register(*shortcut) {
+                    log::warn!("global shortcut {shortcut} unavailable: {error}");
                 }
             }
             Ok(())

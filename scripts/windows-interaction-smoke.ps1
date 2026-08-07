@@ -74,6 +74,9 @@ public static class BlackHoleWindowProbe
     private static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extraInfo);
 
     [DllImport("user32.dll")]
+    private static extern void keybd_event(byte virtualKey, byte scanCode, uint flags, UIntPtr extraInfo);
+
+    [DllImport("user32.dll")]
     private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr dpiContext);
 
     public static bool EnablePerMonitorV2()
@@ -101,6 +104,16 @@ public static class BlackHoleWindowProbe
         mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
         mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
         return true;
+    }
+
+    public static void ToggleSceneShortcut()
+    {
+        keybd_event(0x11, 0, 0, UIntPtr.Zero);
+        keybd_event(0x10, 0, 0, UIntPtr.Zero);
+        keybd_event(0x20, 0, 0, UIntPtr.Zero);
+        keybd_event(0x20, 0, 0x0002, UIntPtr.Zero);
+        keybd_event(0x10, 0, 0x0002, UIntPtr.Zero);
+        keybd_event(0x11, 0, 0x0002, UIntPtr.Zero);
     }
 
     public static WindowInfo[] VisibleWindows(int expectedProcessId)
@@ -349,27 +362,23 @@ try {
   $baselineHandles = $process.HandleCount
   1..12 | ForEach-Object {
     $cycle = $_
-    $compactCenterX = [int](($orb.ClientBounds.Left + $orb.ClientBounds.Right) / 2)
-    $compactCenterY = [int](($orb.ClientBounds.Top + $orb.ClientBounds.Bottom) / 2)
-    [BlackHoleWindowProbe]::ClickAt($compactCenterX, $compactCenterY) | Out-Null
+    [BlackHoleWindowProbe]::ToggleSceneShortcut()
     try {
       $expanded = Wait-SceneSize $process.Id 800 600 5000
     } catch {
-      "RETRY_EXPAND cycle=$cycle click was not observed by the transparent WebView"
+      "RETRY_EXPAND cycle=$cycle global shortcut was not observed"
       Start-Sleep -Milliseconds 500
-      [BlackHoleWindowProbe]::ClickAt($compactCenterX, $compactCenterY) | Out-Null
+      [BlackHoleWindowProbe]::ToggleSceneShortcut()
       $expanded = Wait-SceneSize $process.Id 800 600 10000
     }
     Start-Sleep -Milliseconds 350
-    $collapseX = $expanded.ClientBounds.Left + [int](($expanded.ClientBounds.Right - $expanded.ClientBounds.Left) * 0.74)
-    $collapseY = $expanded.ClientBounds.Top + 45
-    [BlackHoleWindowProbe]::ClickAt($collapseX, $collapseY) | Out-Null
+    [BlackHoleWindowProbe]::ToggleSceneShortcut()
     try {
       $orb = Wait-SceneCompact $process.Id 300 230 5000
     } catch {
-      "RETRY_COLLAPSE cycle=$cycle click was not observed by the transparent WebView"
+      "RETRY_COLLAPSE cycle=$cycle global shortcut was not observed"
       Start-Sleep -Milliseconds 500
-      [BlackHoleWindowProbe]::ClickAt($collapseX, $collapseY) | Out-Null
+      [BlackHoleWindowProbe]::ToggleSceneShortcut()
       $orb = Wait-SceneCompact $process.Id 300 230 10000
     }
     Start-Sleep -Milliseconds 250
