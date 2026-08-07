@@ -335,21 +335,43 @@ try {
   if (-not [BlackHoleWindowProbe]::ClickAt($collapseX, $collapseY)) {
     throw "Failed to click the in-scene collapse control."
   }
-  $orb = Wait-SceneCompact $process.Id
+  try {
+    $orb = Wait-SceneCompact $process.Id 300 230 5000
+  } catch {
+    "RETRY_COLLAPSE initial click was not observed by the transparent WebView"
+    Start-Sleep -Milliseconds 500
+    [BlackHoleWindowProbe]::ClickAt($collapseX, $collapseY) | Out-Null
+    $orb = Wait-SceneCompact $process.Id 300 230 10000
+  }
 
   $process.Refresh()
   $baselineThreads = $process.Threads.Count
   $baselineHandles = $process.HandleCount
   1..12 | ForEach-Object {
+    $cycle = $_
     $compactCenterX = [int](($orb.ClientBounds.Left + $orb.ClientBounds.Right) / 2)
     $compactCenterY = [int](($orb.ClientBounds.Top + $orb.ClientBounds.Bottom) / 2)
     [BlackHoleWindowProbe]::ClickAt($compactCenterX, $compactCenterY) | Out-Null
-    $expanded = Wait-SceneSize $process.Id 800 600 10000
+    try {
+      $expanded = Wait-SceneSize $process.Id 800 600 5000
+    } catch {
+      "RETRY_EXPAND cycle=$cycle click was not observed by the transparent WebView"
+      Start-Sleep -Milliseconds 500
+      [BlackHoleWindowProbe]::ClickAt($compactCenterX, $compactCenterY) | Out-Null
+      $expanded = Wait-SceneSize $process.Id 800 600 10000
+    }
     Start-Sleep -Milliseconds 350
     $collapseX = $expanded.ClientBounds.Left + [int](($expanded.ClientBounds.Right - $expanded.ClientBounds.Left) * 0.74)
     $collapseY = $expanded.ClientBounds.Top + 45
     [BlackHoleWindowProbe]::ClickAt($collapseX, $collapseY) | Out-Null
-    $orb = Wait-SceneCompact $process.Id 300 230 10000
+    try {
+      $orb = Wait-SceneCompact $process.Id 300 230 5000
+    } catch {
+      "RETRY_COLLAPSE cycle=$cycle click was not observed by the transparent WebView"
+      Start-Sleep -Milliseconds 500
+      [BlackHoleWindowProbe]::ClickAt($collapseX, $collapseY) | Out-Null
+      $orb = Wait-SceneCompact $process.Id 300 230 10000
+    }
     Start-Sleep -Milliseconds 250
   }
   Start-Sleep -Milliseconds 750
