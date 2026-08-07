@@ -74,9 +74,6 @@ public static class BlackHoleWindowProbe
     private static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extraInfo);
 
     [DllImport("user32.dll")]
-    private static extern void keybd_event(byte virtualKey, byte scanCode, uint flags, UIntPtr extraInfo);
-
-    [DllImport("user32.dll")]
     private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr dpiContext);
 
     public static bool EnablePerMonitorV2()
@@ -104,16 +101,6 @@ public static class BlackHoleWindowProbe
         mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
         mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
         return true;
-    }
-
-    public static void ToggleSceneShortcut()
-    {
-        keybd_event(0x11, 0, 0, UIntPtr.Zero);
-        keybd_event(0x10, 0, 0, UIntPtr.Zero);
-        keybd_event(0x20, 0, 0, UIntPtr.Zero);
-        keybd_event(0x20, 0, 0x0002, UIntPtr.Zero);
-        keybd_event(0x10, 0, 0x0002, UIntPtr.Zero);
-        keybd_event(0x11, 0, 0x0002, UIntPtr.Zero);
     }
 
     public static WindowInfo[] VisibleWindows(int expectedProcessId)
@@ -260,6 +247,13 @@ function Get-ColorDistance([System.Drawing.Color]$First, [System.Drawing.Color]$
 }
 
 $diagnosticPath = Join-Path $env:TEMP "blackhole-tasks-native-cursor-diagnostics.txt"
+$smokeCommandPath = [System.IO.Path]::ChangeExtension($diagnosticPath, ".command")
+$smokeToggleSequence = 0
+Set-Content -LiteralPath $smokeCommandPath -Value "" -NoNewline
+function Invoke-SmokeToggle {
+  $script:smokeToggleSequence += 1
+  Set-Content -LiteralPath $smokeCommandPath -Value "toggle:$script:smokeToggleSequence" -NoNewline
+}
 $resolvedExePath = (Resolve-Path $ExePath).Path
 $diagnosticMarkerPath = [System.IO.Path]::ChangeExtension($resolvedExePath, ".smoke-diagnostics")
 Set-Content -LiteralPath $diagnosticMarkerPath -Value $diagnosticPath -NoNewline
@@ -362,23 +356,23 @@ try {
   $baselineHandles = $process.HandleCount
   1..12 | ForEach-Object {
     $cycle = $_
-    [BlackHoleWindowProbe]::ToggleSceneShortcut()
+    Invoke-SmokeToggle
     try {
       $expanded = Wait-SceneSize $process.Id 800 600 5000
     } catch {
-      "RETRY_EXPAND cycle=$cycle global shortcut was not observed"
+      "RETRY_EXPAND cycle=$cycle smoke toggle was not observed"
       Start-Sleep -Milliseconds 500
-      [BlackHoleWindowProbe]::ToggleSceneShortcut()
+      Invoke-SmokeToggle
       $expanded = Wait-SceneSize $process.Id 800 600 10000
     }
     Start-Sleep -Milliseconds 350
-    [BlackHoleWindowProbe]::ToggleSceneShortcut()
+    Invoke-SmokeToggle
     try {
       $orb = Wait-SceneCompact $process.Id 300 230 5000
     } catch {
-      "RETRY_COLLAPSE cycle=$cycle global shortcut was not observed"
+      "RETRY_COLLAPSE cycle=$cycle smoke toggle was not observed"
       Start-Sleep -Milliseconds 500
-      [BlackHoleWindowProbe]::ToggleSceneShortcut()
+      Invoke-SmokeToggle
       $orb = Wait-SceneCompact $process.Id 300 230 10000
     }
     Start-Sleep -Milliseconds 250

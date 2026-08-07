@@ -831,12 +831,32 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
+fn start_smoke_command_monitor(app: tauri::AppHandle, command_path: PathBuf) {
+    std::thread::spawn(move || {
+        let mut last_command = String::new();
+        loop {
+            if let Ok(command) = std::fs::read_to_string(&command_path) {
+                if command != last_command && command.starts_with("toggle:") {
+                    last_command = command;
+                    if let Err(error) = toggle_scene_inner(&app) {
+                        log::error!("smoke toggle command failed: {error}");
+                    }
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let smoke_diagnostics = std::env::var_os("BLACKHOLE_SMOKE_DIAGNOSTICS_PATH")
         .map(PathBuf::from)
         .or_else(diagnostics_path_from_args)
         .or_else(diagnostics_path_from_marker);
+    let smoke_command_path = smoke_diagnostics
+        .as_ref()
+        .map(|path| path.with_extension("command"));
     if let Some(path) = &smoke_diagnostics {
         let _ = std::fs::write(path, "build=native-cursor-v5 phase=process-started");
     }
@@ -926,6 +946,9 @@ pub fn run() {
             }
             if let Some(orb) = app.get_webview_window("orb") {
                 orb.show()?;
+            }
+            if let Some(path) = smoke_command_path.clone() {
+                start_smoke_command_monitor(app.handle().clone(), path);
             }
             if !smoke_mode {
                 if let Err(error) = setup_tray(app) {
