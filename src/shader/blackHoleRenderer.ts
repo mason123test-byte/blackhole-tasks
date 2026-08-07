@@ -272,7 +272,10 @@ export function startBlackHole(
     depth: false,
     stencil: false,
     premultipliedAlpha: false,
-    preserveDrawingBuffer: false,
+    // WebView2 can create this transparent surface while its native window is
+    // still hidden. Preserve the submitted frame until the first visible
+    // compositor/readback handshake has proved that real pixels exist.
+    preserveDrawingBuffer: true,
     powerPreference: options.lowPowerMode ? "low-power" : "default",
   });
   if (!gl) {
@@ -420,8 +423,9 @@ export function startBlackHole(
       // requestAnimationFrame suspended until focus changes, so prove that a
       // real geodesic frame exists and expose the result through the native
       // window title used by the Windows smoke probe.
-      if (!rendererReady && readbackAttempts < 6) {
+      if (!rendererReady && readbackAttempts < 120) {
         readbackAttempts += 1;
+        gl.finish();
         const pixels = new Uint8Array(canvas.width * canvas.height * 4);
         gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
         let energy = 0;
@@ -464,7 +468,7 @@ export function startBlackHole(
     canvas.addEventListener("webglcontextlost", onContextLost);
     // Draw even while the native window is still hidden, then repeat around
     // the setup/show boundary. Continuous animation remains visibility-gated.
-    const bootstrapTimers = [0, 300, 1200].map((delay) => window.setTimeout(() => render(performance.now(), true), delay));
+    const bootstrapTimers = [0, 300, 1200, 2500, 5000, 10000].map((delay) => window.setTimeout(() => render(performance.now(), true), delay));
 
     return () => {
       disposed = true;
