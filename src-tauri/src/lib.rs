@@ -1012,3 +1012,22 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("BlackHole Tasks failed to start")
 }
+
+#[cfg(test)]
+mod smoke_command_tests {
+    use super::{parse_smoke_command, SmokeCommand};
+
+    #[test]
+    fn parses_toggle_and_snapshot_commands() {
+        assert_eq!(
+            parse_smoke_command("toggle:7"),
+            Some(SmokeCommand::Toggle(7))
+        );
+        assert_eq!(
+            parse_smoke_command("snapshot:11"),
+            Some(SmokeCommand::Snapshot(11))
+        );
+        assert_eq!(parse_smoke_command("snapshot:x"), None);
+        assert_eq!(parse_smoke_command("unknown:1"), None);
+    }
+}
