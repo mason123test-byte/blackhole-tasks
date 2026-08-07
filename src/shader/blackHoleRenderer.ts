@@ -365,6 +365,8 @@ export function startBlackHole(
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.activeTexture(gl.TEXTURE0);
+    let outputWidth = 1;
+    let outputHeight = 1;
 
     canvas.dataset.renderer = "webgl2";
     canvas.dataset.model = BLACK_HOLE_RENDERER_INFO.model;
@@ -381,6 +383,8 @@ export function startBlackHole(
     let readbackAttempts = 0;
     let rendererReady = false;
     let uploadedSceneVersion = "";
+    let contextLost = false;
+    let bootstrapTimers: number[] = [];
 
     const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => { needsResize = true; });
     resizeObserver?.observe(canvas);
@@ -392,7 +396,7 @@ export function startBlackHole(
     };
     const render = (now: number, force = false) => {
       animationFrame = 0;
-      if (disposed || (!force && document.hidden)) return;
+      if (disposed || contextLost || (!force && document.hidden)) return;
       const targetHover = getHover();
       const fps = targetHover > 0.01 || getPulse() > 0.01 ? profile.activeFps : profile.idleFps;
       const frameInterval = 1000 / fps;
@@ -414,10 +418,26 @@ export function startBlackHole(
         if (canvas.width !== width || canvas.height !== height) {
           canvas.width = width;
           canvas.height = height;
+        }
+        if (outputWidth !== width || outputHeight !== height) {
           gl.activeTexture(gl.TEXTURE1);
           gl.bindTexture(gl.TEXTURE_2D, outputTexture);
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, outputFramebuffer);
+          gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, outputTexture, 0);
+          const resizedFramebufferStatus = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
           gl.activeTexture(gl.TEXTURE0);
+          if (resizedFramebufferStatus !== gl.FRAMEBUFFER_COMPLETE) {
+            const diagnostic = `resize-f${resizedFramebufferStatus}-e${gl.getError()}`;
+            canvas.dataset.diagnostic = diagnostic;
+            reportOrbFrame("webgl2", 0, canvas.width, canvas.height, diagnostic);
+            needsResize = true;
+            schedule();
+            return;
+          }
+          outputWidth = width;
+          outputHeight = height;
         }
         needsResize = false;
       }
@@ -476,6 +496,7 @@ export function startBlackHole(
         canvas.dataset.diagnostic = diagnostic;
         reportOrbFrame("webgl2", energy, canvas.width, canvas.height, diagnostic);
         rendererReady = energy > 100;
+        if (rendererReady) sessionStorage.removeItem("blackhole-webgl-context-retries");
       }
 
       gl.bindFramebuffer(gl.READ_FRAMEBUFFER, outputFramebuffer);
@@ -509,17 +530,31 @@ export function startBlackHole(
     };
     const onContextLost = (event: Event) => {
       event.preventDefault();
+      contextLost = true;
       canvas.dataset.renderer = "context-lost";
       if (animationFrame) cancelAnimationFrame(animationFrame);
       animationFrame = 0;
+      bootstrapTimers.forEach((timer) => window.clearTimeout(timer));
+      bootstrapTimers = [];
+    };
+    const onContextRestored = () => {
+      const retryKey = "blackhole-webgl-context-retries";
+      const retries = Number(sessionStorage.getItem(retryKey) ?? "0");
+      if (retries >= 2) {
+        options.onError?.("WebGL2 上下文反复丢失，请更新显卡驱动或 WebView2 后重启。");
+        return;
+      }
+      sessionStorage.setItem(retryKey, String(retries + 1));
+      window.location.reload();
     };
 
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pageshow", onVisibility);
     canvas.addEventListener("webglcontextlost", onContextLost);
+    canvas.addEventListener("webglcontextrestored", onContextRestored);
     // Draw even while the native window is still hidden, then repeat around
     // the setup/show boundary. Continuous animation remains visibility-gated.
-    const bootstrapTimers = [0, 300, 1200, 2500, 5000, 10000].map((delay) => window.setTimeout(() => render(performance.now(), true), delay));
+    bootstrapTimers = [0, 300, 1200, 2500, 5000, 10000].map((delay) => window.setTimeout(() => render(performance.now(), true), delay));
 
     return () => {
       disposed = true;
@@ -529,6 +564,7 @@ export function startBlackHole(
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pageshow", onVisibility);
       canvas.removeEventListener("webglcontextlost", onContextLost);
+      canvas.removeEventListener("webglcontextrestored", onContextRestored);
       gl.deleteBuffer(buffer);
       gl.deleteTexture(sceneTexture);
       gl.deleteFramebuffer(outputFramebuffer);
