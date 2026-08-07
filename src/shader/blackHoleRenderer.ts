@@ -24,6 +24,9 @@ uniform float u_time;
 uniform float u_hover;
 uniform float u_pulse;
 uniform float u_detail;
+uniform float u_expanded;
+uniform sampler2D u_scene_texture;
+uniform float u_has_scene;
 
 #define PI 3.14159265359
 #define B_CRIT 2.5980762
@@ -88,7 +91,7 @@ void rayTracedReference() {
   // On the 240x180 transparent stage this gives a ~54px shadow and lets the
   // r=8 disk nearly fill the height, matching the reference composition.
   float breathe = 1.0 + 0.012 * sin(u_time * 1.15) + 0.045 * u_hover;
-  float shadowRadius = 0.150 * breathe;
+  float shadowRadius = mix(0.150, 0.085, u_expanded) * breathe;
   float worldScale = B_CRIT / shadowRadius;
   vec2 rayPlane = rotate2(vec2(screen.x, -screen.y), DISK_ROLL) * worldScale;
   float impact = length(rayPlane);
@@ -175,7 +178,22 @@ void rayTracedReference() {
   if (!captured && dot(position, position) < 4.0) captured = true;
 
   vec3 sky = vec3(0.0);
-  if (!captured) sky = stars(normalize(velocity)) * 0.16 * u_detail;
+  float sceneAlpha = 0.0;
+  if (!captured) {
+    vec3 escapedDirection = normalize(velocity);
+    sky = stars(escapedDirection) * 0.16 * u_detail;
+    if (u_has_scene > 0.5 && escapedDirection.z < -0.05) {
+      float projection = (-13.0 - position.z) / escapedDirection.z;
+      vec3 scenePoint = position + escapedDirection * projection;
+      vec2 unrolled = rotate2(scenePoint.xy, -DISK_ROLL) / worldScale;
+      vec2 sceneUv = 0.5 + vec2(unrolled.x, -unrolled.y) / vec2(aspect, 1.0);
+      if (all(greaterThanEqual(sceneUv, vec2(0.0))) && all(lessThanEqual(sceneUv, vec2(1.0)))) {
+        vec4 taskLayer = texture(u_scene_texture, sceneUv);
+        sky += taskLayer.rgb * taskLayer.a;
+        sceneAlpha = taskLayer.a;
+      }
+    }
+  }
   vec3 diskLight = vec3(1.0) - exp(-emission * mix(1.35, 1.60, u_hover));
 
   float pulseRadius = mix(shadowRadius * 1.18, shadowRadius * 3.0, 1.0 - u_pulse);
@@ -190,7 +208,7 @@ void rayTracedReference() {
 
   float lightAlpha = max(max(color.r, color.g), color.b);
   float diskOpacity = 1.0 - transmittance;
-  float alpha = captured ? 0.997 : clamp(max(lightAlpha, diskOpacity), 0.0, 0.97);
+  float alpha = captured ? 0.997 : clamp(max(max(lightAlpha, diskOpacity), sceneAlpha * transmittance), 0.0, 0.97);
   alpha = max(alpha, max(max(pulseLight.r, pulseLight.g), pulseLight.b));
   outColor = vec4(clamp(color, 0.0, 1.0), alpha);
 }
@@ -207,7 +225,7 @@ export const BLACK_HOLE_RENDERER_INFO = Object.freeze({
 const BLACK_HOLE_STAGE_WIDTH = 240;
 const BLACK_HOLE_STAGE_HEIGHT = 180;
 
-function reportOrbFrame(renderer: "webgl2" | "canvas2d", energy: number, width: number, height: number) {
+function reportOrbFrame(renderer: "webgl2", energy: number, width: number, height: number) {
   document.title = `黑洞任务|renderer=${renderer}|frame=ready|energy=${energy}|size=${width}x${height}`;
   if ("__TAURI_INTERNALS__" in window) {
     void invoke("report_orb_render", { renderer, energy, width, height }).catch((error) => {
@@ -236,12 +254,15 @@ export function getRenderProfile(quality: RenderQuality, lowPowerMode = false): 
 interface RendererOptions {
   quality?: RenderQuality;
   lowPowerMode?: boolean;
+  onError?(message: string): void;
 }
 
 export function startBlackHole(
   canvas: HTMLCanvasElement,
   getHover: () => number,
   getPulse: () => number,
+  getExpanded: () => number,
+  getSceneTexture: () => HTMLCanvasElement | null,
   options: RendererOptions = {},
 ) {
   const profile = getRenderProfile(options.quality ?? "balanced", options.lowPowerMode);
@@ -254,7 +275,12 @@ export function startBlackHole(
     preserveDrawingBuffer: false,
     powerPreference: options.lowPowerMode ? "low-power" : "default",
   });
-  if (!gl) return startCanvasFallback(canvas, getHover, getPulse, profile);
+  if (!gl) {
+    const message = "当前 WebView 不支持 WebGL2，请启用硬件加速或更新 WebView2。";
+    canvas.dataset.renderer = "unavailable";
+    options.onError?.(message);
+    return () => undefined;
+  }
 
   const compile = (type: number, source: string) => {
     const shader = gl.createShader(type);
@@ -298,7 +324,20 @@ export function startBlackHole(
       hover: gl.getUniformLocation(program, "u_hover"),
       pulse: gl.getUniformLocation(program, "u_pulse"),
       detail: gl.getUniformLocation(program, "u_detail"),
+      expanded: gl.getUniformLocation(program, "u_expanded"),
+      sceneTexture: gl.getUniformLocation(program, "u_scene_texture"),
+      hasScene: gl.getUniformLocation(program, "u_has_scene"),
     };
+    const sceneTexture = gl.createTexture();
+    if (!sceneTexture) throw new Error("无法创建四象限场景纹理");
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, sceneTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+    gl.uniform1i(uniforms.sceneTexture, 0);
 
     canvas.dataset.renderer = "webgl2";
     canvas.dataset.model = BLACK_HOLE_RENDERER_INFO.model;
@@ -314,6 +353,7 @@ export function startBlackHole(
     let needsResize = true;
     let readbackAttempts = 0;
     let rendererReady = false;
+    let uploadedSceneVersion = "";
 
     const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => { needsResize = true; });
     resizeObserver?.observe(canvas);
@@ -357,6 +397,21 @@ export function startBlackHole(
       gl.uniform1f(uniforms.hover, hoverValue);
       gl.uniform1f(uniforms.pulse, getPulse());
       gl.uniform1f(uniforms.detail, profile.detail);
+      gl.uniform1f(uniforms.expanded, getExpanded());
+      const sceneSource = getSceneTexture();
+      if (sceneSource && sceneSource.width > 0 && sceneSource.height > 0) {
+        const sceneVersion = `${sceneSource.width}x${sceneSource.height}:${sceneSource.dataset.version ?? "0"}`;
+        if (sceneVersion !== uploadedSceneVersion) {
+          gl.activeTexture(gl.TEXTURE0);
+          gl.bindTexture(gl.TEXTURE_2D, sceneTexture);
+          gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sceneSource);
+          uploadedSceneVersion = sceneVersion;
+        }
+        gl.uniform1f(uniforms.hasScene, getExpanded());
+      } else {
+        gl.uniform1f(uniforms.hasScene, 0);
+      }
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -420,102 +475,14 @@ export function startBlackHole(
       window.removeEventListener("pageshow", onVisibility);
       canvas.removeEventListener("webglcontextlost", onContextLost);
       gl.deleteBuffer(buffer);
+      gl.deleteTexture(sceneTexture);
       gl.deleteProgram(program);
     };
   } catch (error) {
-    console.error("WebGL2 黑洞初始化失败，已切换 Canvas 2D：", error);
-    return startCanvasFallback(canvas, getHover, getPulse, profile);
+    const message = error instanceof Error ? error.message : String(error);
+    canvas.dataset.renderer = "shader-error";
+    console.error("WebGL2 黑洞初始化失败：", error);
+    options.onError?.(message);
+    return () => undefined;
   }
-}
-
-function startCanvasFallback(
-  canvas: HTMLCanvasElement,
-  getHover: () => number,
-  getPulse: () => number,
-  profile: RenderProfile,
-) {
-  const context = canvas.getContext("2d");
-  if (!context) return () => undefined;
-  canvas.dataset.renderer = "canvas2d";
-  let animationFrame = 0;
-  let disposed = false;
-  let lastFrameAt = 0;
-  let startedAt = performance.now();
-  let rendererReady = false;
-
-  const schedule = () => {
-    if (!disposed && !document.hidden && animationFrame === 0) animationFrame = requestAnimationFrame(render);
-  };
-  const render = (now: number, force = false) => {
-    animationFrame = 0;
-    if (disposed || (!force && document.hidden)) return;
-    const active = getHover() > 0.01 || getPulse() > 0.01;
-    const fps = Math.min(active ? profile.activeFps : profile.idleFps, 20);
-    if (now - lastFrameAt < 1000 / fps) {
-      schedule();
-      return;
-    }
-    lastFrameAt = now;
-    const dpr = Math.min(window.devicePixelRatio || 1, profile.pixelRatioCap);
-    const width = Math.round(Math.max(BLACK_HOLE_STAGE_WIDTH, canvas.clientWidth) * dpr);
-    const height = Math.round(Math.max(BLACK_HOLE_STAGE_HEIGHT, canvas.clientHeight) * dpr);
-    if (canvas.width !== width || canvas.height !== height) {
-      canvas.width = width;
-      canvas.height = height;
-    }
-    const scale = Math.min(width, height);
-    const cx = width / 2;
-    const cy = height / 2;
-    const time = (now - startedAt) / 1000;
-    context.clearRect(0, 0, width, height);
-    context.save();
-    context.translate(cx, cy);
-    context.rotate(-0.17);
-    context.globalCompositeOperation = "lighter";
-    for (let layer = 0; layer < 5; layer += 1) {
-      context.beginPath();
-      context.ellipse(0, 0, scale * (0.23 + layer * 0.023), scale * (0.055 + layer * 0.008), 0, 0, Math.PI * 2);
-      context.strokeStyle = `rgba(255,${130 + layer * 18},${45 + layer * 13},${0.35 - layer * 0.045})`;
-      context.lineWidth = Math.max(1, scale * 0.018);
-      context.setLineDash([scale * 0.035, scale * 0.012]);
-      context.lineDashOffset = -time * scale * (0.04 + layer * 0.01);
-      context.stroke();
-    }
-    context.setLineDash([]);
-    context.globalCompositeOperation = "source-over";
-    const horizon = context.createRadialGradient(0, 0, 0, 0, 0, scale * 0.16);
-    horizon.addColorStop(0, "rgba(0,0,0,1)");
-    horizon.addColorStop(0.72, "rgba(0,0,0,1)");
-    horizon.addColorStop(0.82, "rgba(255,184,78,.95)");
-    horizon.addColorStop(0.88, "rgba(55,104,157,.28)");
-    horizon.addColorStop(1, "rgba(0,0,0,0)");
-    context.fillStyle = horizon;
-    context.beginPath();
-    context.arc(0, 0, scale * 0.18, 0, Math.PI * 2);
-    context.fill();
-    context.restore();
-    if (!rendererReady) {
-      rendererReady = true;
-      reportOrbFrame("canvas2d", 0, canvas.width, canvas.height);
-    }
-    schedule();
-  };
-  const onVisibility = () => {
-    if (document.hidden) {
-      if (animationFrame) cancelAnimationFrame(animationFrame);
-      animationFrame = 0;
-    } else {
-      startedAt += Math.max(0, performance.now() - lastFrameAt);
-      lastFrameAt = 0;
-      schedule();
-    }
-  };
-  document.addEventListener("visibilitychange", onVisibility);
-  const bootstrapTimers = [0, 300, 1200].map((delay) => window.setTimeout(() => render(performance.now(), true), delay));
-  return () => {
-    disposed = true;
-    if (animationFrame) cancelAnimationFrame(animationFrame);
-    bootstrapTimers.forEach((timer) => window.clearTimeout(timer));
-    document.removeEventListener("visibilitychange", onVisibility);
-  };
 }

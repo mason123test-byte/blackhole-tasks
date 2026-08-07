@@ -71,6 +71,9 @@ public static class BlackHoleWindowProbe
     private static extern bool NativeGetCursorPos(out Point point);
 
     [DllImport("user32.dll")]
+    private static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extraInfo);
+
+    [DllImport("user32.dll")]
     private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr dpiContext);
 
     public static bool EnablePerMonitorV2()
@@ -90,6 +93,14 @@ public static class BlackHoleWindowProbe
         var previous = SetThreadDpiAwarenessContext(new IntPtr(-4));
         try { return NativeGetCursorPos(out point); }
         finally { if (previous != IntPtr.Zero) SetThreadDpiAwarenessContext(previous); }
+    }
+
+    public static bool ClickAt(int x, int y)
+    {
+        if (!SetCursorPos(x, y)) return false;
+        mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
+        mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+        return true;
     }
 
     public static WindowInfo[] VisibleWindows(int expectedProcessId)
@@ -169,6 +180,34 @@ function Wait-OrbRenderReady([int]$ProcessId, [int]$TimeoutMilliseconds = 20000)
   throw "Orb did not produce a non-empty WebGL2 frame within ${TimeoutMilliseconds}ms; lastTitle='$lastTitle'."
 }
 
+function Wait-SceneSize([int]$ProcessId, [int]$MinimumWidth, [int]$MinimumHeight, [int]$TimeoutMilliseconds = 30000) {
+  $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMilliseconds)
+  do {
+    $match = @(Get-AppWindows $ProcessId | Where-Object { $_.Title -eq "黑洞任务" -or $_.Title.StartsWith("黑洞任务|") })
+    if ($match.Count -eq 1) {
+      $width = $match[0].ClientBounds.Right - $match[0].ClientBounds.Left
+      $height = $match[0].ClientBounds.Bottom - $match[0].ClientBounds.Top
+      if ($width -ge $MinimumWidth -and $height -ge $MinimumHeight) { return $match[0] }
+    }
+    Start-Sleep -Milliseconds 50
+  } while ([DateTime]::UtcNow -lt $deadline)
+  throw "Single scene did not reach at least ${MinimumWidth}x${MinimumHeight} within ${TimeoutMilliseconds}ms."
+}
+
+function Wait-SceneCompact([int]$ProcessId, [int]$MaximumWidth = 300, [int]$MaximumHeight = 230, [int]$TimeoutMilliseconds = 30000) {
+  $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMilliseconds)
+  do {
+    $match = @(Get-AppWindows $ProcessId | Where-Object { $_.Title -eq "黑洞任务" -or $_.Title.StartsWith("黑洞任务|") })
+    if ($match.Count -eq 1) {
+      $width = $match[0].ClientBounds.Right - $match[0].ClientBounds.Left
+      $height = $match[0].ClientBounds.Bottom - $match[0].ClientBounds.Top
+      if ($width -le $MaximumWidth -and $height -le $MaximumHeight) { return $match[0] }
+    }
+    Start-Sleep -Milliseconds 50
+  } while ([DateTime]::UtcNow -lt $deadline)
+  throw "Single scene did not return below ${MaximumWidth}x${MaximumHeight} within ${TimeoutMilliseconds}ms."
+}
+
 function Save-DesktopScreenshot([string]$Path) {
   $screen = [System.Windows.Forms.SystemInformation]::VirtualScreen
   $bitmap = [System.Drawing.Bitmap]::new($screen.Width, $screen.Height)
@@ -242,13 +281,12 @@ try {
   }
   $orb = Wait-OrbRenderReady $process.Id
   Start-Sleep -Milliseconds 800
-  $knownTitles = @("黑洞任务", "黑洞任务工作区", "快速新增任务")
-  $initialWindows = @(Get-AppWindows $process.Id | Where-Object { $_.Title -in $knownTitles -or $_.Title.StartsWith("黑洞任务|") })
+  $initialWindows = @(Get-AppWindows $process.Id | Where-Object { $_.Title -eq "黑洞任务" -or $_.Title.StartsWith("黑洞任务|") })
   $initialWindows | ForEach-Object {
     "STARTUP_WINDOW title=$($_.Title) outer=$($_.Bounds.Left),$($_.Bounds.Top),$($_.Bounds.Right),$($_.Bounds.Bottom) client=$($_.ClientBounds.Left),$($_.ClientBounds.Top),$($_.ClientBounds.Right),$($_.ClientBounds.Bottom)"
   }
   if ($initialWindows.Count -ne 1) {
-    throw "Expected only the orb at startup, found $($initialWindows.Count) visible app windows."
+    throw "Expected one single-scene window at startup, found $($initialWindows.Count)."
   }
 
   $initialScreenshot = Join-Path $OutputDirectory "01-orb-only.png"
@@ -272,64 +310,54 @@ try {
 
   $orbCenterX = [int](($orb.ClientBounds.Left + $orb.ClientBounds.Right) / 2)
   $orbCenterY = [int](($orb.ClientBounds.Top + $orb.ClientBounds.Bottom) / 2)
-  if (-not [BlackHoleWindowProbe]::SetCursorPos($orbCenterX, $orbCenterY)) {
-    throw "SetCursorPos failed for $orbCenterX,$orbCenterY."
+  if (-not [BlackHoleWindowProbe]::ClickAt($orbCenterX, $orbCenterY)) {
+    throw "ClickAt failed for compact scene center $orbCenterX,$orbCenterY."
   }
   $actualCursor = [BlackHoleWindowProbe+Point]::new()
   if (-not [BlackHoleWindowProbe]::GetCursorPos([ref]$actualCursor)) {
     throw "GetCursorPos failed after moving to the orb."
   }
   "SCRIPT_CURSOR requested=$orbCenterX,$orbCenterY actual=$($actualCursor.X),$($actualCursor.Y)"
-  try {
-    $workspace = Wait-AppWindow $process.Id "黑洞任务工作区" $true
-  } catch {
-    Get-AppWindows $process.Id | ForEach-Object {
-      "HOVER_TIMEOUT_WINDOW title=$($_.Title) client=$($_.ClientBounds.Left),$($_.ClientBounds.Top),$($_.ClientBounds.Right),$($_.ClientBounds.Bottom)"
-    }
-    if (Test-Path $diagnosticPath) {
-      "NATIVE_CURSOR_DIAGNOSTICS $(Get-Content -LiteralPath $diagnosticPath -Raw)"
-    } else {
-      "NATIVE_CURSOR_DIAGNOSTICS_MISSING path=$diagnosticPath"
-    }
-    Save-DesktopScreenshot (Join-Path $OutputDirectory "02-hover-timeout.png")
-    throw
+  $expanded = Wait-SceneSize $process.Id 800 600
+  $expandedWindows = @(Get-AppWindows $process.Id | Where-Object { $_.Title -eq "黑洞任务" -or $_.Title.StartsWith("黑洞任务|") })
+  if ($expandedWindows.Count -ne 1) {
+    throw "Expansion created another native window; expected 1, found $($expandedWindows.Count)."
   }
+  Save-DesktopScreenshot (Join-Path $OutputDirectory "02-single-scene-expanded.png")
+  Save-ScreenRegion (Join-Path $OutputDirectory "02-single-scene-closeup.png") $expanded.ClientBounds 8
 
-  $separated = $workspace.ClientBounds.Right -le $orb.ClientBounds.Left -or
-    $workspace.ClientBounds.Left -ge $orb.ClientBounds.Right -or
-    $workspace.ClientBounds.Bottom -le $orb.ClientBounds.Top -or
-    $workspace.ClientBounds.Top -ge $orb.ClientBounds.Bottom
-  if (-not $separated) {
-    throw "Workspace client area overlaps the orb: orb=$($orb.ClientBounds.Left),$($orb.ClientBounds.Top),$($orb.ClientBounds.Right),$($orb.ClientBounds.Bottom) workspace=$($workspace.ClientBounds.Left),$($workspace.ClientBounds.Top),$($workspace.ClientBounds.Right),$($workspace.ClientBounds.Bottom)."
+  $collapseX = $expanded.ClientBounds.Left + [int](($expanded.ClientBounds.Right - $expanded.ClientBounds.Left) * 0.74)
+  $collapseY = $expanded.ClientBounds.Top + 45
+  if (-not [BlackHoleWindowProbe]::ClickAt($collapseX, $collapseY)) {
+    throw "Failed to click the in-scene collapse control."
   }
-  Save-DesktopScreenshot (Join-Path $OutputDirectory "02-hover-open.png")
-  Save-ScreenRegion (Join-Path $OutputDirectory "02-workspace-closeup.png") $workspace.ClientBounds 8
-
-  [BlackHoleWindowProbe]::SetCursorPos(1, 1) | Out-Null
-  Wait-AppWindow $process.Id "黑洞任务工作区" $false | Out-Null
+  $orb = Wait-SceneCompact $process.Id
 
   $process.Refresh()
   $baselineThreads = $process.Threads.Count
   $baselineHandles = $process.HandleCount
-  1..20 | ForEach-Object {
-    [BlackHoleWindowProbe]::SetCursorPos($orbCenterX, $orbCenterY) | Out-Null
-    Start-Sleep -Milliseconds 155
-    [BlackHoleWindowProbe]::SetCursorPos(1, 1) | Out-Null
-    Start-Sleep -Milliseconds 55
+  1..12 | ForEach-Object {
+    $compactCenterX = [int](($orb.ClientBounds.Left + $orb.ClientBounds.Right) / 2)
+    $compactCenterY = [int](($orb.ClientBounds.Top + $orb.ClientBounds.Bottom) / 2)
+    [BlackHoleWindowProbe]::ClickAt($compactCenterX, $compactCenterY) | Out-Null
+    $expanded = Wait-SceneSize $process.Id 800 600 10000
+    $collapseX = $expanded.ClientBounds.Left + [int](($expanded.ClientBounds.Right - $expanded.ClientBounds.Left) * 0.74)
+    $collapseY = $expanded.ClientBounds.Top + 45
+    [BlackHoleWindowProbe]::ClickAt($collapseX, $collapseY) | Out-Null
+    $orb = Wait-SceneCompact $process.Id 300 230 10000
   }
   Start-Sleep -Milliseconds 750
-  Wait-AppWindow $process.Id "黑洞任务工作区" $false | Out-Null
   $process.Refresh()
   if ($process.HasExited -or -not $process.Responding) {
-    throw "Application exited or stopped responding during repeated hover cycles."
+    throw "Application exited or stopped responding during repeated single-window resize cycles."
   }
   $threadGrowth = $process.Threads.Count - $baselineThreads
   $handleGrowth = $process.HandleCount - $baselineHandles
   if ($threadGrowth -gt 4) {
-    throw "Thread count grew unexpectedly after hover cycles: delta=$threadGrowth."
+    throw "Thread count grew unexpectedly after resize cycles: delta=$threadGrowth."
   }
   if ($handleGrowth -gt 30) {
-    throw "Handle count grew unexpectedly after hover cycles: delta=$handleGrowth."
+    throw "Handle count grew unexpectedly after resize cycles: delta=$handleGrowth."
   }
 
   $logPath = Join-Path $env:LOCALAPPDATA "com.blackhole.tasks\logs\BlackHole Tasks.log"

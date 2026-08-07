@@ -1,7 +1,6 @@
 mod database;
 mod error;
 mod models;
-mod placement;
 
 use crate::{
     database::Database,
@@ -9,25 +8,8 @@ use crate::{
     models::*,
 };
 use serde_json::Value;
-use std::{
-    path::PathBuf,
-    sync::Mutex,
-    time::{Duration, Instant},
-};
+use std::path::PathBuf;
 use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, State};
-
-struct WindowState {
-    inner: Mutex<WindowInteraction>,
-}
-#[derive(Default)]
-struct WindowInteraction {
-    orb_hovered: bool,
-    workspace_hovered: bool,
-    pinned: bool,
-    orb_entered_at: Option<Instant>,
-    close_deadline: Option<Instant>,
-    close_worker_running: bool,
-}
 
 #[tauri::command]
 fn list_tasks(db: State<Database>) -> AppResult<Vec<Task>> {
@@ -175,6 +157,86 @@ fn map_window(error: tauri::Error) -> AppError {
     AppError::Window(error.to_string())
 }
 
+const COMPACT_SCENE_SIZE: (u32, u32) = (240, 180);
+const EXPANDED_SCENE_SIZE: (u32, u32) = (920, 700);
+
+fn set_scene_expanded_inner(
+    app: &tauri::AppHandle,
+    expanded: bool,
+    focus: bool,
+) -> AppResult<()> {
+    let window = app
+        .get_webview_window("orb")
+        .ok_or_else(|| AppError::Window("黑洞任务窗口不存在".into()))?;
+    let position = window.outer_position().map_err(map_window)?;
+    let current_size = window.outer_size().map_err(map_window)?;
+    let monitor = window
+        .current_monitor()
+        .map_err(map_window)?
+        .or_else(|| window.primary_monitor().ok().flatten())
+        .ok_or_else(|| AppError::Window("未找到显示器".into()))?;
+    let scale = monitor.scale_factor();
+    let logical_size = if expanded {
+        EXPANDED_SCENE_SIZE
+    } else {
+        COMPACT_SCENE_SIZE
+    };
+    let area = monitor.work_area();
+    let target_size = PhysicalSize::new(
+        ((logical_size.0 as f64 * scale).round() as u32).min(area.size.width),
+        ((logical_size.1 as f64 * scale).round() as u32).min(area.size.height),
+    );
+    let center_x = position.x + current_size.width as i32 / 2;
+    let center_y = position.y + current_size.height as i32 / 2;
+    let max_x = area.position.x + area.size.width as i32 - target_size.width as i32;
+    let max_y = area.position.y + area.size.height as i32 - target_size.height as i32;
+    let target_x = (center_x - target_size.width as i32 / 2).clamp(area.position.x, max_x);
+    let target_y = (center_y - target_size.height as i32 / 2).clamp(area.position.y, max_y);
+
+    window.set_size(target_size).map_err(map_window)?;
+    window
+        .set_position(PhysicalPosition::new(target_x, target_y))
+        .map_err(map_window)?;
+    if expanded && focus {
+        window.set_focus().map_err(map_window)?;
+    }
+    let _ = app.emit("scene:expanded-changed", expanded);
+    log::info!(
+        "single scene {} at {},{} size={}x{}",
+        if expanded { "expanded" } else { "collapsed" },
+        target_x,
+        target_y,
+        target_size.width,
+        target_size.height
+    );
+    Ok(())
+}
+
+#[tauri::command]
+fn set_scene_expanded(expanded: bool, app: tauri::AppHandle) -> AppResult<()> {
+    set_scene_expanded_inner(&app, expanded, expanded)
+}
+
+fn toggle_scene_inner(app: &tauri::AppHandle) -> AppResult<()> {
+    let window = app
+        .get_webview_window("orb")
+        .ok_or_else(|| AppError::Window("黑洞任务窗口不存在".into()))?;
+    let scale = window.scale_factor().map_err(map_window)?;
+    let width = window.outer_size().map_err(map_window)?.width;
+    let compact_width = (COMPACT_SCENE_SIZE.0 as f64 * scale).round() as u32;
+    set_scene_expanded_inner(app, width <= compact_width + 4, true)
+}
+
+fn open_scene_quick_add(app: &tauri::AppHandle) -> AppResult<()> {
+    set_scene_expanded_inner(app, true, true)?;
+    let _ = app.emit("scene:quick-add", ());
+    Ok(())
+}
+
+#[rustfmt::skip]
+#[cfg(any())]
+mod legacy_multi_window_coordination {
+use super::*;
 fn workspace(app: &tauri::AppHandle) -> AppResult<tauri::WebviewWindow> {
     app.get_webview_window("workspace")
         .ok_or_else(|| AppError::Window("工作区窗口不存在".into()))
@@ -438,6 +500,7 @@ fn global_cursor_position(_window: &tauri::WebviewWindow) -> Option<PhysicalPosi
 fn global_cursor_position(window: &tauri::WebviewWindow) -> Option<PhysicalPosition<f64>> {
     window.cursor_position().ok()
 }
+}
 
 fn diagnostics_path_from_args() -> Option<PathBuf> {
     std::env::args_os().find_map(|argument| {
@@ -457,6 +520,10 @@ fn diagnostics_path_from_marker() -> Option<PathBuf> {
     (!configured_path.is_empty()).then(|| PathBuf::from(configured_path))
 }
 
+#[rustfmt::skip]
+#[cfg(any())]
+mod legacy_cursor_monitor {
+use super::*;
 fn start_cursor_monitor(app: tauri::AppHandle, hover_delay_ms: u64) {
     let diagnostics_path = std::env::var_os("BLACKHOLE_SMOKE_DIAGNOSTICS_PATH")
         .map(PathBuf::from)
@@ -597,11 +664,26 @@ fn reposition_workspace_inner(app: &tauri::AppHandle) -> AppResult<()> {
         .map_err(map_window)?;
     Ok(())
 }
+}
 #[tauri::command]
-fn save_orb_position(x: i32, y: i32, db: State<Database>) -> AppResult<AppSettings> {
+fn save_orb_position(
+    x: i32,
+    y: i32,
+    app: tauri::AppHandle,
+    db: State<Database>,
+) -> AppResult<AppSettings> {
+    let window = app
+        .get_webview_window("orb")
+        .ok_or_else(|| AppError::Window("黑洞任务窗口不存在".into()))?;
+    let size = window.outer_size().map_err(map_window)?;
+    let scale = window.scale_factor().map_err(map_window)?;
+    let compact_width = (COMPACT_SCENE_SIZE.0 as f64 * scale).round() as i32;
+    let compact_height = (COMPACT_SCENE_SIZE.1 as f64 * scale).round() as i32;
     let mut settings = db.get_settings()?;
-    settings.orb_position_x = x;
-    settings.orb_position_y = y;
+    // Persist the compact-window origin even when the expanded scene is moved,
+    // so the black-hole center returns to exactly the same desktop anchor.
+    settings.orb_position_x = x + size.width as i32 / 2 - compact_width / 2;
+    settings.orb_position_y = y + size.height as i32 / 2 - compact_height / 2;
     db.save_settings(&settings)?;
     Ok(settings)
 }
@@ -650,22 +732,6 @@ fn set_always_on_top(
     Ok(settings)
 }
 #[tauri::command]
-fn open_quick_add(app: tauri::AppHandle) -> AppResult<()> {
-    let window = app
-        .get_webview_window("quick-add")
-        .ok_or_else(|| AppError::Window("快速新增窗口不存在".into()))?;
-    window.show().map_err(map_window)?;
-    window.set_focus().map_err(map_window)?;
-    Ok(())
-}
-#[tauri::command]
-fn hide_quick_add(app: tauri::AppHandle) -> AppResult<()> {
-    app.get_webview_window("quick-add")
-        .ok_or_else(|| AppError::Window("快速新增窗口不存在".into()))?
-        .hide()
-        .map_err(map_window)
-}
-#[tauri::command]
 fn show_orb_menu(_app: tauri::AppHandle) -> AppResult<()> {
     Ok(())
 }
@@ -678,7 +744,7 @@ fn report_orb_render(
     height: u32,
     app: tauri::AppHandle,
 ) -> AppResult<()> {
-    if renderer != "webgl2" && renderer != "canvas2d" {
+    if renderer != "webgl2" {
         return Err(AppError::Window("未知的黑洞渲染器".into()));
     }
     let title = format!(
@@ -731,8 +797,8 @@ fn open_log_directory(app: tauri::AppHandle) -> AppResult<()> {
 fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
     use tauri::tray::TrayIconBuilder;
-    let open = MenuItem::with_id(app, "open", "打开任务面板", true, None::<&str>)?;
-    let quick = MenuItem::with_id(app, "quick", "快速新增任务", true, None::<&str>)?;
+    let open = MenuItem::with_id(app, "open", "展开黑洞任务空间", true, None::<&str>)?;
+    let quick = MenuItem::with_id(app, "quick", "在黑洞中新增任务", true, None::<&str>)?;
     let passthrough = MenuItem::with_id(app, "passthrough", "切换穿透模式", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
@@ -742,11 +808,10 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
         .menu(&menu)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "open" => {
-                let _ = set_workspace_pinned_inner(app, true);
-                let _ = show_workspace_inner(app, true);
+                let _ = set_scene_expanded_inner(app, true, true);
             }
             "quick" => {
-                let _ = open_quick_add(app.clone());
+                let _ = open_scene_quick_add(app);
             }
             "passthrough" => {
                 if let Some(db) = app.try_state::<Database>() {
@@ -777,8 +842,7 @@ pub fn run() {
             if let Some(window) = app.get_webview_window("orb") {
                 let _ = window.show();
             }
-            let _ = set_workspace_pinned_inner(app, true);
-            let _ = show_workspace_inner(app, true);
+            let _ = set_scene_expanded_inner(app, true, true);
         }))
         .plugin(
             tauri_plugin_log::Builder::new()
@@ -802,10 +866,10 @@ pub fn run() {
                         }
                         match shortcut.to_string().as_str() {
                             "Ctrl+Shift+Space" => {
-                                let _ = toggle_workspace(app.clone());
+                                let _ = toggle_scene_inner(app);
                             }
                             "Ctrl+Shift+N" => {
-                                let _ = open_quick_add(app.clone());
+                                let _ = open_scene_quick_add(app);
                             }
                             "Ctrl+Shift+B" => {
                                 if let Some(db) = app.try_state::<Database>() {
@@ -837,9 +901,6 @@ pub fn run() {
             }
             let settings = db.get_settings().unwrap_or_default();
             app.manage(db);
-            app.manage(WindowState {
-                inner: Mutex::new(WindowInteraction::default()),
-            });
             log::info!("application state initialized at {}", data_dir.display());
             if let Some(orb) = app.get_webview_window("orb") {
                 let _ = orb.set_always_on_top(settings.orb_always_on_top);
@@ -860,21 +921,6 @@ pub fn run() {
                     }
                 }
             }
-            if let Some(workspace) = app.get_webview_window("workspace") {
-                let _ = workspace.hide();
-                let app_handle = app.handle().clone();
-                workspace.on_window_event(move |event| {
-                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                        api.prevent_close();
-                        let _ = set_workspace_pinned_inner(&app_handle, false);
-                        let _ = hide_workspace_inner(&app_handle);
-                    }
-                });
-            }
-            if let Some(quick_add) = app.get_webview_window("quick-add") {
-                let _ = quick_add.hide();
-            }
-            start_cursor_monitor(app.handle().clone(), settings.hover_open_delay_ms);
             if let Some(orb) = app.get_webview_window("orb") {
                 orb.show()?;
             }
@@ -917,21 +963,11 @@ pub fn run() {
             get_settings,
             update_settings,
             reset_settings,
-            show_workspace,
-            hide_workspace,
-            toggle_workspace,
-            pin_workspace,
-            unpin_workspace,
-            toggle_workspace_pin,
-            set_orb_hovered,
-            set_workspace_hovered,
+            set_scene_expanded,
             save_orb_position,
             restore_orb_position,
-            reposition_workspace,
             set_click_through,
             set_always_on_top,
-            open_quick_add,
-            hide_quick_add,
             show_orb_menu,
             report_orb_render,
             export_data,

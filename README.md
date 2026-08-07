@@ -1,16 +1,16 @@
 # BlackHole Tasks（黑洞任务）
 
-BlackHole Tasks 是一个 Windows 优先、本地优先的四象限桌面任务管理工具。应用采用独立的 `orb` 黑洞悬浮窗口和 `workspace` 任务工作区窗口；工作区关闭时只隐藏，不销毁任务状态。
+BlackHole Tasks 是一个 Windows 优先、本地优先的四象限桌面任务管理工具。黑洞、四象限、任务新增和详情编辑全部位于同一个透明 `orb` 场景窗口中；窗口展开或收起时始终以黑洞中心为桌面锚点。
 
-> 当前仓库已完成可编译的前端和 Tauri/Rust 项目源码。前端检查已通过；本机尚未安装 Rust/Cargo，因此 Rust 检查与 Windows 安装包仍需安装工具链后执行。详见“验证状态”。
+> 当前仓库已完成可编译的前端和 Tauri/Rust 项目源码。前端检查、测试和真实 Chromium 交互已通过；本机尚未安装 Rust/Cargo，因此最新 Rust 检查与 Windows 安装包仍需在 Windows CI 执行。详见“验证状态”。
 
 ## 功能预览
 
-- 透明、无边框、置顶的 WebGL2 黑洞悬浮球，WebGL2 不可用时自动降级 Canvas 2D
-- 黑洞悬停展开、离开延迟收起、单击固定、拖动阈值、双击快速新增
-- 独立四象限 React Flow 无限画布，支持缩放、平移、框选、多选、节点拖动和连线
-- 任务新增、详情编辑、自动保存、删除确认、完成、恢复、归档、复制
-- 跨中心线自动更新象限、重要/紧急字段一致性
+- 透明、无边框、置顶的 WebGL2 黑洞；WebGL2 不可用时明确报错，不渲染等价替代效果
+- 同一个原生窗口围绕黑洞中心在 `240×180` 收起态和 `920×700` 任务态之间伸缩
+- 四象限与任务先绘制为场景纹理，再由黑洞 Shader 进行引力透镜采样
+- 在象限中直接新增，在任务原位置直接编辑，不打开工作区、快速新增或详情窗口
+- 任务拖入另一个引力象限时立即更新象限；完成、状态、优先级和删除均可原地操作
 - 父子、依赖、普通关联模型与循环检测；折叠父任务时隐藏后代及相关边
 - 标题/描述/标签搜索与状态、标签筛选
 - SQLite WAL 本地持久化、参数化 SQL、迁移表、批量坐标事务
@@ -22,7 +22,6 @@ BlackHole Tasks 是一个 Windows 优先、本地优先的四象限桌面任务�
 
 - Tauri 2 / Rust / rusqlite（bundled SQLite）
 - React 19 / TypeScript / Vite
-- React Flow (`@xyflow/react`)
 - Zustand
 - Vitest / Testing Library / ESLint
 
@@ -59,13 +58,13 @@ npm install
 npm run tauri dev
 ```
 
-仅预览工作区前端：
+仅预览单窗口前端：
 
 ```powershell
 npm run dev
 ```
 
-然后访问 `http://127.0.0.1:1420/?window=workspace`。黑洞预览使用 `?window=orb`。
+然后访问 `http://127.0.0.1:1420/`。使用 `?compact=1` 可单独预览 `240×180` 收起态。
 
 也可以双击 [dev.bat](./dev.bat)。
 
@@ -107,10 +106,10 @@ C:\codex\HDDB\src-tauri\target\release\bundle\msi\BlackHole Tasks_0.1.4_x64_en-U
 ```text
 HDDB/
 ├─ src/
-│  ├─ app/                 # orb/workspace/quick-add 三个前端入口
-│  ├─ components/          # 黑洞、画布、工具栏、详情、快速新增
+│  ├─ app/                 # 单一黑洞任务场景入口
+│  ├─ components/          # 黑洞、离屏任务纹理与四象限交互组件
 │  ├─ services/            # Tauri Command + 浏览器 localStorage 降级
-│  ├─ shader/              # WebGL2 Shader 与 Canvas 2D 降级
+│  ├─ shader/              # WebGL2 测地线 Shader（无等价降级）
 │  ├─ stores/              # Zustand 任务、设置、历史状态
 │  ├─ styles/
 │  ├─ types/
@@ -119,7 +118,7 @@ HDDB/
 │  ├─ capabilities/        # 最小权限配置
 │  ├─ icons/               # Windows/macOS/移动端图标产物
 │  ├─ migrations/          # SQLite 迁移
-│  ├─ src/                 # Rust Commands、SQLite、窗口定位、托盘
+│  ├─ src/                 # Rust Commands、SQLite、单窗口锚点伸缩、托盘
 │  ├─ Cargo.toml
 │  └─ tauri.conf.json
 ├─ build-installer.ps1
@@ -149,15 +148,11 @@ HDDB/
 
 | 快捷键 | 功能 |
 |---|---|
-| `Ctrl + Shift + Space` | 显示或隐藏工作区 |
+| `Ctrl + Shift + Space` | 展开或收起黑洞任务空间 |
 | `Ctrl + Shift + B` | 切换黑洞穿透模式 |
-| `Ctrl + Shift + N` | 快速新增任务 |
-| `Ctrl + N` | 工作区内新增任务 |
-| `Ctrl + F` | 搜索（工具栏） |
-| `Ctrl + Z` / `Ctrl + Shift + Z` | 撤销 / 重做 |
-| `Delete` | 删除选中任务 |
-| `Ctrl + Enter` | 完成选中任务 |
-| `Esc` | 关闭详情或隐藏工作区 |
+| `Ctrl + Shift + N` | 展开场景并在 Q1 原地新增任务 |
+| `Enter` | 编辑聚焦的任务 |
+| `Esc` | 结束当前原地编辑 |
 
 ## 数据隐私与安全
 
@@ -176,17 +171,16 @@ HDDB/
 - `npm run test`：4 个测试文件、9 项测试全部通过
 - `npm run lint`：通过，0 warning
 - `npm run build`：通过
-- 真实 `240×180` Chromium/WebGL2 视觉检查：平衡模式静止 18 FPS、悬停 30 FPS，控制台 0 error
-- 四象限初始视图、任务新增、鼠标拖动和象限持久化：通过
-- 500 节点/800 关系负载：约 1.4 秒装载；密集模式只保留可见节点、最多绘制 160 条优先关系且关闭连线动画
-- 500 节点搜索：约 36ms，命中任务自动适应视图并保持可见
-- GitHub Actions Windows Runner：`cargo fmt --check`、Clippy、Rust 测试、Tauri NSIS/MSI 构建均已通过；工作流现增加原生 EXE 启动/响应冒烟检查
+- 真实 Chrome/WebGL2 收起态 `240×180`：像素能量 5747，控制台 0 error
+- 真实 Chrome/WebGL2 展开态 `920×700`：像素能量 30772，四个象限和离屏场景纹理均存在
+- 同一场景内任务新增、原地编辑、拖动换象限、完成和收起：通过
+- 禁用 WebGL2 时显示明确错误，`canvas2d` 渲染器数量为 0
 
-仍需在真实多显示器和不同 DPI 桌面上做手工验收；自动化不能完全替代透明窗口、桌面合成和鼠标跨窗口体验检查。
+仍需在 Windows CI 验证最新 Rust 单窗口命令和安装包，并在真实多显示器及不同 DPI 桌面上验收透明窗口锚点伸缩。
 
 ## 黑洞视觉参考
 
-黑洞渲染器基于 [s0xDk/ghostty-blackhole](https://github.com/s0xDk/ghostty-blackhole) 的 Schwarzschild 光子测地线积分进行适配：实际运行路径逐像素执行 leapfrog 积分，由光线与倾斜吸积盘的多次交点自然产生事件视界、光子环、上下引力透镜像、温度色彩与相对论多普勒增亮。Windows 透明 WebView 无法读取桌面背后的像素，因此这里只对程序星空进行弯曲，不声称可以透镜化桌面内容。为兼顾常驻稳定性，`240×180` 舞台按画质档限制像素比、步数和帧率。完整第三方许可见 `THIRD_PARTY_NOTICES.md`。
+黑洞渲染器基于 [s0xDk/ghostty-blackhole](https://github.com/s0xDk/ghostty-blackhole) 的 Schwarzschild 光子测地线积分进行适配：实际运行路径逐像素执行 leapfrog 积分，由光线与倾斜吸积盘的多次交点自然产生事件视界、光子环、上下引力透镜像、温度色彩与相对论多普勒增亮。参考项目把终端画面作为 `iChannel0`；本项目则把四象限和非编辑任务绘制为 `u_scene_texture`，让任务边界和文字在黑洞附近参与同样的重新采样。正在编辑的任务保留为清晰 DOM 层，以保证输入法、光标和无障碍能力。完整第三方许可见 `THIRD_PARTY_NOTICES.md`。
 
 ## 已知问题
 

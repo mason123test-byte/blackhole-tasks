@@ -20,8 +20,8 @@
         "height": 180,
         "minWidth": 240,
         "minHeight": 180,
-        "maxWidth": 240,
-        "maxHeight": 180,
+        "maxWidth": 920,
+        "maxHeight": 700,
         "resizable": false,
         "decorations": false,
         "transparent": true,
@@ -30,35 +30,6 @@
         "shadow": false,
         "focus": false,
         "visible": false
-      },
-      {
-        "label": "workspace",
-        "title": "黑洞任务工作区",
-        "url": "index.html?window=workspace",
-        "width": 1100,
-        "height": 760,
-        "minWidth": 760,
-        "minHeight": 520,
-        "visible": false,
-        "decorations": false,
-        "transparent": false,
-        "resizable": true,
-        "skipTaskbar": true,
-        "shadow": true,
-        "center": true
-      },
-      {
-        "label": "quick-add",
-        "title": "快速新增任务",
-        "url": "index.html?window=quick-add",
-        "width": 560,
-        "height": 210,
-        "visible": false,
-        "decorations": false,
-        "resizable": false,
-        "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "center": true
       }
     ],
     "security": {
@@ -70,7 +41,7 @@
     "targets": ["nsis", "msi"],
     "category": "Productivity",
     "shortDescription": "黑洞悬浮四象限任务管理工具",
-    "longDescription": "本地优先的 Windows 黑洞悬浮四象限任务管理工具",
+    "longDescription": "在单一黑洞引力场中直接编辑四象限任务的本地优先 Windows 工具",
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
     "resources": ["../THIRD_PARTY_NOTICES.md"],
     "windows": {

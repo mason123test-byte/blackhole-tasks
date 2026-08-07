@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Least-privilege permissions for BlackHole Tasks windows",
-  "windows": ["orb", "workspace", "quick-add"],
+  "description": "Least-privilege permissions for the BlackHole Tasks scene window",
+  "windows": ["orb"],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
@@ -16,4 +16,3 @@
     "autostart:allow-is-enabled"
   ]
 }
-
