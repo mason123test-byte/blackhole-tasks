@@ -160,11 +160,7 @@ fn map_window(error: tauri::Error) -> AppError {
 const COMPACT_SCENE_SIZE: (u32, u32) = (240, 180);
 const EXPANDED_SCENE_SIZE: (u32, u32) = (920, 700);
 
-fn set_scene_expanded_inner(
-    app: &tauri::AppHandle,
-    expanded: bool,
-    focus: bool,
-) -> AppResult<()> {
+fn set_scene_expanded_inner(app: &tauri::AppHandle, expanded: bool, focus: bool) -> AppResult<()> {
     let window = app
         .get_webview_window("orb")
         .ok_or_else(|| AppError::Window("黑洞任务窗口不存在".into()))?;
@@ -747,9 +743,8 @@ fn report_orb_render(
     if renderer != "webgl2" {
         return Err(AppError::Window("未知的黑洞渲染器".into()));
     }
-    let title = format!(
-        "黑洞任务|renderer={renderer}|frame=ready|energy={energy}|size={width}x{height}"
-    );
+    let title =
+        format!("黑洞任务|renderer={renderer}|frame=ready|energy={energy}|size={width}x{height}");
     app.get_webview_window("orb")
         .ok_or_else(|| AppError::Window("黑洞窗口不存在".into()))?
         .set_title(&title)
