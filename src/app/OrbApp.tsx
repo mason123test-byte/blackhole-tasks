@@ -356,6 +356,8 @@ export function OrbApp() {
         pulse={pulse}
         quality={settings.renderQuality}
         lowPowerMode={settings.lowPowerMode}
+        tasks={visibleTasks.map(({ id, title, quadrant, status }) => ({ id, title, quadrant, status }))}
+        editingTaskId={editingId}
         onError={setRenderError}
       />
 
