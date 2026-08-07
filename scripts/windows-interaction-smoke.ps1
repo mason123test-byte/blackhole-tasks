@@ -76,6 +76,17 @@ public static class BlackHoleWindowProbe
     [DllImport("user32.dll")]
     private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr dpiContext);
 
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(
+        IntPtr window,
+        IntPtr insertAfter,
+        int x,
+        int y,
+        int width,
+        int height,
+        uint flags
+    );
+
     public static bool EnablePerMonitorV2()
     {
         return SetThreadDpiAwarenessContext(new IntPtr(-4)) != IntPtr.Zero;
@@ -92,6 +103,27 @@ public static class BlackHoleWindowProbe
     {
         var previous = SetThreadDpiAwarenessContext(new IntPtr(-4));
         try { return NativeGetCursorPos(out point); }
+        finally { if (previous != IntPtr.Zero) SetThreadDpiAwarenessContext(previous); }
+    }
+
+    public static bool MoveTopLeft(IntPtr window, int x, int y)
+    {
+        const uint SWP_NOSIZE = 0x0001;
+        const uint SWP_NOZORDER = 0x0004;
+        const uint SWP_NOACTIVATE = 0x0010;
+        var previous = SetThreadDpiAwarenessContext(new IntPtr(-4));
+        try
+        {
+            return SetWindowPos(
+                window,
+                IntPtr.Zero,
+                x,
+                y,
+                0,
+                0,
+                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE
+            );
+        }
         finally { if (previous != IntPtr.Zero) SetThreadDpiAwarenessContext(previous); }
     }
 
@@ -206,6 +238,27 @@ function Wait-SceneCompact([int]$ProcessId, [int]$MaximumWidth = 300, [int]$Maxi
     Start-Sleep -Milliseconds 50
   } while ([DateTime]::UtcNow -lt $deadline)
   throw "Single scene did not return below ${MaximumWidth}x${MaximumHeight} within ${TimeoutMilliseconds}ms."
+}
+
+function Ensure-WindowOnVirtualScreen([int]$ProcessId, $Window) {
+  $screen = [System.Windows.Forms.SystemInformation]::VirtualScreen
+  $width = $Window.Bounds.Right - $Window.Bounds.Left
+  $height = $Window.Bounds.Bottom - $Window.Bounds.Top
+  $maximumLeft = [Math]::Max($screen.Left, $screen.Right - $width)
+  $maximumTop = [Math]::Max($screen.Top, $screen.Bottom - $height)
+  $targetLeft = [Math]::Min([Math]::Max($Window.Bounds.Left, $screen.Left), $maximumLeft)
+  $targetTop = [Math]::Min([Math]::Max($Window.Bounds.Top, $screen.Top), $maximumTop)
+  if ($targetLeft -eq $Window.Bounds.Left -and $targetTop -eq $Window.Bounds.Top) {
+    return $Window
+  }
+  $before = "$($Window.Bounds.Left),$($Window.Bounds.Top),$($Window.Bounds.Right),$($Window.Bounds.Bottom)"
+  if (-not [BlackHoleWindowProbe]::MoveTopLeft($Window.Handle, $targetLeft, $targetTop)) {
+    throw "Failed to move expanded scene into the visible virtual screen."
+  }
+  Start-Sleep -Milliseconds 250
+  $moved = Wait-SceneSize $ProcessId 800 600 5000
+  "SCENE_REPOSITION before=$before after=$($moved.Bounds.Left),$($moved.Bounds.Top),$($moved.Bounds.Right),$($moved.Bounds.Bottom) screen=$($screen.Left),$($screen.Top),$($screen.Right),$($screen.Bottom)"
+  return $moved
 }
 
 function Get-SceneClosePoint($Window) {
@@ -356,6 +409,7 @@ try {
   }
   "SCRIPT_CURSOR requested=$orbCenterX,$orbCenterY actual=$($actualCursor.X),$($actualCursor.Y)"
   $expanded = Wait-SceneSize $process.Id 800 600
+  $expanded = Ensure-WindowOnVirtualScreen $process.Id $expanded
   Start-Sleep -Milliseconds 800
   $expandedWindows = @(Get-AppWindows $process.Id | Where-Object { $_.Title -eq "黑洞任务" -or $_.Title.StartsWith("黑洞任务|") })
   if ($expandedWindows.Count -ne 1) {
