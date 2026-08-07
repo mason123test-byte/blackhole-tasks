@@ -1,5 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { RenderQuality } from "../types/settings";
+import {
+  buildSceneTextureSignature,
+  createSceneTextureBitmap,
+  type SceneTextureState,
+  type SceneTextureSnapshot,
+} from "./sceneTexture";
 
 const vertex = `#version 300 es
 in vec2 a_position;
@@ -12,8 +18,8 @@ void main() {
 // Adapted for a transparent desktop WebView from s0xDk/ghostty-blackhole's
 // Schwarzschild geodesic tracer (MIT). Unlike the previous painted-ring
 // approximation, the shadow, photon ring and upper/lower disk images all come
-// from integrating the ray path. The Ghostty terminal texture is intentionally
-// omitted because a transparent WebView cannot sample the desktop behind it.
+// from integrating the ray path. An SVG snapshot uploaded directly to a WebGL
+// texture supplies the iChannel0-equivalent scene without any Canvas2D path.
 const fragment = `#version 300 es
 precision highp float;
 in vec2 v_uv;
@@ -25,6 +31,8 @@ uniform float u_hover;
 uniform float u_pulse;
 uniform float u_detail;
 uniform float u_expanded;
+uniform sampler2D u_scene_texture;
+uniform float u_scene_ready;
 
 #define PI 3.14159265359
 #define B_CRIT 2.5980762
@@ -54,6 +62,10 @@ vec2 rotate2(vec2 p, float angle) {
   float c = cos(angle);
   float s = sin(angle);
   return vec2(c * p.x - s * p.y, s * p.x + c * p.y);
+}
+
+vec2 mirrorUV(vec2 value) {
+  return 1.0 - abs(1.0 - mod(value, 2.0));
 }
 
 vec3 blackbody(float temperature) {
@@ -93,16 +105,31 @@ void rayTracedReference() {
   float worldScale = B_CRIT / shadowRadius;
   vec2 rayPlane = rotate2(vec2(screen.x, -screen.y), DISK_ROLL) * worldScale;
   float impact = length(rayPlane);
+  float screenDistance = length(screen);
+  float lensWindow = exp(-pow(screenDistance / (7.0 * shadowRadius), 2.0));
+  float traceLimit = DISK_OUTER + 2.0;
+  float cameraZ = 14.0;
 
-  // Pixels beyond the physical disk stay transparent. A tiny procedural sky
-  // remains inside the traced region so gravitational bending is still visible
-  // without pretending that we can sample the Windows desktop.
-  if (impact > DISK_OUTER + 2.0) {
-    outColor = vec4(0.0);
+  // Match the reference shader's finite-camera weak-field handoff. Ghostty
+  // samples iChannel0 here; this build samples the GPU-uploaded scene texture.
+  if (impact >= traceLimit) {
+    if (u_scene_ready < 0.5 || lensWindow < 0.01) {
+      outColor = vec4(0.0);
+      return;
+    }
+    float finiteCamera = cameraZ * inversesqrt(cameraZ * cameraZ + impact * impact);
+    float deflection = (2.0 / (worldScale * worldScale)) / max(screenDistance, 0.0001)
+      * (1.29 * finiteCamera + 0.07)
+      * max(13.0 - 2.14 * finiteCamera + 0.75, 0.0)
+      * lensWindow;
+    vec2 direction = screen / max(screenDistance, 0.00001);
+    vec2 sampledScreen = screen - direction * deflection;
+    vec2 sampledUv = mirrorUV(vec2(0.5) + sampledScreen / vec2(aspect, 1.0));
+    vec3 scene = texture(u_scene_texture, sampledUv).rgb;
+    float alpha = smoothstep(0.02, 0.22, lensWindow) * u_scene_ready;
+    outColor = vec4(scene, alpha);
     return;
   }
-
-  float cameraZ = 14.0;
   vec3 position = vec3(rayPlane, cameraZ);
   vec3 velocity = vec3(0.0, 0.0, -1.0);
   float angularMomentum2 = dot(rayPlane, rayPlane);
@@ -175,10 +202,22 @@ void rayTracedReference() {
 
   if (!captured && dot(position, position) < 4.0) captured = true;
 
-  vec3 sky = vec3(0.0);
+  vec3 additiveSky = vec3(0.0);
+  vec3 sceneColor = vec3(0.0);
+  float sceneAlpha = 0.0;
   if (!captured) {
     vec3 escapedDirection = normalize(velocity);
-    sky = stars(escapedDirection) * 0.16 * u_detail;
+    additiveSky = stars(escapedDirection) * 0.16 * u_detail;
+    if (u_scene_ready > 0.5 && escapedDirection.z < -0.05) {
+      float projection = (-13.0 - position.z) / escapedDirection.z;
+      vec3 hit = position + escapedDirection * projection;
+      vec2 unrolled = rotate2(hit.xy, -DISK_ROLL) / worldScale;
+      vec2 sampledScreen = vec2(unrolled.x, -unrolled.y);
+      vec2 sampledUv = mirrorUV(vec2(0.5) + sampledScreen / vec2(aspect, 1.0));
+      float towardScene = smoothstep(0.05, 0.35, -escapedDirection.z);
+      sceneColor = texture(u_scene_texture, sampledUv).rgb * towardScene;
+      sceneAlpha = smoothstep(0.02, 0.22, lensWindow) * towardScene * u_scene_ready;
+    }
   }
   vec3 diskLight = vec3(1.0) - exp(-emission * mix(1.35, 1.60, u_hover));
 
@@ -189,14 +228,19 @@ void rayTracedReference() {
   // Keep disk emission in front of both escaped and captured rays. Captured
   // rays remove only the background; dropping their accumulated emission was
   // the reason earlier builds rendered a clipped bright wedge.
-  vec3 color = sky * transmittance + diskLight;
-  color += pulseLight;
-
-  float lightAlpha = max(max(color.r, color.g), color.b);
-  float diskOpacity = 1.0 - transmittance;
-  float alpha = captured ? 0.997 : clamp(max(lightAlpha, diskOpacity), 0.0, 0.97);
-  alpha = max(alpha, max(max(pulseLight.r, pulseLight.g), pulseLight.b));
-  outColor = vec4(clamp(color, 0.0, 1.0), alpha);
+  // Build the physical premultiplied result first, then convert to straight
+  // alpha for WebView2. Returning the dim emission as straight RGB directly
+  // would multiply it by alpha a second time and erase the reference filaments.
+  vec3 premultiplied = sceneColor * sceneAlpha * transmittance
+    + additiveSky + diskLight + pulseLight;
+  float additiveAlpha = max(max(additiveSky.r, additiveSky.g), additiveSky.b);
+  float diskAlpha = max(max(diskLight.r, diskLight.g), diskLight.b);
+  diskAlpha = max(diskAlpha, 1.0 - transmittance);
+  float pulseAlpha = max(max(pulseLight.r, pulseLight.g), pulseLight.b);
+  float alpha = captured ? 0.997 : clamp(max(sceneAlpha, max(additiveAlpha, diskAlpha)), 0.0, 0.97);
+  alpha = max(alpha, pulseAlpha);
+  vec3 straightColor = alpha > 0.0001 ? premultiplied / alpha : vec3(0.0);
+  outColor = vec4(clamp(straightColor, 0.0, 1.0), alpha);
 }
 
 void main() {
@@ -207,6 +251,7 @@ export const BLACK_HOLE_RENDERER_INFO = Object.freeze({
   model: "schwarzschild-geodesic",
   integrationSteps: 48,
   reference: "https://github.com/s0xDk/ghostty-blackhole",
+  sceneInput: "svg-gpu-texture",
 });
 const BLACK_HOLE_STAGE_WIDTH = 240;
 const BLACK_HOLE_STAGE_HEIGHT = 180;
@@ -237,7 +282,7 @@ export function getRenderProfile(quality: RenderQuality, lowPowerMode = false): 
   if (quality === "high") {
     return { idleFps: 24, activeFps: 40, pixelRatioCap: 1.5, detail: 1 };
   }
-  return { idleFps: 18, activeFps: 30, pixelRatioCap: 1.25, detail: 0.60 };
+  return { idleFps: 18, activeFps: 30, pixelRatioCap: 1.25, detail: 1 };
 }
 
 interface RendererOptions {
@@ -251,6 +296,7 @@ export function startBlackHole(
   getHover: () => number,
   getPulse: () => number,
   getExpanded: () => number,
+  getScene: () => SceneTextureState,
   options: RendererOptions = {},
 ) {
   const profile = getRenderProfile(options.quality ?? "balanced", options.lowPowerMode);
@@ -316,7 +362,22 @@ export function startBlackHole(
       pulse: gl.getUniformLocation(program, "u_pulse"),
       detail: gl.getUniformLocation(program, "u_detail"),
       expanded: gl.getUniformLocation(program, "u_expanded"),
+      sceneTexture: gl.getUniformLocation(program, "u_scene_texture"),
+      sceneReady: gl.getUniformLocation(program, "u_scene_ready"),
     };
+    gl.uniform1i(uniforms.sceneTexture, 0);
+
+    // Ghostty provides iChannel0. Here WebView2 decodes an SVG task-field
+    // snapshot and uploads it directly to this texture; Canvas2D is never used.
+    const sceneTexture = gl.createTexture();
+    if (!sceneTexture) throw new Error("无法创建黑洞场景纹理");
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, sceneTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
 
     // Render into an explicit texture-backed framebuffer first. WebView2's
     // transparent DirectComposition default framebuffer can return zeroes from
@@ -359,6 +420,43 @@ export function startBlackHole(
     let rendererReady = false;
     let contextLost = false;
     let bootstrapTimers: number[] = [];
+    let sceneSignature = "";
+    let sceneReady = false;
+    let sceneRevision = 0;
+
+    const refreshSceneTexture = () => {
+      const state = getScene();
+      const snapshot: SceneTextureSnapshot = {
+        ...state,
+        width: Math.max(1, Math.round(canvas.clientWidth)),
+        height: Math.max(1, Math.round(canvas.clientHeight)),
+      };
+      const signature = buildSceneTextureSignature(snapshot);
+      if (signature === sceneSignature) return;
+      sceneSignature = signature;
+      const revision = ++sceneRevision;
+      if (!snapshot.expanded) {
+        sceneReady = false;
+        return;
+      }
+      void createSceneTextureBitmap(snapshot).then((bitmap) => {
+        if (disposed || contextLost || revision !== sceneRevision) {
+          bitmap.close();
+          return;
+        }
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, sceneTexture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bitmap);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        bitmap.close();
+        sceneReady = true;
+        schedule();
+      }).catch((error) => {
+        sceneReady = false;
+        console.error("无法生成黑洞场景纹理：", error);
+      });
+    };
 
     const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => { needsResize = true; });
     resizeObserver?.observe(canvas);
@@ -428,8 +526,10 @@ export function startBlackHole(
       gl.uniform1f(uniforms.time, (now - startedAt) / 1000);
       gl.uniform1f(uniforms.hover, hoverValue);
       gl.uniform1f(uniforms.pulse, getPulse());
+      refreshSceneTexture();
       gl.uniform1f(uniforms.detail, profile.detail);
       gl.uniform1f(uniforms.expanded, getExpanded());
+      gl.uniform1f(uniforms.sceneReady, sceneReady ? 1 : 0);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -531,9 +631,11 @@ export function startBlackHole(
       window.removeEventListener("pageshow", onVisibility);
       canvas.removeEventListener("webglcontextlost", onContextLost);
       canvas.removeEventListener("webglcontextrestored", onContextRestored);
+      sceneRevision += 1;
       gl.deleteBuffer(buffer);
       gl.deleteFramebuffer(outputFramebuffer);
       gl.deleteTexture(outputTexture);
+      gl.deleteTexture(sceneTexture);
       gl.deleteProgram(program);
     };
   } catch (error) {
