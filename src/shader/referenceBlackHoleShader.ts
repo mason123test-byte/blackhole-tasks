@@ -179,10 +179,11 @@ void rayTracedReference() {
       float projection = (-13.0 - position.z) / escapedDirection.z;
       vec3 hit = position + escapedDirection * projection;
       vec2 unrolled = rotate2(hit.xy, -DISK_ROLL) / worldScale;
-      vec2 sampledScreen = vec2(unrolled.x, -unrolled.y);
+      vec2 escapedScreen = vec2(unrolled.x, -unrolled.y);
+      vec2 sampledScreen = mix(screen, escapedScreen, lensWindow);
       vec2 sampledUv = mirrorUV(vec2(0.5) + sampledScreen / vec2(aspect, 1.0));
       float towardScene = smoothstep(0.05, 0.35, -escapedDirection.z);
-      sceneColor = texture(u_scene_texture, sampledUv).rgb * towardScene;
+      sceneColor = texture(u_scene_texture, sampledUv).rgb;
       sceneAlpha = smoothstep(0.02, 0.22, lensWindow) * towardScene * u_scene_ready;
     }
   }
