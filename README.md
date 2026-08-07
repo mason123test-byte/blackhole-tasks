@@ -2,7 +2,7 @@
 
 BlackHole Tasks 是一个 Windows 优先、本地优先的四象限桌面任务管理工具。黑洞、四象限、任务新增和详情编辑全部位于同一个透明 `orb` 场景窗口中；窗口展开或收起时始终以黑洞中心为桌面锚点。
 
-> 当前仓库已完成可编译的前端和 Tauri/Rust 项目源码。前端检查、测试和真实 Chromium 交互已通过；本机尚未安装 Rust/Cargo，因此最新 Rust 检查与 Windows 安装包仍需在 Windows CI 执行。详见“验证状态”。
+> 当前仓库已完成可编译的前端和 Tauri/Rust 项目源码。前端检查、真实 Chromium 交互、Rust 检查、Windows 原生窗口烟雾测试与 NSIS/MSI 安装包构建均已通过。详见“验证状态”。
 
 ## 功能预览
 
@@ -171,12 +171,16 @@ HDDB/
 - `npm run test`：4 个测试文件、9 项测试全部通过
 - `npm run lint`：通过，0 warning
 - `npm run build`：通过
-- 真实 Chrome/WebGL2 收起态 `240×180`：像素能量 5747，控制台 0 error
-- 真实 Chrome/WebGL2 展开态 `920×700`：像素能量 30772，四个象限和离屏场景纹理均存在
+- 真实 Chrome/WebGL2 收起态 `240×180`：像素能量 2034，控制台 0 error
+- 真实 Chrome/WebGL2 展开态 `920×700`：Shader 背景帧缓冲 `473×360`，像素能量 7380，四个象限和离屏场景纹理均存在
 - 同一场景内任务新增、原地编辑、拖动换象限、完成和收起：通过
+- 主动制造 `WEBGL_lose_context` 后自动重建：展开状态、4 个象限和 WebGL2 像素能量均保持
 - 禁用 WebGL2 时显示明确错误，`canvas2d` 渲染器数量为 0
+- GitHub Windows CI `31156086168`：前端、Rustfmt、Clippy、Rust 测试、Tauri 安装包构建和原生交互测试全部通过
+- Windows Server 2025/WebView2 首帧：`renderer=webgl2`，像素能量 5747，WebGL 错误码 0，帧缓冲完整
+- Windows 单窗口连续 12 次展开/收起：`threadsDelta=0`、`handlesDelta=0`
 
-仍需在 Windows CI 验证最新 Rust 单窗口命令和安装包，并在真实多显示器及不同 DPI 桌面上验收透明窗口锚点伸缩。
+剩余人工验收项：在真实多显示器及不同 DPI 桌面上检查透明窗口的锚点伸缩和跨屏移动。
 
 ## 黑洞视觉参考
 
