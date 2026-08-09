@@ -401,6 +401,7 @@ $smokeCommandPath = [System.IO.Path]::ChangeExtension($diagnosticPath, ".command
 $smokeSnapshotPath = [System.IO.Path]::ChangeExtension($diagnosticPath, ".snapshot.json")
 $smokeToggleSequence = 0
 $smokeSnapshotSequence = 0
+Remove-Item -LiteralPath $smokeSnapshotPath -ErrorAction SilentlyContinue
 Set-Content -LiteralPath $smokeCommandPath -Value "" -NoNewline
 function Invoke-SmokeToggle {
   $script:smokeToggleSequence += 1
@@ -588,14 +589,7 @@ try {
   Save-DesktopScreenshot (Join-Path $OutputDirectory "05-task-completed-q2.png")
 
   Invoke-SceneCloseClick $expanded "persistence"
-  try {
-    $orb = Wait-SceneCompact $process.Id 300 230 5000
-  } catch {
-    "RETRY_COLLAPSE persistence click was not observed by the transparent WebView"
-    $expanded = Wait-SceneSize $process.Id 800 600 5000
-    Invoke-SceneCloseClick $expanded "persistence-retry"
-    $orb = Wait-SceneCompact $process.Id 300 230 10000
-  }
+  $orb = Wait-SceneCompact $process.Id 300 230 10000
   $orbCenterX = [int](($orb.ClientBounds.Left + $orb.ClientBounds.Right) / 2)
   $orbCenterY = [int](($orb.ClientBounds.Top + $orb.ClientBounds.Bottom) / 2)
   if (-not [BlackHoleWindowProbe]::ClickAt($orbCenterX, $orbCenterY)) {
@@ -627,15 +621,7 @@ try {
   "TASK_INTERACTION_OK title=$smokeTaskTitle created=q1/todo dragged=q2/todo completed=q2/done persisted=q2/done deleted=true"
 
   Invoke-SceneCloseClick $expanded "initial"
-  try {
-    $orb = Wait-SceneCompact $process.Id 300 230 5000
-  } catch {
-    "RETRY_COLLAPSE initial click was not observed by the transparent WebView"
-    Start-Sleep -Milliseconds 500
-    $expanded = Wait-SceneSize $process.Id 800 600 5000
-    Invoke-SceneCloseClick $expanded "retry"
-    $orb = Wait-SceneCompact $process.Id 300 230 10000
-  }
+  $orb = Wait-SceneCompact $process.Id 300 230 10000
 
   $process.Refresh()
   $baselineThreads = $process.Threads.Count
@@ -643,24 +629,10 @@ try {
   1..12 | ForEach-Object {
     $cycle = $_
     Invoke-SmokeToggle
-    try {
-      $expanded = Wait-SceneSize $process.Id 800 600 5000
-    } catch {
-      "RETRY_EXPAND cycle=$cycle smoke toggle was not observed"
-      Start-Sleep -Milliseconds 500
-      Invoke-SmokeToggle
-      $expanded = Wait-SceneSize $process.Id 800 600 10000
-    }
+    $expanded = Wait-SceneSize $process.Id 800 600 10000
     Start-Sleep -Milliseconds 350
     Invoke-SmokeToggle
-    try {
-      $orb = Wait-SceneCompact $process.Id 300 230 5000
-    } catch {
-      "RETRY_COLLAPSE cycle=$cycle smoke toggle was not observed"
-      Start-Sleep -Milliseconds 500
-      Invoke-SmokeToggle
-      $orb = Wait-SceneCompact $process.Id 300 230 10000
-    }
+    $orb = Wait-SceneCompact $process.Id 300 230 10000
     Start-Sleep -Milliseconds 250
   }
   Start-Sleep -Milliseconds 750
@@ -697,4 +669,7 @@ try {
   if (Test-Path $diagnosticPath) {
     Copy-Item -LiteralPath $diagnosticPath -Destination (Join-Path $OutputDirectory "native-cursor-diagnostics.txt") -Force
   }
+  Remove-Item -LiteralPath $diagnosticMarkerPath -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $smokeCommandPath -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $smokeSnapshotPath -ErrorAction SilentlyContinue
 }
