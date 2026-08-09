@@ -61,7 +61,7 @@ The implementation will delete, rather than rename or retain behind feature flag
 3. `hovered`, `pulse`, `getHover`, and `getPulse` plumbing that only changes FPS.
 4. The `orb:render-pulse` listener/emission and the no-effect center pulse click behavior.
 5. `GravitySceneTexture.tsx`, whose compatibility component always returns `null` and has no callers.
-6. The `#[cfg(any())] legacy_cursor_monitor` module, which can never compile.
+6. The `#[cfg(any())] legacy_multi_window_coordination` and `#[cfg(any())] legacy_cursor_monitor` modules, which can never compile and contain the retired workspace/cursor architecture.
 7. Context-loss session retry counters and automatic page reload. Context loss becomes a clear terminal render error.
 8. The six delayed bootstrap render timers. They are replaced by one owned scheduling path that cannot create parallel requestAnimationFrame chains.
 9. Windows smoke retry branches that repeat failed close/toggle clicks. A missed first interaction must fail the run and preserve evidence.
@@ -100,7 +100,7 @@ Failure behavior is explicit:
 - Render profiles contain only functional fields.
 - Renderer API contains no hover/pulse parameters.
 - No Canvas2D symbols appear in the rendering boundary.
-- The compile-disabled legacy module and null compatibility component are absent.
+- Both compile-disabled legacy modules and the null compatibility component are absent.
 - Bootstrap scheduling cannot create more than one pending animation frame.
 - Shader Inferno constants and 48-step geodesic invariants remain fixed.
 
