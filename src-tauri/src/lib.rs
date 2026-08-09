@@ -448,8 +448,7 @@ fn pending_smoke_command_paths(command_path: &Path) -> Vec<PathBuf> {
             let entry = entry.ok()?;
             let file_name = entry.file_name();
             let file_name = file_name.to_str()?;
-            (file_name.starts_with(&prefix) && file_name.ends_with(".cmd"))
-                .then(|| entry.path())
+            (file_name.starts_with(&prefix) && file_name.ends_with(".cmd")).then(|| entry.path())
         })
         .collect::<Vec<_>>();
     paths.sort();
@@ -695,7 +694,10 @@ mod smoke_command_tests {
         std::fs::write(&temporary, "toggle:3").expect("write temporary command");
         std::fs::write(&first, "toggle:1").expect("write first command");
 
-        assert_eq!(pending_smoke_command_paths(&command_path), vec![first, second]);
+        assert_eq!(
+            pending_smoke_command_paths(&command_path),
+            vec![first, second]
+        );
 
         std::fs::remove_dir_all(directory).expect("remove smoke command test directory");
     }
