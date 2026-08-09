@@ -34,9 +34,9 @@ export function getRenderProfile(quality: RenderQuality, lowPowerMode = false): 
     return { fps: 12, pixelRatioCap: 1 };
   }
   if (quality === "high") {
-    return { fps: 40, pixelRatioCap: 1.5 };
+    return { fps: 40, pixelRatioCap: 2 };
   }
-  return { fps: 30, pixelRatioCap: 1.25 };
+  return { fps: 30, pixelRatioCap: 2 };
 }
 
 export function getRenderSize(
@@ -74,7 +74,7 @@ function startBlackHoleSession(
     antialias: false,
     depth: false,
     stencil: false,
-    premultipliedAlpha: true,
+    premultipliedAlpha: false,
     // WebView2 can create this transparent surface while its native window is
     // still hidden. Preserve the submitted frame until the first visible
     // compositor/readback handshake has proved that real pixels exist.
