@@ -14,6 +14,7 @@ describe("strict Inferno fallback boundary", () => {
     expect(renderer).not.toMatch(/MAX_RENDER_|renderScale|blackhole-webgl-context-retries/);
     expect(renderer).not.toMatch(/bootstrapTimers|getHover|getPulse|detail:/);
     expect(renderer).not.toContain("window.location.reload()");
+    expect(renderer).toContain("webglcontextrestored");
     expect(canvas).not.toMatch(/hovered|pulse/);
     expect(app).not.toMatch(/orb:render-pulse|setPulse|pulseTimer/);
   });

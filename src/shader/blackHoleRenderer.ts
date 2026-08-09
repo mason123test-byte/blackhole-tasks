@@ -58,11 +58,15 @@ interface RendererOptions {
   onError?(message: string): void;
 }
 
-export function startBlackHole(
+interface RendererSessionOptions extends RendererOptions {
+  onContextLost?(): void;
+}
+
+function startBlackHoleSession(
   canvas: HTMLCanvasElement,
   getExpanded: () => number,
   getScene: () => SceneTextureState,
-  options: RendererOptions = {},
+  options: RendererSessionOptions = {},
 ) {
   const profile = getRenderProfile(options.quality ?? "balanced", options.lowPowerMode);
   const gl = canvas.getContext("webgl2", {
@@ -356,7 +360,7 @@ export function startBlackHole(
       canvas.dataset.renderer = "context-lost";
       if (animationFrame) cancelAnimationFrame(animationFrame);
       animationFrame = 0;
-      options.onError?.("WebGL2 上下文已丢失，请检查显卡驱动或 WebView2 后重启应用。");
+      options.onContextLost?.();
     };
 
     document.addEventListener("visibilitychange", onVisibility);
@@ -390,4 +394,48 @@ export function startBlackHole(
     options.onError?.(message);
     return () => undefined;
   }
+}
+
+export function startBlackHole(
+  canvas: HTMLCanvasElement,
+  getExpanded: () => number,
+  getScene: () => SceneTextureState,
+  options: RendererOptions = {},
+) {
+  let disposed = false;
+  let restoreTimeout = 0;
+  let stopSession: () => void = () => undefined;
+
+  function startSession() {
+    stopSession = startBlackHoleSession(canvas, getExpanded, getScene, {
+      ...options,
+      onContextLost: waitForContextRestore,
+    });
+  }
+
+  function restoreSession() {
+    window.clearTimeout(restoreTimeout);
+    restoreTimeout = 0;
+    if (disposed) return;
+    stopSession();
+    startSession();
+  }
+
+  function waitForContextRestore() {
+    if (disposed) return;
+    canvas.addEventListener("webglcontextrestored", restoreSession, { once: true });
+    window.clearTimeout(restoreTimeout);
+    restoreTimeout = window.setTimeout(() => {
+      canvas.removeEventListener("webglcontextrestored", restoreSession);
+      options.onError?.("WebGL2 上下文丢失且未能恢复，请检查显卡驱动或 WebView2。");
+    }, 5000);
+  }
+
+  startSession();
+  return () => {
+    disposed = true;
+    window.clearTimeout(restoreTimeout);
+    canvas.removeEventListener("webglcontextrestored", restoreSession);
+    stopSession();
+  };
 }
