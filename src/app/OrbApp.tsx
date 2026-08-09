@@ -402,9 +402,9 @@ export function OrbApp() {
               style={{ left: taskDrag.x, top: taskDrag.y }}
             ><span>›</span>{taskDrag.task.title}</div>
           )}
-          <button type="button" className="gravity-center-control" aria-label="黑洞中心，点击产生引力脉冲" onClick={() => { setPulse(1); window.setTimeout(() => setPulse(0), 420); }}>
+          <div className="gravity-center-control" aria-hidden="true">
             <span>BLACKHOLE</span><small>drag task → quadrant</small>
-          </button>
+          </div>
           {error && <div className="gravity-data-error" role="alert">{error}</div>}
         </>
       )}
