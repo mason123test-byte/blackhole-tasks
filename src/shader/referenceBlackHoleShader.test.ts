@@ -51,8 +51,11 @@ describe("reference-author WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INCL = 1.50;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_ROLL = 0.35;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float bmax = DISK_OUTER + 3.0;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "sceneColor = texture(u_scene_texture, sampledUv).rgb;",
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec4 sceneSample = texture(u_scene_texture, sampledUv);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("sceneAlpha = sceneSample.a * lensWindow");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("sceneColor = sceneSample.rgb * 1.30;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain(
+      "sceneAlpha = smoothstep(0.02, 0.22, lensWindow) * u_scene_ready;",
     );
   });
 
