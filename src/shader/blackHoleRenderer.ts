@@ -13,10 +13,6 @@ import {
 } from "./sceneTexture";
 
 export const BLACK_HOLE_RENDERER_INFO = REFERENCE_BLACK_HOLE_INFO;
-const BLACK_HOLE_STAGE_WIDTH = 240;
-const BLACK_HOLE_STAGE_HEIGHT = 180;
-const MAX_RENDER_WIDTH = 480;
-const MAX_RENDER_HEIGHT = 360;
 
 function reportOrbFrame(renderer: "webgl2", energy: number, width: number, height: number, diagnostic = "") {
   const diagnosticSuffix = diagnostic ? `|diag=${diagnostic}` : "";
@@ -29,20 +25,31 @@ function reportOrbFrame(renderer: "webgl2", energy: number, width: number, heigh
 }
 
 export interface RenderProfile {
-  idleFps: number;
-  activeFps: number;
+  fps: number;
   pixelRatioCap: number;
-  detail: number;
 }
 
 export function getRenderProfile(quality: RenderQuality, lowPowerMode = false): RenderProfile {
   if (lowPowerMode || quality === "low") {
-    return { idleFps: 12, activeFps: 24, pixelRatioCap: 1, detail: 0.22 };
+    return { fps: 12, pixelRatioCap: 1 };
   }
   if (quality === "high") {
-    return { idleFps: 24, activeFps: 40, pixelRatioCap: 1.5, detail: 1 };
+    return { fps: 40, pixelRatioCap: 1.5 };
   }
-  return { idleFps: 18, activeFps: 30, pixelRatioCap: 1.25, detail: 1 };
+  return { fps: 30, pixelRatioCap: 1.25 };
+}
+
+export function getRenderSize(
+  clientWidth: number,
+  clientHeight: number,
+  devicePixelRatio: number,
+  pixelRatioCap: number,
+) {
+  const dpr = Math.min(Math.max(devicePixelRatio || 1, 1), pixelRatioCap);
+  return {
+    width: Math.max(1, Math.round(clientWidth * dpr)),
+    height: Math.max(1, Math.round(clientHeight * dpr)),
+  };
 }
 
 interface RendererOptions {
@@ -53,8 +60,6 @@ interface RendererOptions {
 
 export function startBlackHole(
   canvas: HTMLCanvasElement,
-  getHover: () => number,
-  getPulse: () => number,
   getExpanded: () => number,
   getScene: () => SceneTextureState,
   options: RendererOptions = {},
@@ -175,7 +180,7 @@ export function startBlackHole(
     let readbackAttempts = 0;
     let rendererReady = false;
     let contextLost = false;
-    let bootstrapTimers: number[] = [];
+    let failed = false;
     let sceneSignature = "";
     let sceneReady = false;
     let sceneRevision = 0;
@@ -196,7 +201,7 @@ export function startBlackHole(
         return;
       }
       void createSceneTextureBitmap(snapshot).then((bitmap) => {
-        if (disposed || contextLost || revision !== sceneRevision) {
+        if (disposed || contextLost || failed || revision !== sceneRevision) {
           bitmap.close();
           return;
         }
@@ -209,8 +214,13 @@ export function startBlackHole(
         sceneReady = true;
         schedule();
       }).catch((error) => {
+        failed = true;
         sceneReady = false;
+        if (animationFrame) cancelAnimationFrame(animationFrame);
+        animationFrame = 0;
+        const message = error instanceof Error ? error.message : String(error);
         console.error("无法生成黑洞场景纹理：", error);
+        options.onError?.(`无法生成黑洞场景纹理：${message}`);
       });
     };
 
@@ -218,16 +228,14 @@ export function startBlackHole(
     resizeObserver?.observe(canvas);
 
     const schedule = () => {
-      if (!disposed && !document.hidden && animationFrame === 0) {
+      if (!disposed && !failed && !document.hidden && animationFrame === 0) {
         animationFrame = requestAnimationFrame(render);
       }
     };
     const render = (now: number, force = false) => {
       animationFrame = 0;
-      if (disposed || contextLost || (!force && document.hidden)) return;
-      const targetHover = getHover();
-      const fps = targetHover > 0.01 || getPulse() > 0.01 ? profile.activeFps : profile.idleFps;
-      const frameInterval = 1000 / fps;
+      if (disposed || contextLost || failed || (!force && document.hidden)) return;
+      const frameInterval = 1000 / profile.fps;
       if (!force && nextFrameAt !== 0 && now + 0.5 < nextFrameAt) {
         schedule();
         return;
@@ -238,15 +246,12 @@ export function startBlackHole(
         : nextFrameAt + frameInterval;
 
       if (needsResize) {
-        const dpr = Math.min(window.devicePixelRatio || 1, profile.pixelRatioCap);
-        const desiredWidth = Math.max(BLACK_HOLE_STAGE_WIDTH, canvas.clientWidth) * dpr;
-        const desiredHeight = Math.max(BLACK_HOLE_STAGE_HEIGHT, canvas.clientHeight) * dpr;
-        // The editable DOM remains at native window resolution. Only cap the
-        // ray-traced backing buffer so a 920x700 scene cannot multiply the
-        // geodesic workload enough to reset WebView2's GPU process.
-        const renderScale = Math.min(1, MAX_RENDER_WIDTH / desiredWidth, MAX_RENDER_HEIGHT / desiredHeight);
-        const width = Math.round(desiredWidth * renderScale);
-        const height = Math.round(desiredHeight * renderScale);
+        const { width, height } = getRenderSize(
+          canvas.clientWidth,
+          canvas.clientHeight,
+          window.devicePixelRatio,
+          profile.pixelRatioCap,
+        );
         if (canvas.width !== width || canvas.height !== height) {
           canvas.width = width;
           canvas.height = height;
@@ -313,7 +318,6 @@ export function startBlackHole(
         canvas.dataset.diagnostic = diagnostic;
         reportOrbFrame("webgl2", energy, canvas.width, canvas.height, diagnostic);
         rendererReady = energy > 100;
-        if (rendererReady) sessionStorage.removeItem("blackhole-webgl-context-retries");
       }
 
       gl.bindFramebuffer(gl.READ_FRAMEBUFFER, outputFramebuffer);
@@ -348,40 +352,30 @@ export function startBlackHole(
     const onContextLost = (event: Event) => {
       event.preventDefault();
       contextLost = true;
+      failed = true;
       canvas.dataset.renderer = "context-lost";
       if (animationFrame) cancelAnimationFrame(animationFrame);
       animationFrame = 0;
-      bootstrapTimers.forEach((timer) => window.clearTimeout(timer));
-      bootstrapTimers = [];
-    };
-    const onContextRestored = () => {
-      const retryKey = "blackhole-webgl-context-retries";
-      const retries = Number(sessionStorage.getItem(retryKey) ?? "0");
-      if (retries >= 2) {
-        options.onError?.("WebGL2 上下文反复丢失，请更新显卡驱动或 WebView2 后重启。");
-        return;
-      }
-      sessionStorage.setItem(retryKey, String(retries + 1));
-      window.location.reload();
+      options.onError?.("WebGL2 上下文已丢失，请检查显卡驱动或 WebView2 后重启应用。");
     };
 
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pageshow", onVisibility);
     canvas.addEventListener("webglcontextlost", onContextLost);
-    canvas.addEventListener("webglcontextrestored", onContextRestored);
-    // Draw even while the native window is still hidden, then repeat around
-    // the setup/show boundary. Continuous animation remains visibility-gated.
-    bootstrapTimers = [0, 300, 1200, 2500, 5000, 10000].map((delay) => window.setTimeout(() => render(performance.now(), true), delay));
+    const forceRender = () => {
+      if (animationFrame) cancelAnimationFrame(animationFrame);
+      animationFrame = 0;
+      render(performance.now(), true);
+    };
+    forceRender();
 
     return () => {
       disposed = true;
       if (animationFrame) cancelAnimationFrame(animationFrame);
-      bootstrapTimers.forEach((timer) => window.clearTimeout(timer));
       resizeObserver?.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pageshow", onVisibility);
       canvas.removeEventListener("webglcontextlost", onContextLost);
-      canvas.removeEventListener("webglcontextrestored", onContextRestored);
       sceneRevision += 1;
       gl.deleteBuffer(buffer);
       gl.deleteFramebuffer(outputFramebuffer);

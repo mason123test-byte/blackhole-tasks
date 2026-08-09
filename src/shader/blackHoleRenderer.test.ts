@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { BLACK_HOLE_RENDERER_INFO, getRenderProfile, getRenderSize } from "./blackHoleRenderer";
 
 describe("black-hole render profiles", () => {
-  it("uses full reference detail for balanced and high quality", () => {
-    expect(getRenderProfile("low")).toMatchObject({ idleFps: 12, activeFps: 24, pixelRatioCap: 1 });
-    expect(getRenderProfile("balanced")).toMatchObject({ idleFps: 18, activeFps: 30, pixelRatioCap: 1.25, detail: 1 });
-    expect(getRenderProfile("high")).toMatchObject({ idleFps: 24, activeFps: 40, pixelRatioCap: 1.5, detail: 1 });
+  it("uses only functional frame-rate and pixel-ratio controls", () => {
+    expect(getRenderProfile("low")).toEqual({ fps: 12, pixelRatioCap: 1 });
+    expect(getRenderProfile("balanced")).toEqual({ fps: 30, pixelRatioCap: 1.25 });
+    expect(getRenderProfile("high")).toEqual({ fps: 40, pixelRatioCap: 1.5 });
   });
 
   it("forces the low-cost profile when low-power mode is enabled", () => {
