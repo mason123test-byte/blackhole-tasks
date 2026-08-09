@@ -168,23 +168,24 @@ HDDB/
 已实际通过：
 
 - `npm run typecheck`：通过
-- `npm run test`：6 个测试文件、12 项测试全部通过
+- `npm run test`：8 个测试文件、20 项测试全部通过
 - `npm run lint`：通过，0 warning
 - `npm run build`：通过
 - 真实 Chrome/WebGL2 收起态 `240×180`：像素能量 2034，控制台 0 error
-- 真实 Chrome/WebGL2 展开态：Shader 帧缓冲 `480×345`，像素能量 6785，四个 DOM 象限和终端式任务行均存在
+- Windows Server 2025/WebView2 展开态：窗口与原生绘图区 `920×700`，已移除固定 `480×345` backing-buffer 上限；四个 DOM 象限、终端任务行与 11 条低对比度透镜输入均存在
 - 同一场景内从 Q1 新增任务、直接拖入 Q4、原地编辑：通过；编辑器仅保留标题、备注、保存和删除
-- 主动制造 `WEBGL_lose_context` 后自动重建：展开状态、4 个象限和 WebGL2 像素能量均保持
+- `webglcontextlost` 后在同一 Canvas 的标准 `webglcontextrestored` 生命周期中重建全部 GPU 资源；不刷新页面、不切换渲染器
 - 禁用 WebGL2 时显示明确错误，`canvas2d` 渲染器数量为 0
-- GitHub Windows CI `31186685252`：前端类型检查/Lint/测试/构建、Rustfmt、Clippy、Rust 测试、Tauri 安装包构建和原生交互测试全部通过
-- Windows Server 2025/WebView2 首帧：`renderer=webgl2`，像素能量 6173，帧缓冲完整
-- Windows 单窗口展开/关闭闭环：工具栏实测范围 `284,23–844,54`，关闭点击命中 `826,37`；结束时 `threadsDelta=0`、`handlesDelta=2`
+- GitHub Windows CI `31304642388`：前端类型检查/Lint/20 项测试、Rustfmt、Clippy、3 项 Rust 测试、Tauri EXE/NSIS/MSI 构建和原生交互测试全部通过
+- Windows Server 2025/WebView2 收起态首帧：`renderer=webgl2`、`size=240x180`、像素能量 5788；展开态颜色证据为 `luminous=5473`、`warm=2262`、`neutralBright=1775`
+- Windows 单窗口交互闭环：Q1 新增、DOM Pointer Events 拖入 Q2、完成、重开持久化、删除以及 12 次展开/收起均通过；结束时 `threadsDelta=0`、`handlesDelta=2`
+- Windows 证据 artifact：`blackhole-tasks-windows-82` 与 `blackhole-tasks-windows-smoke-82`
 
 剩余人工验收项：在真实多显示器及不同 DPI 桌面上检查透明窗口的锚点伸缩和跨屏移动。
 
 ## 黑洞视觉参考
 
-黑洞渲染器基于 [s0xDk/ghostty-blackhole](https://github.com/s0xDk/ghostty-blackhole) 的 Schwarzschild 光子测地线积分进行适配：实际运行路径逐像素执行 leapfrog 积分，由光线与倾斜吸积盘的多次交点自然产生事件视界、光子环、上下引力透镜像、温度色彩与相对论多普勒增亮。参考项目采样 Ghostty 提供的终端 `iChannel0`；本项目对应地把非编辑态四象限与任务行序列化为 SVG，经 `createImageBitmap` 解码后直接上传为 WebGL2 场景纹理，远场弱透镜与近场逃逸光线均会采样该纹理。真实 DOM 仍负责输入、编辑、完成和 Pointer Events 跨象限拖动，正在编辑的任务不会进入纹理快照；项目没有 Canvas2D 路径。完整第三方许可见 `THIRD_PARTY_NOTICES.md`。
+黑洞渲染器基于 [s0xDk/ghostty-blackhole](https://github.com/s0xDk/ghostty-blackhole) 的 Schwarzschild 光子测地线积分进行适配：实际运行路径逐像素执行 leapfrog 积分，由光线与倾斜吸积盘的多次交点自然产生事件视界、光子环、上下引力透镜像、温度色彩与相对论多普勒增亮。参考项目采样 Ghostty 提供的终端 `iChannel0`；本项目对应地把非编辑态四象限与任务行序列化为 SVG，以单一的 UTF-8 data image 管线经 `Image.decode()` 与 `createImageBitmap(image)` 上传为 WebGL2 场景纹理，远场弱透镜与近场逃逸光线均会采样该纹理。真实 DOM 仍负责输入、编辑、完成和 Pointer Events 跨象限拖动，正在编辑的任务不会进入纹理快照；项目没有 Canvas2D 路径。完整第三方许可见 `THIRD_PARTY_NOTICES.md`。
 
 ## 已知问题
 

@@ -218,6 +218,7 @@ function startBlackHoleSession(
         sceneReady = true;
         schedule();
       }).catch((error) => {
+        if (disposed || contextLost || failed || revision !== sceneRevision) return;
         failed = true;
         sceneReady = false;
         if (animationFrame) cancelAnimationFrame(animationFrame);

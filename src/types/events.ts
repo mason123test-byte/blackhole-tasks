@@ -9,7 +9,5 @@ export const AppEvents = {
   TASK_DELETED: "task:deleted",
   TASK_COMPLETED: "task:completed",
   SETTINGS_UPDATED: "settings:updated",
-  RENDER_PULSE: "orb:render-pulse",
   QUICK_ADD_OPEN: "quick-add:open",
 } as const;
-

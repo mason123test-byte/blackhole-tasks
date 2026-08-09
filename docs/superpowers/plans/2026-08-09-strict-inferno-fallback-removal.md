@@ -1,6 +1,6 @@
 # Strict Inferno Rendering and Fallback Removal Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Render the default Inferno black hole at native Windows canvas resolution and delete the retired or no-effect fallback paths without changing DOM task interaction boundaries.
 
@@ -30,7 +30,7 @@
 - Modify: `src/shader/blackHoleRenderer.test.ts`
 - Create: `src/shader/fallbackBoundary.test.ts`
 
-- [ ] **Step 1: Add a failing native-size test**
+- [x] **Step 1: Add a failing native-size test**
 
 Update the renderer test import and add:
 
@@ -48,7 +48,7 @@ it("renders the Windows scene at client resolution without a fixed backing-buffe
 });
 ```
 
-- [ ] **Step 2: Add a failing fallback-boundary test**
+- [x] **Step 2: Add a failing fallback-boundary test**
 
 Create `src/shader/fallbackBoundary.test.ts` with complete source assertions:
 
@@ -86,7 +86,7 @@ describe("strict Inferno fallback boundary", () => {
 });
 ```
 
-- [ ] **Step 3: Run the Windows RED build**
+- [x] **Step 3: Run the Windows RED build**
 
 Commit only the tests to `agent/initial-blackhole-tasks`. GitHub Actions command set:
 
@@ -102,7 +102,7 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 Expected: Vitest fails because `getRenderSize` is missing and the audited fallback strings/files still exist.
 
-- [ ] **Step 4: Commit the RED boundary**
+- [x] **Step 4: Commit the RED boundary**
 
 ```bash
 git add src/shader/blackHoleRenderer.test.ts src/shader/fallbackBoundary.test.ts
@@ -115,7 +115,7 @@ git commit -m "test: require native strict Inferno rendering"
 - Modify: `src/shader/blackHoleRenderer.ts`
 - Modify: `src/shader/blackHoleRenderer.test.ts`
 
-- [ ] **Step 1: Replace the profile and size calculation**
+- [x] **Step 1: Replace the profile and size calculation**
 
 Use only functional fields:
 
@@ -147,7 +147,7 @@ export function getRenderSize(
 
 Resize with `getRenderSize(canvas.clientWidth, canvas.clientHeight, window.devicePixelRatio, profile.pixelRatioCap)` and remove all fixed render caps.
 
-- [ ] **Step 2: Remove hover/pulse scheduling and bootstrap timers**
+- [x] **Step 2: Remove hover/pulse scheduling and bootstrap timers**
 
 Change `startBlackHole` to:
 
@@ -174,7 +174,7 @@ forceRender();
 
 No timer collection remains. Visibility changes are the only later start/stop boundary.
 
-- [ ] **Step 3: Make scene and context failures terminal**
+- [x] **Step 3: Make scene and context failures terminal**
 
 Introduce a single `failed` boolean used by `schedule` and `render`. On scene texture failure:
 
@@ -195,7 +195,7 @@ options.onError?.("WebGL2 上下文已丢失，请检查显卡驱动或 WebView2
 
 Delete context-restored reload handling and retry session storage.
 
-- [ ] **Step 4: Update profile expectations and run GREEN tests on Windows**
+- [x] **Step 4: Update profile expectations and run GREEN tests on Windows**
 
 Expected profile assertions:
 
@@ -207,7 +207,7 @@ expect(getRenderProfile("high")).toEqual({ fps: 40, pixelRatioCap: 1.5 });
 
 Expected: renderer tests pass; fallback boundary still fails until Tasks 3 and 4.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/shader/blackHoleRenderer.ts src/shader/blackHoleRenderer.test.ts
@@ -223,7 +223,7 @@ git commit -m "fix: render Inferno at native resolution"
 - Modify: `src/shader/sceneTexture.ts`
 - Modify: `src/shader/sceneTexture.test.ts`
 
-- [ ] **Step 1: Remove hover and pulse props**
+- [x] **Step 1: Remove hover and pulse props**
 
 `BlackHoleCanvasProps` keeps only:
 
@@ -240,7 +240,7 @@ interface BlackHoleCanvasProps {
 
 Keep `expandedRef` and `sceneRef`; call `startBlackHole(ref.current, () => expandedRef.current, () => sceneRef.current, options)`.
 
-- [ ] **Step 2: Remove the no-effect pulse UI**
+- [x] **Step 2: Remove the no-effect pulse UI**
 
 Delete pulse state, timer, listener, and props from `OrbApp.tsx`. Replace the clickable center button with decoration:
 
@@ -250,7 +250,7 @@ Delete pulse state, timer, listener, and props from `OrbApp.tsx`. Replace the cl
 </div>
 ```
 
-- [ ] **Step 3: Add deterministic terminal-field lens guides**
+- [x] **Step 3: Add deterministic terminal-field lens guides**
 
 In `buildSceneTextureSvg`, calculate task counts and build low-opacity source rows:
 
@@ -267,7 +267,7 @@ const lensRows = Array.from({ length: 11 }, (_, index) => {
 
 Insert it as `<g data-lens-field="terminal-guides">${lensRows}</g>` behind the actual quadrant/task markup. It is scene input only and has no events.
 
-- [ ] **Step 4: Test the lens input**
+- [x] **Step 4: Test the lens input**
 
 Add:
 
@@ -282,7 +282,7 @@ it("provides a dense terminal field for readable lens displacement", () => {
 
 Run Windows Vitest; expected: scene texture and component boundary tests pass.
 
-- [ ] **Step 5: Delete the null compatibility file and commit**
+- [x] **Step 5: Delete the null compatibility file and commit**
 
 ```bash
 git rm src/components/orb/GravitySceneTexture.tsx
@@ -296,7 +296,7 @@ git commit -m "refactor: remove no-effect black-hole UI paths"
 - Modify: `src-tauri/src/lib.rs`
 - Modify: `scripts/windows-interaction-smoke.ps1`
 
-- [ ] **Step 1: Remove retired Rust code**
+- [x] **Step 1: Remove retired Rust code**
 
 Delete the `orb:render-pulse` emit from `complete_task`. Delete both complete blocks beginning with:
 
@@ -316,7 +316,7 @@ mod legacy_cursor_monitor
 
 No function from either module is present in `generate_handler!`, so no replacement is added.
 
-- [ ] **Step 2: Remove smoke click retries**
+- [x] **Step 2: Remove smoke click retries**
 
 Replace every `try/catch` retry around `Wait-SceneCompact` or `Wait-SceneSize` with one condition wait. Keep startup diagnostic `catch`, JSON partial-write retry, and state polling because they capture evidence rather than repeat a user action.
 
@@ -329,7 +329,7 @@ $orb = Wait-SceneCompact $process.Id 300 230 10000
 
 The 12 resize cycles issue one `Invoke-SmokeToggle` per transition and one wait per expected state.
 
-- [ ] **Step 3: Clean smoke transport files**
+- [x] **Step 3: Clean smoke transport files**
 
 At startup remove a stale snapshot if present. In `finally`, remove the marker, command, and snapshot files after copying diagnostics:
 
@@ -337,11 +337,11 @@ At startup remove a stale snapshot if present. In `finally`, remove the marker, 
 Remove-Item -LiteralPath $diagnosticMarkerPath, $smokeCommandPath, $smokeSnapshotPath -Force -ErrorAction SilentlyContinue
 ```
 
-- [ ] **Step 4: Run Rust and boundary tests on Windows**
+- [x] **Step 4: Run Rust and boundary tests on Windows**
 
 Expected: Rustfmt, Clippy, three Rust tests, and `fallbackBoundary.test.ts` pass. `rg '#\[cfg\(any\(\)\)\]|RETRY_|orb:render-pulse'` returns no matches in the scoped files.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src-tauri/src/lib.rs scripts/windows-interaction-smoke.ps1 src/shader/fallbackBoundary.test.ts
@@ -354,29 +354,38 @@ git commit -m "refactor: delete retired rendering fallbacks"
 - Modify: `README.md`
 - Modify: `docs/superpowers/plans/2026-08-09-strict-inferno-fallback-removal.md`
 
-- [ ] **Step 1: Run the full Windows pipeline**
+- [x] **Step 1: Run the full Windows pipeline**
 
 Require one uncancelled run on the final code head with all workflow steps green. Expected first-frame sizes are at least `240×180` compact and `920×700` expanded at 100% runner DPI.
 
-- [ ] **Step 2: Inspect artifacts**
+- [x] **Step 2: Inspect artifacts**
 
 Download the smoke artifact and inspect compact, expanded, created, dragged, completed, persisted, and deleted screenshots. Compare the expanded close-up with the Inferno panel in `s0xDk/ghostty-blackhole/presets-grid.png`.
 
-- [ ] **Step 3: Reject unchanged visuals**
+- [x] **Step 3: Reject unchanged visuals**
 
 If disk filaments remain broad or the terminal field does not visibly bend, change only the confirmed failing boundary—DPR/render size first, lens-field opacity second—and rerun Windows CI. Do not change physical Inferno constants to mask a sampling problem.
 
-- [ ] **Step 4: Update README with actual evidence**
+- [x] **Step 4: Update README with actual evidence**
 
 Record only the run ID, actual framebuffer sizes, test counts, interaction evidence, artifact names, and visually observed comparison from the successful final run. Remove stale `480×345`/`480×360` claims.
 
-- [ ] **Step 5: Mark plan checkboxes and commit docs**
+- [x] **Step 5: Mark plan checkboxes and commit docs**
 
 ```bash
 git add README.md docs/superpowers/plans/2026-08-09-strict-inferno-fallback-removal.md
 git commit -m "docs: record native Inferno Windows evidence"
 ```
 
-- [ ] **Step 6: Final independent review**
+- [x] **Step 6: Final independent review**
 
 Review the final diff for Critical/Important issues, confirm no Canvas2D, dropdown, or DOM Pointer Events regressions, and leave PR #1 in Draft until the user accepts the new Windows screenshot.
+
+## Execution Notes
+
+- Final production run before documentation: GitHub Actions `31304642388` on `windows-latest`, conclusion `success`.
+- Verified artifacts: `blackhole-tasks-windows-82` and `blackhole-tasks-windows-smoke-82`.
+- Verified sizes: compact WebGL2 frame `240×180`; expanded single-scene window/client area `920×700` at runner DPR 1.
+- Verified tests: 8 Vitest files / 20 tests and 3 Rust tests passed; typecheck, ESLint, Rustfmt, and Clippy passed.
+- Verified interaction: create Q1, Pointer Events drag to Q2, complete, reopen/persist, delete, and 12 expand/collapse cycles; `threadsDelta=0`, `handlesDelta=2`.
+- Evidence-driven deviation: transient Windows `webglcontextlost` is handled through the standard same-canvas `webglcontextrestored` lifecycle instead of reload/session retry. SVG scene input uses one UTF-8 data-image → `Image.decode()` → `createImageBitmap(image)` path because WebView2 rejected direct SVG Blob decoding.

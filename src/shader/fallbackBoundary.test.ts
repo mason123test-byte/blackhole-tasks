@@ -11,6 +11,7 @@ describe("strict Inferno fallback boundary", () => {
     const renderer = read("./blackHoleRenderer.ts");
     const canvas = read("../components/orb/BlackHoleCanvas.tsx");
     const app = read("../app/OrbApp.tsx");
+    const events = read("../types/events.ts");
     const sceneTexture = read("./sceneTexture.ts");
     expect(renderer).not.toMatch(/MAX_RENDER_|renderScale|blackhole-webgl-context-retries/);
     expect(renderer).not.toMatch(/bootstrapTimers|getHover|getPulse|detail:/);
@@ -22,6 +23,7 @@ describe("strict Inferno fallback boundary", () => {
     expect(sceneTexture).not.toContain("URL.createObjectURL");
     expect(canvas).not.toMatch(/hovered|pulse/);
     expect(app).not.toMatch(/orb:render-pulse|setPulse|pulseTimer/);
+    expect(events).not.toMatch(/RENDER_PULSE|orb:render-pulse/);
   });
 
   it("contains no retired compatibility modules or retry clicks", () => {
