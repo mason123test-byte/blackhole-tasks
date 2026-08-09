@@ -28,4 +28,13 @@ describe("scene texture snapshot", () => {
     expect(buildSceneTextureSignature({ ...snapshot, tasks: [{ ...snapshot.tasks[0], status: "done" }] })).not.toBe(signature);
     expect(buildSceneTextureSignature({ ...snapshot })).toBe(signature);
   });
+
+  it("adds dense terminal guides for visible gravitational lensing", () => {
+    const svg = buildSceneTextureSvg(snapshot);
+
+    expect(svg).toContain('data-lens-field="terminal-guides"');
+    expect(svg.match(/gravity\.field\//g)).toHaveLength(11);
+    expect(svg).toContain("q1:1 q2:0 q3:0 q4:0");
+    expect(buildSceneTextureSvg({ ...snapshot, expanded: false })).not.toContain("gravity.field/");
+  });
 });

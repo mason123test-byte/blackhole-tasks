@@ -222,7 +222,6 @@ export function OrbApp() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addingQuadrant, setAddingQuadrant] = useState<Quadrant | null>(null);
   const [query, setQuery] = useState("");
-  const [pulse, setPulse] = useState(0);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [taskDrag, setTaskDrag] = useState<TaskDragSession | null>(null);
   const down = useRef<{ x: number; y: number } | null>(null);
@@ -233,9 +232,7 @@ export function OrbApp() {
   useEffect(() => { void loadSettings(); void loadAll(); }, [loadAll, loadSettings]);
   useEffect(() => {
     if (!("__TAURI_INTERNALS__" in window)) return;
-    let pulseTimer: number | undefined;
     const cleanups = [
-      listen("orb:render-pulse", () => { setPulse(1); window.clearTimeout(pulseTimer); pulseTimer = window.setTimeout(() => setPulse(0), 420); }),
       listen("scene:expanded-changed", (event) => {
         const next = Boolean(event.payload);
         sessionStorage.setItem("blackhole-scene-expanded", next ? "1" : "0");
@@ -247,7 +244,7 @@ export function OrbApp() {
         setAddingQuadrant("q1");
       }),
     ];
-    return () => { window.clearTimeout(pulseTimer); cleanups.forEach((cleanup) => void cleanup.then((fn) => fn())); };
+    return () => { cleanups.forEach((cleanup) => void cleanup.then((fn) => fn())); };
   }, []);
 
   const setSceneExpanded = async (next: boolean) => {
@@ -351,9 +348,7 @@ export function OrbApp() {
       onPointerCancel={() => { down.current = null; }}
     >
       <BlackHoleCanvas
-        hovered={false}
         expanded={expanded}
-        pulse={pulse}
         quality={settings.renderQuality}
         lowPowerMode={settings.lowPowerMode}
         tasks={visibleTasks.map(({ id, title, quadrant, status }) => ({ id, title, quadrant, status }))}

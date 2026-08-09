@@ -69,6 +69,16 @@ export function buildSceneTextureSvg(snapshot: SceneTextureSnapshot) {
   const centerPadX = compactLayout ? 105 : 150;
   const centerPadY = compactLayout ? 70 : 96;
   const tasks = snapshot.tasks.filter((task) => task.id !== snapshot.editingTaskId && task.status !== "archived");
+  const quadrantCounts = Object.fromEntries(
+    QUADRANTS.map((quadrant) => [quadrant, tasks.filter((task) => task.quadrant === quadrant).length]),
+  ) as Record<Quadrant, number>;
+  const lensRowGap = Math.max(34, (height - 136) / 10);
+  const lensRows = Array.from({ length: 11 }, (_, index) => {
+    const y = 72 + index * lensRowGap;
+    const sequence = String(index).padStart(2, "0");
+    const telemetry = `gravity.field/${sequence} q1:${quadrantCounts.q1} q2:${quadrantCounts.q2} q3:${quadrantCounts.q3} q4:${quadrantCounts.q4}`;
+    return `<text x="${marginX}" y="${y}" fill="#8ba7af" fill-opacity=".11">$ ${telemetry}</text>`;
+  }).join("");
 
   const quadrantBounds: Record<Quadrant, { left: number; right: number; headerY: number; rowsY: number }> = {
     q1: { left: marginX + 14, right: centerX - centerPadX, headerY: top + 20, rowsY: top + 43 },
@@ -108,6 +118,7 @@ export function buildSceneTextureSvg(snapshot: SceneTextureSnapshot) {
     <g font-family="Cascadia Mono,Consolas,Microsoft YaHei,monospace" font-size="11">
       <text x="${Math.max(32, centerX - 280)}" y="34" fill="#80cbc4">$</text>
       <text x="${Math.max(48, centerX - 262)}" y="34" fill="#52646c">filter tasks</text>
+      ${snapshot.expanded ? `<g data-lens-field="terminal-guides">${lensRows}</g>` : ""}
       ${snapshot.expanded ? quadrantMarkup : ""}
     </g>
   </svg>`;
