@@ -17,7 +17,9 @@ describe("strict Inferno fallback boundary", () => {
     expect(renderer).not.toContain("window.location.reload()");
     expect(renderer).toContain("webglcontextrestored");
     expect(sceneTexture).toContain("await image.decode()");
+    expect(sceneTexture).toContain("data:image/svg+xml;charset=utf-8");
     expect(sceneTexture).not.toContain("createImageBitmap(blob)");
+    expect(sceneTexture).not.toContain("URL.createObjectURL");
     expect(canvas).not.toMatch(/hovered|pulse/);
     expect(app).not.toMatch(/orb:render-pulse|setPulse|pulseTimer/);
   });

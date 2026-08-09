@@ -125,15 +125,10 @@ export function buildSceneTextureSvg(snapshot: SceneTextureSnapshot) {
 }
 
 export async function createSceneTextureBitmap(snapshot: SceneTextureSnapshot) {
-  const blob = new Blob([buildSceneTextureSvg(snapshot)], { type: "image/svg+xml;charset=utf-8" });
-  const objectUrl = URL.createObjectURL(blob);
-  try {
-    const image = new Image();
-    image.decoding = "sync";
-    image.src = objectUrl;
-    await image.decode();
-    return await createImageBitmap(image);
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
+  const svg = buildSceneTextureSvg(snapshot);
+  const image = new Image();
+  image.decoding = "sync";
+  image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  await image.decode();
+  return await createImageBitmap(image);
 }
