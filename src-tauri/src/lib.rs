@@ -8,7 +8,7 @@ use crate::{
     models::*,
 };
 use serde_json::Value;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, State};
 
 #[tauri::command]
@@ -432,48 +432,70 @@ fn parse_smoke_command(command: &str) -> Option<SmokeCommand> {
     }
 }
 
+fn pending_smoke_command_paths(command_path: &Path) -> Vec<PathBuf> {
+    let Some(parent) = command_path.parent() else {
+        return Vec::new();
+    };
+    let Some(command_name) = command_path.file_name().and_then(|name| name.to_str()) else {
+        return Vec::new();
+    };
+    let prefix = format!("{command_name}.");
+    let Ok(entries) = std::fs::read_dir(parent) else {
+        return Vec::new();
+    };
+    let mut paths = entries
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let file_name = entry.file_name();
+            let file_name = file_name.to_str()?;
+            (file_name.starts_with(&prefix) && file_name.ends_with(".cmd"))
+                .then(|| entry.path())
+        })
+        .collect::<Vec<_>>();
+    paths.sort();
+    paths
+}
+
 fn start_smoke_command_monitor(app: tauri::AppHandle, command_path: PathBuf) {
     let snapshot_path = command_path.with_extension("snapshot.json");
-    std::thread::spawn(move || {
-        let mut last_command = String::new();
-        loop {
-            if let Ok(raw_command) = std::fs::read_to_string(&command_path) {
-                if raw_command != last_command {
-                    if let Some(command) = parse_smoke_command(&raw_command) {
-                        last_command = raw_command;
-                        match command {
-                            SmokeCommand::Toggle(_) => {
-                                if let Err(error) = toggle_scene_inner(&app) {
-                                    log::error!("smoke toggle command failed: {error}");
+    std::thread::spawn(move || loop {
+        for published_path in pending_smoke_command_paths(&command_path) {
+            let Ok(raw_command) = std::fs::read_to_string(&published_path) else {
+                continue;
+            };
+            if let Some(command) = parse_smoke_command(&raw_command) {
+                match command {
+                    SmokeCommand::Toggle(_) => {
+                        if let Err(error) = toggle_scene_inner(&app) {
+                            log::error!("smoke toggle command failed: {error}");
+                        }
+                    }
+                    SmokeCommand::Snapshot(sequence) => {
+                        let snapshot = app.state::<Database>().list_tasks().and_then(|tasks| {
+                            serde_json::to_vec_pretty(&serde_json::json!({
+                                "sequence": sequence,
+                                "tasks": tasks,
+                            }))
+                            .map_err(AppError::from)
+                        });
+                        match snapshot {
+                            Ok(snapshot) => {
+                                if let Err(error) = std::fs::write(&snapshot_path, snapshot) {
+                                    log::error!("smoke snapshot write failed: {error}");
                                 }
                             }
-                            SmokeCommand::Snapshot(sequence) => {
-                                let snapshot =
-                                    app.state::<Database>().list_tasks().and_then(|tasks| {
-                                        serde_json::to_vec_pretty(&serde_json::json!({
-                                            "sequence": sequence,
-                                            "tasks": tasks,
-                                        }))
-                                        .map_err(AppError::from)
-                                    });
-                                match snapshot {
-                                    Ok(snapshot) => {
-                                        if let Err(error) = std::fs::write(&snapshot_path, snapshot)
-                                        {
-                                            log::error!("smoke snapshot write failed: {error}");
-                                        }
-                                    }
-                                    Err(error) => {
-                                        log::error!("smoke snapshot failed: {error}");
-                                    }
-                                }
+                            Err(error) => {
+                                log::error!("smoke snapshot failed: {error}");
                             }
                         }
                     }
                 }
             }
-            std::thread::sleep(std::time::Duration::from_millis(50));
+            if let Err(error) = std::fs::remove_file(&published_path) {
+                log::warn!("smoke command cleanup failed: {error}");
+            }
         }
+        std::thread::sleep(std::time::Duration::from_millis(50));
     });
 }
 
@@ -644,7 +666,7 @@ pub fn run() {
 
 #[cfg(test)]
 mod smoke_command_tests {
-    use super::{parse_smoke_command, SmokeCommand};
+    use super::{parse_smoke_command, pending_smoke_command_paths, SmokeCommand};
 
     #[test]
     fn parses_toggle_and_snapshot_commands() {
@@ -658,5 +680,23 @@ mod smoke_command_tests {
         );
         assert_eq!(parse_smoke_command("snapshot:x"), None);
         assert_eq!(parse_smoke_command("unknown:1"), None);
+    }
+
+    #[test]
+    fn orders_only_published_command_files() {
+        let unique = format!("blackhole-smoke-{}", std::process::id());
+        let directory = std::env::temp_dir().join(unique);
+        std::fs::create_dir_all(&directory).expect("create smoke command test directory");
+        let command_path = directory.join("transport.command");
+        let first = directory.join("transport.command.000001.cmd");
+        let second = directory.join("transport.command.000002.cmd");
+        let temporary = directory.join("transport.command.000003.cmd.tmp");
+        std::fs::write(&second, "toggle:2").expect("write second command");
+        std::fs::write(&temporary, "toggle:3").expect("write temporary command");
+        std::fs::write(&first, "toggle:1").expect("write first command");
+
+        assert_eq!(pending_smoke_command_paths(&command_path), vec![first, second]);
+
+        std::fs::remove_dir_all(directory).expect("remove smoke command test directory");
     }
 }

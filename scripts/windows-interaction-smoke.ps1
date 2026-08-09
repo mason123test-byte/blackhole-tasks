@@ -396,18 +396,22 @@ function Get-ColorDistance([System.Drawing.Color]$First, [System.Drawing.Color]$
     [Math]::Abs([int]$First.B - [int]$Second.B)
 }
 
-$diagnosticPath = Join-Path $env:TEMP "blackhole-tasks-native-cursor-diagnostics.txt"
+$diagnosticPath = Join-Path $env:TEMP "blackhole-tasks-native-cursor-$([Guid]::NewGuid().ToString('N')).txt"
 $smokeCommandPath = [System.IO.Path]::ChangeExtension($diagnosticPath, ".command")
 $smokeSnapshotPath = [System.IO.Path]::ChangeExtension($diagnosticPath, ".snapshot.json")
 $smokeToggleSequence = 0
 $smokeSnapshotSequence = 0
+$smokeTransportSequence = 0
+$smokeCommandFiles = [System.Collections.Generic.List[string]]::new()
 Remove-Item -LiteralPath $smokeSnapshotPath -ErrorAction SilentlyContinue
-[System.IO.File]::WriteAllText($smokeCommandPath, "", [System.Text.UTF8Encoding]::new($false))
 function Write-SmokeCommand([string]$Command) {
-  $temporaryPath = "$smokeCommandPath.$([Guid]::NewGuid().ToString('N')).tmp"
+  $script:smokeTransportSequence += 1
+  $publishedPath = "{0}.{1:D6}.cmd" -f $smokeCommandPath, $script:smokeTransportSequence
+  $temporaryPath = "$publishedPath.tmp"
+  $script:smokeCommandFiles.Add($publishedPath)
   try {
     [System.IO.File]::WriteAllText($temporaryPath, $Command, [System.Text.UTF8Encoding]::new($false))
-    [System.IO.File]::Move($temporaryPath, $smokeCommandPath, $true)
+    [System.IO.File]::Move($temporaryPath, $publishedPath)
   } finally {
     Remove-Item -LiteralPath $temporaryPath -ErrorAction SilentlyContinue
   }
@@ -681,4 +685,8 @@ try {
   Remove-Item -LiteralPath $diagnosticMarkerPath -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath $smokeCommandPath -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath $smokeSnapshotPath -ErrorAction SilentlyContinue
+  $smokeCommandFiles | ForEach-Object {
+    Remove-Item -LiteralPath $_ -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath "$_.tmp" -ErrorAction SilentlyContinue
+  }
 }

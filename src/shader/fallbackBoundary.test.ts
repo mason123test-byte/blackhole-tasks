@@ -33,7 +33,7 @@ describe("strict Inferno fallback boundary", () => {
     expect(rust).not.toContain("orb:render-pulse");
     expect(smoke).not.toContain("RETRY_");
     expect(smoke).not.toContain("Set-Content -LiteralPath $smokeCommandPath");
-    expect(smoke).toContain("[System.IO.File]::Move($temporaryPath, $smokeCommandPath, $true)");
+    expect(smoke).toContain("[System.IO.File]::Move($temporaryPath, $publishedPath)");
     expect(existsSync(resolve(process.cwd(), "src/components/orb/GravitySceneTexture.tsx"))).toBe(false);
   });
 });
