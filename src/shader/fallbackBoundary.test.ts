@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -23,9 +24,6 @@ describe("strict Inferno fallback boundary", () => {
     expect(rust).not.toContain("#[cfg(any())]");
     expect(rust).not.toContain("orb:render-pulse");
     expect(smoke).not.toContain("RETRY_");
-    expect(existsSync(fileURLToPath(new URL(
-      "../components/orb/GravitySceneTexture.tsx",
-      import.meta.url,
-    )))).toBe(false);
+    expect(existsSync(resolve(process.cwd(), "src/components/orb/GravitySceneTexture.tsx"))).toBe(false);
   });
 });
