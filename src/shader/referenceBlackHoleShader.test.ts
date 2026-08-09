@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { getRenderProfile, getRenderSize } from "./blackHoleRenderer";
 import {
@@ -8,7 +8,7 @@ import {
 } from "./referenceBlackHoleShader";
 
 const rendererSource = readFileSync(
-  fileURLToPath(new URL("./blackHoleRenderer.ts", import.meta.url)),
+  resolve(process.cwd(), "src/shader/blackHoleRenderer.ts"),
   "utf8",
 );
 
