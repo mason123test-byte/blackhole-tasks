@@ -68,7 +68,9 @@ vec3 blackbody(float temperature) {
 
 void rayTracedReference() {
   float aspect = u_resolution.x / max(u_resolution.y, 1.0);
-  vec2 screen = (v_uv - 0.5) * vec2(aspect, 1.0);
+  // Ghostty's fragment coordinates run top-down; WebGL texture UVs run bottom-up.
+  vec2 referenceUv = vec2(v_uv.x, 1.0 - v_uv.y);
+  vec2 screen = (referenceUv - 0.5) * vec2(aspect, 1.0);
 
   // On the 240x180 transparent stage this gives a ~54px shadow and lets the
   // r=8 disk nearly fill the height, matching the reference composition.
