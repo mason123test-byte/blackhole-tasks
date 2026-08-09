@@ -19,6 +19,15 @@ describe("reference-faithful black-hole shader", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float bmax = DISK_OUTER + 3.0;");
   });
 
+  it("converts WebGL bottom-up UV into Ghostty top-down coordinates", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "vec2 referenceUv = vec2(v_uv.x, 1.0 - v_uv.y);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "vec2 screen = (referenceUv - 0.5) * vec2(aspect, 1.0);",
+    );
+  });
+
   it("keeps application animation out of the physical light calculation", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("u_hover");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("u_pulse");
