@@ -402,15 +402,24 @@ $smokeSnapshotPath = [System.IO.Path]::ChangeExtension($diagnosticPath, ".snapsh
 $smokeToggleSequence = 0
 $smokeSnapshotSequence = 0
 Remove-Item -LiteralPath $smokeSnapshotPath -ErrorAction SilentlyContinue
-Set-Content -LiteralPath $smokeCommandPath -Value "" -NoNewline
+[System.IO.File]::WriteAllText($smokeCommandPath, "", [System.Text.UTF8Encoding]::new($false))
+function Write-SmokeCommand([string]$Command) {
+  $temporaryPath = "$smokeCommandPath.$([Guid]::NewGuid().ToString('N')).tmp"
+  try {
+    [System.IO.File]::WriteAllText($temporaryPath, $Command, [System.Text.UTF8Encoding]::new($false))
+    [System.IO.File]::Move($temporaryPath, $smokeCommandPath, $true)
+  } finally {
+    Remove-Item -LiteralPath $temporaryPath -ErrorAction SilentlyContinue
+  }
+}
 function Invoke-SmokeToggle {
   $script:smokeToggleSequence += 1
-  Set-Content -LiteralPath $smokeCommandPath -Value "toggle:$script:smokeToggleSequence" -NoNewline
+  Write-SmokeCommand "toggle:$script:smokeToggleSequence"
 }
 function Get-SmokeTaskSnapshot([int]$TimeoutMilliseconds = 5000) {
   $script:smokeSnapshotSequence += 1
   $expectedSequence = $script:smokeSnapshotSequence
-  Set-Content -LiteralPath $smokeCommandPath -Value "snapshot:$expectedSequence" -NoNewline
+  Write-SmokeCommand "snapshot:$expectedSequence"
   $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMilliseconds)
   do {
     if (Test-Path $smokeSnapshotPath) {
