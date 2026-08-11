@@ -38,7 +38,10 @@ void main() {
   float candidateWeight = u_visual_compare < 0.5
     ? 0.0
     : (u_visual_compare > 1.5 ? step(0.0, screen.x) : 1.0);
-  outColor = mix(baseFrame, mirroredFrame, mirrorMask * candidateWeight);
+  float mirrorWeight = mirrorMask * candidateWeight;
+  vec3 reconstructedColor = mix(baseFrame.rgb, mirroredFrame.rgb, mirrorWeight);
+  float reconstructedAlpha = max(baseFrame.a, mirroredFrame.a * mirrorWeight);
+  outColor = vec4(reconstructedColor, reconstructedAlpha);
 }`;
 
 function reportOrbFrame(renderer: "webgl2", energy: number, width: number, height: number, diagnostic = "") {
