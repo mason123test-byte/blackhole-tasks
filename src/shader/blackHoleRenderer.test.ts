@@ -43,18 +43,18 @@ describe("black-hole render profiles", () => {
     expect(getVisualComparisonSettings("split")).toEqual({ shaderMode: 2, fixedTime: 12 });
   });
 
-  it("mirrors the upper WebGL frame only inside the lower black-hole region", () => {
+  it("keeps the diagonal disk, outer wings, and scene background out of lower-arc reconstruction", () => {
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
       "texture(u_frame_texture, vec2(v_uv.x, 1.0 - v_uv.y))",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "float lowerHalf = 1.0 - step(0.5, v_uv.y);",
+      "float annulusMask = smoothstep(0.14, 0.17, radius) * (1.0 - smoothstep(0.29, 0.32, radius));",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "float mirrorMask = lowerHalf * (1.0 - smoothstep(0.43, 0.47, length(screen)));",
+      "float mirrorMask = lowerHalf * annulusMask * mirroredLightMask;",
     );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "outColor = mix(baseFrame, mirroredFrame, mirrorMask * candidateWeight);",
+    expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain(
+      "lowerHalf * (1.0 - smoothstep(0.43, 0.47, length(screen)))",
     );
   });
 });
