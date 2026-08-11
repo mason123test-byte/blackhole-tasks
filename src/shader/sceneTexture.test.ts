@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildSceneTextureSignature, buildSceneTextureSvg, type SceneTextureSnapshot } from "./sceneTexture";
 
@@ -13,6 +15,12 @@ const snapshot: SceneTextureSnapshot = {
 };
 
 describe("scene texture snapshot", () => {
+  it("uploads straight-alpha scene pixels without premultiplying them twice", () => {
+    const source = readFileSync(resolve(process.cwd(), "src/shader/sceneTexture.ts"), "utf8");
+    expect(source).toContain('premultiplyAlpha: "none"');
+    expect(source).toContain('colorSpaceConversion: "none"');
+  });
+
   it("renders all quadrant guides and escaped non-editing task text", () => {
     const svg = buildSceneTextureSvg(snapshot);
 

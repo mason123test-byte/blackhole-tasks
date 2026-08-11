@@ -135,5 +135,8 @@ export async function createSceneTextureBitmap(snapshot: SceneTextureSnapshot) {
   image.decoding = "sync";
   image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   await image.decode();
-  return await createImageBitmap(image);
+  return await createImageBitmap(image, {
+    premultiplyAlpha: "none",
+    colorSpaceConversion: "none",
+  });
 }
