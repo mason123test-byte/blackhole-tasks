@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { BLACK_HOLE_RENDERER_INFO, getRenderProfile, getRenderSize } from "./blackHoleRenderer";
+import {
+  BLACK_HOLE_RENDERER_INFO,
+  getRenderProfile,
+  getRenderSize,
+  getVisualComparisonSettings,
+} from "./blackHoleRenderer";
 
 describe("black-hole render profiles", () => {
   it("uses the reference author's WebGL pixel-ratio ceiling", () => {
@@ -28,5 +33,12 @@ describe("black-hole render profiles", () => {
       alphaMode: "reference-webgl-straight-alpha",
       webglReference: "https://s13k.dev/blackhole/",
     });
+  });
+
+  it("freezes only diagnostic visual-comparison frames", () => {
+    expect(getVisualComparisonSettings("normal")).toEqual({ shaderMode: 1, fixedTime: null });
+    expect(getVisualComparisonSettings("baseline")).toEqual({ shaderMode: 0, fixedTime: 12 });
+    expect(getVisualComparisonSettings("candidate")).toEqual({ shaderMode: 1, fixedTime: 12 });
+    expect(getVisualComparisonSettings("split")).toEqual({ shaderMode: 2, fixedTime: 12 });
   });
 });
