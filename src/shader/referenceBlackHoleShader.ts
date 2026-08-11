@@ -95,9 +95,9 @@ void rayTracedReference() {
   vec2 referenceUv = vec2(v_uv.x, 1.0 - v_uv.y);
   vec2 screen = (referenceUv - 0.5) * vec2(aspect, 1.0);
 
-  // On the 240x180 transparent stage this gives a ~54px shadow and lets the
-  // r=8 disk nearly fill the height, matching the reference composition.
-  float shadowRadius = mix(0.150, 0.085, u_expanded);
+  // Keep the expanded task field at the reference Inferno scale: its shadow
+  // is about 14% of the surface height and the r=8 disk fills most of it.
+  float shadowRadius = mix(0.150, 0.140, u_expanded);
   float worldScale = B_CRIT / shadowRadius;
   vec2 rayPlane = rotate2(vec2(screen.x, -screen.y), DISK_ROLL) * worldScale;
   float impact = length(rayPlane);

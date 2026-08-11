@@ -53,6 +53,9 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_OUTER = 8.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INCL = 1.50;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_ROLL = 0.35;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float shadowRadius = mix(0.150, 0.140, u_expanded);",
+    );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float bmax = DISK_OUTER + 3.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec4 sceneSample = texture(u_scene_texture, sampledUv);");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("sceneAlpha = sceneSample.a * lensWindow");
