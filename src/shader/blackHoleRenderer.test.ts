@@ -63,4 +63,22 @@ describe("black-hole render profiles", () => {
       "lowerHalf * (1.0 - smoothstep(0.43, 0.47, length(screen)))",
     );
   });
+
+  it("preserves straight-alpha coverage while reconstructing the lower arc", () => {
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
+      "float mirrorWeight = mirrorMask * candidateWeight;",
+    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
+      "vec3 reconstructedColor = mix(baseFrame.rgb, mirroredFrame.rgb, mirrorWeight);",
+    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
+      "float reconstructedAlpha = max(baseFrame.a, mirroredFrame.a * mirrorWeight);",
+    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
+      "outColor = vec4(reconstructedColor, reconstructedAlpha);",
+    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain(
+      "mix(baseFrame, mirroredFrame",
+    );
+  });
 });
