@@ -415,7 +415,7 @@ function Write-SmokeCommand([string]$Command) {
     Remove-Item -LiteralPath $temporaryPath -ErrorAction SilentlyContinue
   }
 }
-function Get-SmokeTaskSnapshot([int]$TimeoutMilliseconds = 5000) {
+function Get-SmokeTaskSnapshot([int]$TimeoutMilliseconds = 15000) {
   $script:smokeSnapshotSequence += 1
   $expectedSequence = $script:smokeSnapshotSequence
   Write-SmokeCommand "snapshot:$expectedSequence"

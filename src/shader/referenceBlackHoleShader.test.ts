@@ -83,7 +83,7 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
 
   it("uses the reference author's DPR ceiling without fixed resolution caps", () => {
     expect(getRenderProfile("low")).toEqual({ fps: 12, pixelRatioCap: 1 });
-    expect(getRenderProfile("balanced")).toEqual({ fps: 30, pixelRatioCap: 2 });
+    expect(getRenderProfile("balanced")).toEqual({ fps: 20, pixelRatioCap: 1.5 });
     expect(getRenderProfile("high")).toEqual({ fps: 40, pixelRatioCap: 2 });
     expect(getRenderSize(920, 700, 2, 2)).toEqual({ width: 1840, height: 1400 });
   });
