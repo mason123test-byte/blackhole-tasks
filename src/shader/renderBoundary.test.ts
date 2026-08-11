@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -14,7 +15,7 @@ const readSource = (relativePath: string) =>
   readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), "utf8");
 
 const smokeSource = readFileSync(
-  fileURLToPath(new URL("../../scripts/windows-interaction-smoke.ps1", import.meta.url)),
+  resolve(process.cwd(), "scripts/windows-interaction-smoke.ps1"),
   "utf8",
 );
 
