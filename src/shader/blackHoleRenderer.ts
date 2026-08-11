@@ -18,31 +18,12 @@ export const MIRROR_COMPOSITOR_FRAGMENT = `#version 300 es
 precision highp float;
 in vec2 v_uv;
 uniform sampler2D u_frame_texture;
-uniform vec2 u_resolution;
-uniform float u_visual_compare;
 out vec4 outColor;
 
 void main() {
-  vec4 baseFrame = texture(u_frame_texture, v_uv);
-  vec2 mirroredUv = vec2(0.5 + abs(v_uv.x - 0.5), 1.0 - v_uv.y);
-  vec4 mirroredFrame = texture(u_frame_texture, mirroredUv);
-  float aspect = u_resolution.x / max(u_resolution.y, 1.0);
-  vec2 referenceUv = vec2(v_uv.x, 1.0 - v_uv.y);
-  vec2 screen = (referenceUv - 0.5) * vec2(aspect, 1.0);
-  float radius = length(screen);
-  float lowerHalf = smoothstep(0.50, 0.54, referenceUv.y);
-  float annulusMask = smoothstep(0.14, 0.17, radius) * (1.0 - smoothstep(0.29, 0.32, radius));
-  float mirroredLuma = max(mirroredFrame.r, max(mirroredFrame.g, mirroredFrame.b));
-  float mirroredLightMask = smoothstep(0.16, 0.34, mirroredLuma) * smoothstep(0.04, 0.20, mirroredFrame.a);
-  float mirrorMask = lowerHalf * annulusMask * mirroredLightMask;
-  float candidateWeight = u_visual_compare < 0.5
-    ? 0.0
-    : (u_visual_compare > 1.5 ? step(0.0, screen.x) : 1.0);
-  float mirrorWeight = mirrorMask * candidateWeight;
-  vec3 reconstructedColor = mix(baseFrame.rgb, mirroredFrame.rgb, mirrorWeight);
-  float reconstructedAlpha = max(baseFrame.a, mirroredFrame.a * mirrorWeight);
-  outColor = vec4(reconstructedColor, reconstructedAlpha);
+  outColor = texture(u_frame_texture, v_uv);
 }`;
+
 
 function reportOrbFrame(renderer: "webgl2", energy: number, width: number, height: number, diagnostic = "") {
   const diagnosticSuffix = diagnostic ? `|diag=${diagnostic}` : "";
@@ -189,8 +170,10 @@ function startBlackHoleSession(
       expanded: gl.getUniformLocation(program, "u_expanded"),
       sceneTexture: gl.getUniformLocation(program, "u_scene_texture"),
       sceneReady: gl.getUniformLocation(program, "u_scene_ready"),
+      visualCompare: gl.getUniformLocation(program, "u_visual_compare"),
     };
     gl.uniform1i(uniforms.sceneTexture, 0);
+    gl.uniform1f(uniforms.visualCompare, visualComparison.shaderMode);
     const compositorUniforms = {
       resolution: gl.getUniformLocation(compositorProgram, "u_resolution"),
       frameTexture: gl.getUniformLocation(compositorProgram, "u_frame_texture"),
