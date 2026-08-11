@@ -36,7 +36,7 @@ export function getRenderProfile(quality: RenderQuality, lowPowerMode = false): 
   if (quality === "high") {
     return { fps: 40, pixelRatioCap: 2 };
   }
-  return { fps: 20, pixelRatioCap: 1.5 };
+  return { fps: 15, pixelRatioCap: 1 };
 }
 
 export function getRenderSize(

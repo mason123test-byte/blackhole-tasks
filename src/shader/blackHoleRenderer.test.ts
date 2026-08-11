@@ -4,7 +4,7 @@ import { BLACK_HOLE_RENDERER_INFO, getRenderProfile, getRenderSize } from "./bla
 describe("black-hole render profiles", () => {
   it("uses the reference author's WebGL pixel-ratio ceiling", () => {
     expect(getRenderProfile("low")).toEqual({ fps: 12, pixelRatioCap: 1 });
-    expect(getRenderProfile("balanced")).toEqual({ fps: 20, pixelRatioCap: 1.5 });
+    expect(getRenderProfile("balanced")).toEqual({ fps: 15, pixelRatioCap: 1 });
     expect(getRenderProfile("high")).toEqual({ fps: 40, pixelRatioCap: 2 });
   });
 

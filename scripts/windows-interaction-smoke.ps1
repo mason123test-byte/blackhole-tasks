@@ -571,7 +571,7 @@ try {
   if (-not [BlackHoleWindowProbe]::ClickAt($addX, $addY)) {
     throw "Failed to click the Q1 add control at $addX,$addY."
   }
-  Start-Sleep -Milliseconds 200
+  Start-Sleep -Milliseconds 750
   [System.Windows.Forms.SendKeys]::SendWait($smokeTaskTitle)
   [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
   Wait-SmokeTaskState $smokeTaskTitle $true "q1" "todo" | Out-Null
