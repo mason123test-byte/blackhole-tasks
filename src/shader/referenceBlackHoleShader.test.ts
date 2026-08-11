@@ -71,6 +71,23 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     );
   });
 
+  it("widens only the candidate lower far-side lens image inside the geodesic shader", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("uniform float u_visual_compare;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float lowerFarWeight = candidateWeight * smoothstep(0.50, 0.64, referenceUv.y) * (1.0 - step(0.0, diskPoint.z));",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float diskInner = mix(DISK_INNER, 1.25, lowerFarWeight);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float diskOuter = mix(DISK_OUTER, 11.0, lowerFarWeight);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("LOWER_FAR_DISK_INNER");
+    expect(rendererSource).toContain(
+      "gl.uniform1f(uniforms.visualCompare, visualComparison.shaderMode);",
+    );
+  });
+
   it("converts WebGL bottom-up UV into Ghostty top-down coordinates", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "vec2 referenceUv = vec2(v_uv.x, 1.0 - v_uv.y);",
