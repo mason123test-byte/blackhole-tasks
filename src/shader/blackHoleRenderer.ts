@@ -14,6 +14,28 @@ import {
 
 export const BLACK_HOLE_RENDERER_INFO = REFERENCE_BLACK_HOLE_INFO;
 
+export const MIRROR_COMPOSITOR_FRAGMENT = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform sampler2D u_frame_texture;
+uniform vec2 u_resolution;
+uniform float u_visual_compare;
+out vec4 outColor;
+
+void main() {
+  vec4 baseFrame = texture(u_frame_texture, v_uv);
+  vec4 mirroredFrame = texture(u_frame_texture, vec2(v_uv.x, 1.0 - v_uv.y));
+  float aspect = u_resolution.x / max(u_resolution.y, 1.0);
+  vec2 referenceUv = vec2(v_uv.x, 1.0 - v_uv.y);
+  vec2 screen = (referenceUv - 0.5) * vec2(aspect, 1.0);
+  float lowerHalf = 1.0 - step(0.5, v_uv.y);
+  float mirrorMask = lowerHalf * (1.0 - smoothstep(0.43, 0.47, length(screen)));
+  float candidateWeight = u_visual_compare < 0.5
+    ? 0.0
+    : (u_visual_compare > 1.5 ? step(0.0, screen.x) : 1.0);
+  outColor = mix(baseFrame, mirroredFrame, mirrorMask * candidateWeight);
+}`;
+
 function reportOrbFrame(renderer: "webgl2", energy: number, width: number, height: number, diagnostic = "") {
   const diagnosticSuffix = diagnostic ? `|diag=${diagnostic}` : "";
   document.title = `黑洞任务|renderer=${renderer}|frame=ready|energy=${energy}|size=${width}x${height}${diagnosticSuffix}`;
@@ -130,11 +152,25 @@ function startBlackHoleSession(
       throw new Error(gl.getProgramInfoLog(program) ?? "Shader 链接失败");
     }
 
+    const compositorVertexShader = compile(gl.VERTEX_SHADER, REFERENCE_BLACK_HOLE_VERTEX);
+    const compositorFragmentShader = compile(gl.FRAGMENT_SHADER, MIRROR_COMPOSITOR_FRAGMENT);
+    const compositorProgram = gl.createProgram();
+    if (!compositorProgram) throw new Error("无法创建黑洞镜像合成程序");
+    gl.attachShader(compositorProgram, compositorVertexShader);
+    gl.attachShader(compositorProgram, compositorFragmentShader);
+    gl.linkProgram(compositorProgram);
+    gl.deleteShader(compositorVertexShader);
+    gl.deleteShader(compositorFragmentShader);
+    if (!gl.getProgramParameter(compositorProgram, gl.LINK_STATUS)) {
+      throw new Error(gl.getProgramInfoLog(compositorProgram) ?? "镜像合成 Shader 链接失败");
+    }
+
     const buffer = gl.createBuffer();
     if (!buffer) throw new Error("无法创建黑洞顶点缓冲区");
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
     const position = gl.getAttribLocation(program, "a_position");
+    const compositorPosition = gl.getAttribLocation(compositorProgram, "a_position");
     gl.enableVertexAttribArray(position);
     gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
     gl.useProgram(program);
@@ -143,12 +179,19 @@ function startBlackHoleSession(
       resolution: gl.getUniformLocation(program, "u_resolution"),
       time: gl.getUniformLocation(program, "u_time"),
       expanded: gl.getUniformLocation(program, "u_expanded"),
-      visualCompare: gl.getUniformLocation(program, "u_visual_compare"),
       sceneTexture: gl.getUniformLocation(program, "u_scene_texture"),
       sceneReady: gl.getUniformLocation(program, "u_scene_ready"),
     };
     gl.uniform1i(uniforms.sceneTexture, 0);
-    gl.uniform1f(uniforms.visualCompare, visualComparison.shaderMode);
+    const compositorUniforms = {
+      resolution: gl.getUniformLocation(compositorProgram, "u_resolution"),
+      frameTexture: gl.getUniformLocation(compositorProgram, "u_frame_texture"),
+      visualCompare: gl.getUniformLocation(compositorProgram, "u_visual_compare"),
+    };
+    gl.useProgram(compositorProgram);
+    gl.uniform1i(compositorUniforms.frameTexture, 1);
+    gl.uniform1f(compositorUniforms.visualCompare, visualComparison.shaderMode);
+    gl.useProgram(program);
 
     // Ghostty provides iChannel0. Here WebView2 decodes an SVG task-field
     // snapshot and uploads it directly to this texture; Canvas2D is never used.
@@ -166,7 +209,7 @@ function startBlackHoleSession(
     // transparent DirectComposition default framebuffer can return zeroes from
     // readPixels even when the submitted frame is visible. The explicit target
     // gives both the native smoke probe and the compositor the same shader
-    // output: validate it here, then blit it to the window surface below.
+    // output: validate it here, then composite it to the window surface below.
     const outputTexture = gl.createTexture();
     const outputFramebuffer = gl.createFramebuffer();
     if (!outputTexture || !outputFramebuffer) throw new Error("无法创建黑洞输出帧缓冲");
@@ -303,6 +346,10 @@ function startBlackHoleSession(
 
       gl.bindFramebuffer(gl.FRAMEBUFFER, outputFramebuffer);
       gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.useProgram(program);
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      gl.enableVertexAttribArray(position);
+      gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
       gl.uniform2f(uniforms.resolution, canvas.width, canvas.height);
       gl.uniform1f(uniforms.time, visualComparison.fixedTime ?? (now - startedAt) / 1000);
       refreshSceneTexture();
@@ -342,15 +389,17 @@ function startBlackHoleSession(
         rendererReady = energy > 100;
       }
 
-      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, outputFramebuffer);
-      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
-      gl.blitFramebuffer(
-        0, 0, canvas.width, canvas.height,
-        0, 0, canvas.width, canvas.height,
-        gl.COLOR_BUFFER_BIT,
-        gl.NEAREST,
-      );
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.useProgram(compositorProgram);
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      gl.enableVertexAttribArray(compositorPosition);
+      gl.vertexAttribPointer(compositorPosition, 2, gl.FLOAT, false, 0, 0);
+      gl.uniform2f(compositorUniforms.resolution, canvas.width, canvas.height);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, outputTexture);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      gl.activeTexture(gl.TEXTURE0);
 
       measuredFrames += 1;
       if (now - measuredAt >= 1000) {
@@ -403,6 +452,7 @@ function startBlackHoleSession(
       gl.deleteFramebuffer(outputFramebuffer);
       gl.deleteTexture(outputTexture);
       gl.deleteTexture(sceneTexture);
+      gl.deleteProgram(compositorProgram);
       gl.deleteProgram(program);
     };
   } catch (error) {

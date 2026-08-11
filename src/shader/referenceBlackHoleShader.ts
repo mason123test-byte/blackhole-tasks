@@ -17,7 +17,6 @@ out vec4 outColor;
 uniform vec2 u_resolution;
 uniform float u_time;
 uniform float u_expanded;
-uniform float u_visual_compare;
 uniform sampler2D u_scene_texture;
 uniform float u_scene_ready;
 
@@ -26,7 +25,6 @@ uniform float u_scene_ready;
 #define N_STEPS 48
 
 const float DISK_INNER = 1.8;
-const float LOWER_FAR_DISK_INNER = 2.8;
 const float DISK_OUTER = 8.0;
 const float DISK_INCL = 1.50;
 const float DISK_ROLL = 0.35;
@@ -180,19 +178,12 @@ void rayTracedReference() {
       float crossing = previousSide / (previousSide - side);
       vec3 diskPoint = mix(previousPosition, position, crossing);
       float diskRadius = length(diskPoint);
-      float farSideWeight = 1.0 - smoothstep(-1.6, 0.4, diskPoint.z);
-      float lowerImageWeight = smoothstep(-0.02, shadowRadius * 0.65, screen.y);
-      float candidateWeight = u_visual_compare < 0.5
-        ? 0.0
-        : (u_visual_compare > 1.5 ? step(0.0, screen.x) : 1.0);
-      float lowerFarWeight = farSideWeight * lowerImageWeight * candidateWeight;
-      float innerRadius = mix(DISK_INNER, LOWER_FAR_DISK_INNER, lowerFarWeight);
-      if (diskRadius > innerRadius && diskRadius < DISK_OUTER) {
-        float band = smoothstep(innerRadius, innerRadius * 1.25, diskRadius)
+      if (diskRadius > DISK_INNER && diskRadius < DISK_OUTER) {
+        float band = smoothstep(DISK_INNER, DISK_INNER * 1.25, diskRadius)
           * (1.0 - smoothstep(DISK_OUTER * 0.70, DISK_OUTER, diskRadius));
         float phi = atan(dot(diskPoint, diskAxis), diskPoint.x);
         float turns = phi / (2.0 * PI);
-        float kepler = pow(innerRadius / diskRadius, 1.5);
+        float kepler = pow(DISK_INNER / diskRadius, 1.5);
         float localTime = sqrt(max(1.0 - 1.5 / diskRadius, 0.02));
         float swirl = diskRadius * 7.0 * 0.12 - patternTime * kepler * 5.0 * localTime;
         float streaks = vnoiseWrapY(vec2(diskRadius * 2.8, turns * 19.0 + swirl * 3.0), 19.0) * 0.65
@@ -203,8 +194,8 @@ void rayTracedReference() {
         float beta = clamp(inversesqrt(max(2.0 * (diskRadius - 1.0), 0.2)), 0.0, 0.99);
         float shift = localTime / max(1.0 + beta * dot(gasDirection, normalize(velocity)), 0.05);
         shift = mix(1.0, shift, 0.60);
-        float profileBase = max(1.0 - sqrt(innerRadius / diskRadius), 0.0);
-        float temperatureProfile = pow(innerRadius / diskRadius, 0.75) * pow(profileBase, 0.25) / 0.488;
+        float profileBase = max(1.0 - sqrt(DISK_INNER / diskRadius), 0.0);
+        float temperatureProfile = pow(DISK_INNER / diskRadius, 0.75) * pow(profileBase, 0.25) / 0.488;
         vec3 diskColor = blackbody(5500.0 * temperatureProfile * shift);
         float boost = pow(shift, 2.5);
         float density = band * streaks;
