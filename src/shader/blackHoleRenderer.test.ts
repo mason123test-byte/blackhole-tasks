@@ -21,9 +21,9 @@ describe("black-hole render profiles", () => {
   it("uses the reference Schwarzschild WebGL compositor with a GPU scene texture", () => {
     expect(BLACK_HOLE_RENDERER_INFO).toMatchObject({
       model: "schwarzschild-geodesic",
-      integrationSteps: 64,
+      integrationSteps: 48,
       tracePadding: 3,
-      starGain: 0.35,
+      starGain: 0,
       sceneInput: "svg-gpu-texture",
       alphaMode: "reference-webgl-straight-alpha",
       webglReference: "https://s13k.dev/blackhole/",

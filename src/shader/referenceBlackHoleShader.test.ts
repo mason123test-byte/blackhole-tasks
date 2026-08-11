@@ -12,23 +12,26 @@ const rendererSource = readFileSync(
   "utf8",
 );
 
-describe("reference-author WebGL black-hole port", () => {
-  it("uses the reference author's high-detail transparent WebGL profile", () => {
+describe("Ghostty Inferno WebGL black-hole port", () => {
+  it("uses the Ghostty shader's physical integration profile", () => {
     expect(REFERENCE_BLACK_HOLE_INFO).toEqual({
       model: "schwarzschild-geodesic",
-      integrationSteps: 64,
+      integrationSteps: 48,
       tracePadding: 3,
-      starGain: 0.35,
+      starGain: 0,
       sceneInput: "svg-gpu-texture",
       alphaMode: "reference-webgl-straight-alpha",
       reference: "https://github.com/s0xDk/ghostty-blackhole",
       webglReference: "https://s13k.dev/blackhole/",
     });
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("#define N_STEPS 64");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float STAR_GAIN = 0.35;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DILATION = 0.56;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("#define N_STEPS 48");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float STAR_GAIN = 0.0;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DILATION_MIN = 0.20;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float dt = clamp(0.20 * radius, 0.03, 1.0);",
+      "float dt = clamp(0.16 * radius, 0.03, 1.5);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float aberration = 0.035 * smoothstep(1.0, 2.0, impact / bmax);",
     );
   });
 

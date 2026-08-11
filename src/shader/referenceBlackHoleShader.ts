@@ -22,14 +22,14 @@ uniform float u_scene_ready;
 
 #define PI 3.14159265359
 #define B_CRIT 2.5980762
-#define N_STEPS 64
+#define N_STEPS 48
 
 const float DISK_INNER = 1.8;
 const float DISK_OUTER = 8.0;
 const float DISK_INCL = 1.50;
 const float DISK_ROLL = 0.35;
-const float STAR_GAIN = 0.35;
-const float DILATION = 0.56;
+const float STAR_GAIN = 0.0;
+const float DILATION_MIN = 0.20;
 
 float hash21(vec2 p) {
   p = fract(p * vec2(234.34, 435.345));
@@ -120,11 +120,18 @@ void rayTracedReference() {
         * max(13.0 - 2.14 * finiteCamera + 0.75, 0.0)
         * lensWindow;
       vec2 direction = screen / max(screenDistance, 0.00001);
-      vec2 sampledScreen = screen - direction * deflection;
-      vec2 sampledUv = mirrorUV(vec2(0.5) + sampledScreen / vec2(aspect, 1.0));
-      vec4 sceneSample = texture(u_scene_texture, sampledUv);
-      sceneColor = sceneSample.rgb * 1.30;
-      sceneAlpha = sceneSample.a * lensWindow * u_scene_ready;
+      float aberration = 0.035 * smoothstep(1.0, 2.0, impact / bmax);
+      float sampledAlpha = 0.0;
+      for (int channel = 0; channel < 3; channel++) {
+        float bend = 1.0 + (float(channel) - 1.0) * aberration;
+        vec2 sampledScreen = screen - direction * deflection * bend;
+        vec2 sampledUv = mirrorUV(vec2(0.5) + sampledScreen / vec2(aspect, 1.0));
+        vec4 sceneSample = texture(u_scene_texture, sampledUv);
+        sceneColor[channel] = sceneSample[channel];
+        if (channel == 1) sampledAlpha = sceneSample.a;
+      }
+      sceneColor *= 1.30;
+      sceneAlpha = sampledAlpha * lensWindow * u_scene_ready;
     }
     float lightAlpha = clamp(luma(starLight) * 2.0, 0.0, 1.0);
     float coverage = max(sceneAlpha, lightAlpha);
@@ -144,7 +151,8 @@ void rayTracedReference() {
   bool captured = false;
   float previousSide = dot(position, diskNormal);
   vec3 previousPosition = position;
-  float patternTime = u_time * DILATION;
+  float dilation = mix(1.0, DILATION_MIN, u_expanded);
+  float patternTime = u_time * dilation;
 
   for (int i = 0; i < N_STEPS; i++) {
     float radius2 = dot(position, position);
@@ -156,7 +164,7 @@ void rayTracedReference() {
     if (radius2 > 4.0 * cameraZ * cameraZ) break;
 
     float radius = sqrt(radius2);
-    float dt = clamp(0.20 * radius, 0.03, 1.0);
+    float dt = clamp(0.16 * radius, 0.03, 1.5);
     vec3 acceleration = -1.5 * angularMomentum2 * position / (radius2 * radius2 * radius);
     velocity += acceleration * (0.5 * dt);
     position += velocity * dt;
@@ -235,9 +243,9 @@ void main() {
 
 export const REFERENCE_BLACK_HOLE_INFO = Object.freeze({
   model: "schwarzschild-geodesic",
-  integrationSteps: 64,
+  integrationSteps: 48,
   tracePadding: 3,
-  starGain: 0.35,
+  starGain: 0,
   sceneInput: "svg-gpu-texture",
   alphaMode: "reference-webgl-straight-alpha",
   reference: "https://github.com/s0xDk/ghostty-blackhole",
