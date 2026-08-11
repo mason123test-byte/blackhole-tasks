@@ -53,22 +53,16 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_OUTER = 8.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INCL = 1.50;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("NEAR_DISK_INNER");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "const float LOWER_FAR_DISK_INNER = 2.8;",
-    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("LOWER_FAR_DISK_INNER");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_ROLL = 0.35;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float shadowRadius = mix(0.150, 0.140, u_expanded);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float bmax = DISK_OUTER + 3.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float nearSide =");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("uniform float u_visual_compare;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float farSideWeight = 1.0 - smoothstep(-1.6, 0.4, diskPoint.z);",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float lowerImageWeight = smoothstep(-0.02, shadowRadius * 0.65, screen.y);",
-    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("u_visual_compare");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("farSideWeight");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("lowerImageWeight");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec4 sceneSample = texture(u_scene_texture, sampledUv);");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("sceneAlpha = sceneSample.a * lensWindow");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("sceneColor = sceneSample.rgb * 1.30;");

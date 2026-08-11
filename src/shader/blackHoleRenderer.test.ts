@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BLACK_HOLE_RENDERER_INFO,
+  MIRROR_COMPOSITOR_FRAGMENT,
   getRenderProfile,
   getRenderSize,
   getVisualComparisonSettings,
@@ -40,5 +41,20 @@ describe("black-hole render profiles", () => {
     expect(getVisualComparisonSettings("baseline")).toEqual({ shaderMode: 0, fixedTime: 12 });
     expect(getVisualComparisonSettings("candidate")).toEqual({ shaderMode: 1, fixedTime: 12 });
     expect(getVisualComparisonSettings("split")).toEqual({ shaderMode: 2, fixedTime: 12 });
+  });
+
+  it("mirrors the upper WebGL frame only inside the lower black-hole region", () => {
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
+      "texture(u_frame_texture, vec2(v_uv.x, 1.0 - v_uv.y))",
+    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
+      "float lowerHalf = 1.0 - step(0.5, v_uv.y);",
+    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
+      "float mirrorMask = lowerHalf * (1.0 - smoothstep(0.43, 0.47, length(screen)));",
+    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
+      "outColor = mix(baseFrame, mirroredFrame, mirrorMask * candidateWeight);",
+    );
   });
 });
