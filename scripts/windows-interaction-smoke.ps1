@@ -399,7 +399,6 @@ function Get-ColorDistance([System.Drawing.Color]$First, [System.Drawing.Color]$
 $diagnosticPath = Join-Path $env:TEMP "blackhole-tasks-native-cursor-$([Guid]::NewGuid().ToString('N')).txt"
 $smokeCommandPath = [System.IO.Path]::ChangeExtension($diagnosticPath, ".command")
 $smokeSnapshotPath = [System.IO.Path]::ChangeExtension($diagnosticPath, ".snapshot.json")
-$smokeToggleSequence = 0
 $smokeSnapshotSequence = 0
 $smokeTransportSequence = 0
 $smokeCommandFiles = [System.Collections.Generic.List[string]]::new()
@@ -415,10 +414,6 @@ function Write-SmokeCommand([string]$Command) {
   } finally {
     Remove-Item -LiteralPath $temporaryPath -ErrorAction SilentlyContinue
   }
-}
-function Invoke-SmokeToggle {
-  $script:smokeToggleSequence += 1
-  Write-SmokeCommand "toggle:$script:smokeToggleSequence"
 }
 function Get-SmokeTaskSnapshot([int]$TimeoutMilliseconds = 5000) {
   $script:smokeSnapshotSequence += 1
@@ -641,10 +636,15 @@ try {
   $baselineHandles = $process.HandleCount
   1..12 | ForEach-Object {
     $cycle = $_
-    Invoke-SmokeToggle
-    $expanded = Wait-SceneSize $process.Id 800 600 10000
+    $orbCenterX = [int](($orb.ClientBounds.Left + $orb.ClientBounds.Right) / 2)
+    $orbCenterY = [int](($orb.ClientBounds.Top + $orb.ClientBounds.Bottom) / 2)
+    if (-not [BlackHoleWindowProbe]::ClickAt($orbCenterX, $orbCenterY)) {
+      throw "Cycle $cycle failed to click the compact scene at $orbCenterX,$orbCenterY."
+    }
+    $expanded = Wait-SceneSize $process.Id 800 600 30000
+    $expanded = Ensure-WindowOnVirtualScreen $process.Id $expanded
     Start-Sleep -Milliseconds 350
-    Invoke-SmokeToggle
+    Invoke-SceneCloseClick $expanded "cycle-$cycle"
     $orb = Wait-SceneCompact $process.Id 300 230 10000
     Start-Sleep -Milliseconds 250
   }
