@@ -24,12 +24,13 @@ out vec4 outColor;
 
 void main() {
   vec4 baseFrame = texture(u_frame_texture, v_uv);
-  vec4 mirroredFrame = texture(u_frame_texture, vec2(v_uv.x, 1.0 - v_uv.y));
+  vec2 mirroredUv = vec2(0.5 + abs(v_uv.x - 0.5), 1.0 - v_uv.y);
+  vec4 mirroredFrame = texture(u_frame_texture, mirroredUv);
   float aspect = u_resolution.x / max(u_resolution.y, 1.0);
   vec2 referenceUv = vec2(v_uv.x, 1.0 - v_uv.y);
   vec2 screen = (referenceUv - 0.5) * vec2(aspect, 1.0);
   float radius = length(screen);
-  float lowerHalf = 1.0 - step(0.5, v_uv.y);
+  float lowerHalf = smoothstep(0.50, 0.54, referenceUv.y);
   float annulusMask = smoothstep(0.14, 0.17, radius) * (1.0 - smoothstep(0.29, 0.32, radius));
   float mirroredLuma = max(mirroredFrame.r, max(mirroredFrame.g, mirroredFrame.b));
   float mirroredLightMask = smoothstep(0.16, 0.34, mirroredLuma) * smoothstep(0.04, 0.20, mirroredFrame.a);
