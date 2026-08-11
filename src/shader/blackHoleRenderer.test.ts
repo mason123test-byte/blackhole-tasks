@@ -43,42 +43,12 @@ describe("black-hole render profiles", () => {
     expect(getVisualComparisonSettings("split")).toEqual({ shaderMode: 2, fixedTime: 12 });
   });
 
-  it("keeps the diagonal disk, outer wings, and scene background out of lower-arc reconstruction", () => {
+  it("keeps framebuffer reconstruction out of the production compositor", () => {
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "vec2 mirroredUv = vec2(0.5 + abs(v_uv.x - 0.5), 1.0 - v_uv.y);",
+      "outColor = texture(u_frame_texture, v_uv);",
     );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "vec4 mirroredFrame = texture(u_frame_texture, mirroredUv);",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "float lowerHalf = smoothstep(0.50, 0.54, referenceUv.y);",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "float annulusMask = smoothstep(0.14, 0.17, radius) * (1.0 - smoothstep(0.29, 0.32, radius));",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "float mirrorMask = lowerHalf * annulusMask * mirroredLightMask;",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain(
-      "lowerHalf * (1.0 - smoothstep(0.43, 0.47, length(screen)))",
-    );
-  });
-
-  it("preserves straight-alpha coverage while reconstructing the lower arc", () => {
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "float mirrorWeight = mirrorMask * candidateWeight;",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "vec3 reconstructedColor = mix(baseFrame.rgb, mirroredFrame.rgb, mirrorWeight);",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "float reconstructedAlpha = max(baseFrame.a, mirroredFrame.a * mirrorWeight);",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "outColor = vec4(reconstructedColor, reconstructedAlpha);",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain(
-      "mix(baseFrame, mirroredFrame",
-    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("mirroredUv");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("1.0 - v_uv.y");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("annulusMask");
   });
 });
