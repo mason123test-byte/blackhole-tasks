@@ -45,7 +45,13 @@ describe("black-hole render profiles", () => {
 
   it("keeps the diagonal disk, outer wings, and scene background out of lower-arc reconstruction", () => {
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "texture(u_frame_texture, vec2(v_uv.x, 1.0 - v_uv.y))",
+      "vec2 mirroredUv = vec2(0.5 + abs(v_uv.x - 0.5), 1.0 - v_uv.y);",
+    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
+      "vec4 mirroredFrame = texture(u_frame_texture, mirroredUv);",
+    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
+      "float lowerHalf = smoothstep(0.50, 0.54, referenceUv.y);",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
       "float annulusMask = smoothstep(0.14, 0.17, radius) * (1.0 - smoothstep(0.29, 0.32, radius));",
