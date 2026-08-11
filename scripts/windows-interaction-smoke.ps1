@@ -641,10 +641,12 @@ try {
     if (-not [BlackHoleWindowProbe]::ClickAt($orbCenterX, $orbCenterY)) {
       throw "Cycle $cycle failed to click the compact scene at $orbCenterX,$orbCenterY."
     }
+    Start-Sleep -Milliseconds 500
     $expanded = Wait-SceneSize $process.Id 800 600 30000
     $expanded = Ensure-WindowOnVirtualScreen $process.Id $expanded
     Start-Sleep -Milliseconds 350
     Invoke-SceneCloseClick $expanded "cycle-$cycle"
+    Start-Sleep -Milliseconds 500
     $orb = Wait-SceneCompact $process.Id 300 230 10000
     Start-Sleep -Milliseconds 250
   }
