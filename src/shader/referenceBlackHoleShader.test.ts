@@ -51,12 +51,21 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
   it("keeps the reference Inferno constants and GPU scene-lensing boundary", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INNER = 1.8;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_OUTER = 8.0;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INCL = 1.42;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INCL = 1.50;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "const float NEAR_DISK_INNER = 2.4;",
+    );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_ROLL = 0.35;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float shadowRadius = mix(0.150, 0.140, u_expanded);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float bmax = DISK_OUTER + 3.0;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float nearSide = smoothstep(-0.4, 1.6, diskPoint.z);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float innerRadius = mix(DISK_INNER, NEAR_DISK_INNER, nearSide);",
+    );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec4 sceneSample = texture(u_scene_texture, sampledUv);");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("sceneAlpha = sceneSample.a * lensWindow");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("sceneColor = sceneSample.rgb * 1.30;");
