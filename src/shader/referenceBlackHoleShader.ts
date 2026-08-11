@@ -26,7 +26,7 @@ uniform float u_scene_ready;
 
 const float DISK_INNER = 1.8;
 const float DISK_OUTER = 8.0;
-const float DISK_INCL = 1.50;
+const float DISK_INCL = 1.42;
 const float DISK_ROLL = 0.35;
 const float STAR_GAIN = 0.0;
 const float DILATION_MIN = 0.20;
