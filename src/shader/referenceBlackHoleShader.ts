@@ -19,6 +19,7 @@ uniform float u_time;
 uniform float u_expanded;
 uniform sampler2D u_scene_texture;
 uniform float u_scene_ready;
+uniform float u_visual_compare;
 
 #define PI 3.14159265359
 #define B_CRIT 2.5980762
@@ -94,6 +95,9 @@ void rayTracedReference() {
   // Ghostty's fragment coordinates run top-down; WebGL texture UVs run bottom-up.
   vec2 referenceUv = vec2(v_uv.x, 1.0 - v_uv.y);
   vec2 screen = (referenceUv - 0.5) * vec2(aspect, 1.0);
+  float candidateWeight = u_visual_compare < 0.5
+    ? 0.0
+    : (u_visual_compare > 1.5 ? step(0.0, screen.x) : 1.0);
 
   // Keep the expanded task field at the reference Inferno scale: its shadow
   // is about 14% of the surface height and the r=8 disk fills most of it.
@@ -178,12 +182,15 @@ void rayTracedReference() {
       float crossing = previousSide / (previousSide - side);
       vec3 diskPoint = mix(previousPosition, position, crossing);
       float diskRadius = length(diskPoint);
-      if (diskRadius > DISK_INNER && diskRadius < DISK_OUTER) {
-        float band = smoothstep(DISK_INNER, DISK_INNER * 1.25, diskRadius)
-          * (1.0 - smoothstep(DISK_OUTER * 0.70, DISK_OUTER, diskRadius));
+      float lowerFarWeight = candidateWeight * smoothstep(0.50, 0.64, referenceUv.y) * (1.0 - step(0.0, diskPoint.z));
+      float diskInner = mix(DISK_INNER, 1.25, lowerFarWeight);
+      float diskOuter = mix(DISK_OUTER, 11.0, lowerFarWeight);
+      if (diskRadius > diskInner && diskRadius < diskOuter) {
+        float band = smoothstep(diskInner, diskInner * 1.25, diskRadius)
+          * (1.0 - smoothstep(diskOuter * 0.70, diskOuter, diskRadius));
         float phi = atan(dot(diskPoint, diskAxis), diskPoint.x);
         float turns = phi / (2.0 * PI);
-        float kepler = pow(DISK_INNER / diskRadius, 1.5);
+        float kepler = pow(diskInner / diskRadius, 1.5);
         float localTime = sqrt(max(1.0 - 1.5 / diskRadius, 0.02));
         float swirl = diskRadius * 7.0 * 0.12 - patternTime * kepler * 5.0 * localTime;
         float streaks = vnoiseWrapY(vec2(diskRadius * 2.8, turns * 19.0 + swirl * 3.0), 19.0) * 0.65
@@ -194,13 +201,14 @@ void rayTracedReference() {
         float beta = clamp(inversesqrt(max(2.0 * (diskRadius - 1.0), 0.2)), 0.0, 0.99);
         float shift = localTime / max(1.0 + beta * dot(gasDirection, normalize(velocity)), 0.05);
         shift = mix(1.0, shift, 0.60);
-        float profileBase = max(1.0 - sqrt(DISK_INNER / diskRadius), 0.0);
-        float temperatureProfile = pow(DISK_INNER / diskRadius, 0.75) * pow(profileBase, 0.25) / 0.488;
+        float profileBase = max(1.0 - sqrt(diskInner / diskRadius), 0.0);
+        float temperatureProfile = pow(diskInner / diskRadius, 0.75) * pow(profileBase, 0.25) / 0.488;
         vec3 diskColor = blackbody(5500.0 * temperatureProfile * shift);
         float boost = pow(shift, 2.5);
         float density = band * streaks;
         emission += transmittance * diskColor
-          * (4.84 * density * temperatureProfile * temperatureProfile * boost);
+          * (4.84 * density * temperatureProfile * temperatureProfile * boost)
+          * mix(1.0, 1.35, lowerFarWeight);
         transmittance *= 1.0 - clamp(0.90 * density, 0.0, 1.0);
       }
     }
