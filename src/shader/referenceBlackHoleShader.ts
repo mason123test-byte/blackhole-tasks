@@ -17,6 +17,7 @@ out vec4 outColor;
 uniform vec2 u_resolution;
 uniform float u_time;
 uniform float u_expanded;
+uniform float u_visual_compare;
 uniform sampler2D u_scene_texture;
 uniform float u_scene_ready;
 
@@ -25,7 +26,7 @@ uniform float u_scene_ready;
 #define N_STEPS 48
 
 const float DISK_INNER = 1.8;
-const float NEAR_DISK_INNER = 2.4;
+const float LOWER_FAR_DISK_INNER = 2.8;
 const float DISK_OUTER = 8.0;
 const float DISK_INCL = 1.50;
 const float DISK_ROLL = 0.35;
@@ -179,8 +180,13 @@ void rayTracedReference() {
       float crossing = previousSide / (previousSide - side);
       vec3 diskPoint = mix(previousPosition, position, crossing);
       float diskRadius = length(diskPoint);
-      float nearSide = smoothstep(-0.4, 1.6, diskPoint.z);
-      float innerRadius = mix(DISK_INNER, NEAR_DISK_INNER, nearSide);
+      float farSideWeight = 1.0 - smoothstep(-1.6, 0.4, diskPoint.z);
+      float lowerImageWeight = smoothstep(-0.02, shadowRadius * 0.65, screen.y);
+      float candidateWeight = u_visual_compare < 0.5
+        ? 0.0
+        : (u_visual_compare > 1.5 ? step(0.0, screen.x) : 1.0);
+      float lowerFarWeight = farSideWeight * lowerImageWeight * candidateWeight;
+      float innerRadius = mix(DISK_INNER, LOWER_FAR_DISK_INNER, lowerFarWeight);
       if (diskRadius > innerRadius && diskRadius < DISK_OUTER) {
         float band = smoothstep(innerRadius, innerRadius * 1.25, diskRadius)
           * (1.0 - smoothstep(DISK_OUTER * 0.70, DISK_OUTER, diskRadius));

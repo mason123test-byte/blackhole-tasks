@@ -1,5 +1,10 @@
-import { useEffect, useRef } from "react";
-import { startBlackHole } from "../../shader/blackHoleRenderer";
+import { useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import {
+  normalizeVisualComparisonMode,
+  startBlackHole,
+  type VisualComparisonMode,
+} from "../../shader/blackHoleRenderer";
 import type { SceneTextureState, SceneTextureTask } from "../../shader/sceneTexture";
 import type { RenderQuality } from "../../types/settings";
 
@@ -23,6 +28,21 @@ export function BlackHoleCanvas({
   const ref = useRef<HTMLCanvasElement>(null);
   const expandedRef = useRef(expanded ? 1 : 0);
   const sceneRef = useRef<SceneTextureState>({ expanded, editingTaskId, tasks });
+  const [visualComparisonMode, setVisualComparisonMode] = useState<VisualComparisonMode | null>(
+    "__TAURI_INTERNALS__" in window ? null : "normal",
+  );
+
+  useEffect(() => {
+    if (!("__TAURI_INTERNALS__" in window)) return;
+    let active = true;
+    void invoke<string>("get_visual_comparison_mode")
+      .then((mode) => { if (active) setVisualComparisonMode(normalizeVisualComparisonMode(mode)); })
+      .catch((error) => {
+        console.error("无法读取视觉对比模式：", error);
+        if (active) setVisualComparisonMode("normal");
+      });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     expandedRef.current = expanded ? 1 : 0;
@@ -30,14 +50,14 @@ export function BlackHoleCanvas({
   }, [editingTaskId, expanded, tasks]);
 
   useEffect(() => {
-    if (!ref.current) return;
+    if (!ref.current || visualComparisonMode === null) return;
     return startBlackHole(
       ref.current,
       () => expandedRef.current,
       () => sceneRef.current,
-      { quality, lowPowerMode, onError },
+      { quality, lowPowerMode, visualComparisonMode, onError },
     );
-  }, [lowPowerMode, onError, quality]);
+  }, [lowPowerMode, onError, quality, visualComparisonMode]);
 
   return <canvas ref={ref} className="black-hole-canvas" aria-label="黑洞任务悬浮窗" />;
 }

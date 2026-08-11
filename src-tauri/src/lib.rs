@@ -11,6 +11,21 @@ use serde_json::Value;
 use std::path::{Path, PathBuf};
 use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, State};
 
+fn normalize_visual_comparison_mode(value: Option<&str>) -> &'static str {
+    match value {
+        Some("baseline") => "baseline",
+        Some("candidate") => "candidate",
+        Some("split") => "split",
+        _ => "normal",
+    }
+}
+
+#[tauri::command]
+fn get_visual_comparison_mode() -> String {
+    let value = std::env::var("BLACKHOLE_VISUAL_COMPARE").ok();
+    normalize_visual_comparison_mode(value.as_deref()).to_owned()
+}
+
 #[tauri::command]
 fn list_tasks(db: State<Database>) -> AppResult<Vec<Task>> {
     db.list_tasks()
@@ -619,6 +634,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            get_visual_comparison_mode,
             list_tasks,
             get_task,
             create_task,
@@ -665,7 +681,25 @@ pub fn run() {
 
 #[cfg(test)]
 mod smoke_command_tests {
-    use super::{parse_smoke_command, pending_smoke_command_paths, SmokeCommand};
+    use super::{
+        normalize_visual_comparison_mode, parse_smoke_command, pending_smoke_command_paths,
+        SmokeCommand,
+    };
+
+    #[test]
+    fn normalizes_visual_comparison_modes() {
+        assert_eq!(
+            normalize_visual_comparison_mode(Some("baseline")),
+            "baseline"
+        );
+        assert_eq!(
+            normalize_visual_comparison_mode(Some("candidate")),
+            "candidate"
+        );
+        assert_eq!(normalize_visual_comparison_mode(Some("split")), "split");
+        assert_eq!(normalize_visual_comparison_mode(Some("invalid")), "normal");
+        assert_eq!(normalize_visual_comparison_mode(None), "normal");
+    }
 
     #[test]
     fn parses_toggle_and_snapshot_commands() {

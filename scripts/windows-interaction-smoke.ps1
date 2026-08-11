@@ -461,7 +461,138 @@ function Wait-SmokeTaskState(
   } while ([DateTime]::UtcNow -lt $deadline)
   throw "Task '$Title' did not reach exists=$Exists quadrant='$Quadrant' status='$Status'; lastState=$lastState."
 }
+
+function Capture-VisualComparisonFrame(
+  [string]$ResolvedExePath,
+  [string]$Mode,
+  [string]$OutputPath
+) {
+  $modeDiagnostics = Join-Path $OutputDirectory "visual-$Mode-diagnostics.txt"
+  $env:BLACKHOLE_VISUAL_COMPARE = $Mode
+  $visualProcess = Start-Process -FilePath $ResolvedExePath `
+    -ArgumentList "--smoke-diagnostics=$modeDiagnostics" `
+    -PassThru
+  try {
+    $orbWindow = Wait-AppWindow $visualProcess.Id "黑洞任务" $true 90000
+    $orbWindow = Wait-OrbRenderReady $visualProcess.Id
+    $centerX = [int](($orbWindow.ClientBounds.Left + $orbWindow.ClientBounds.Right) / 2)
+    $centerY = [int](($orbWindow.ClientBounds.Top + $orbWindow.ClientBounds.Bottom) / 2)
+    if (-not [BlackHoleWindowProbe]::ClickAt($centerX, $centerY)) {
+      throw "Failed to expand $Mode visual comparison at $centerX,$centerY."
+    }
+    $expandedWindow = Wait-SceneSize $visualProcess.Id 800 600 30000
+    $expandedWindow = Ensure-WindowOnVirtualScreen $visualProcess.Id $expandedWindow
+    Start-Sleep -Milliseconds 1600
+    Save-ScreenRegion $OutputPath $expandedWindow.ClientBounds
+    "VISUAL_COMPARISON_CAPTURE mode=$Mode path=$OutputPath size=$($expandedWindow.ClientBounds.Right - $expandedWindow.ClientBounds.Left)x$($expandedWindow.ClientBounds.Bottom - $expandedWindow.ClientBounds.Top)"
+  } finally {
+    Remove-Item Env:BLACKHOLE_VISUAL_COMPARE -ErrorAction SilentlyContinue
+    if (-not $visualProcess.HasExited) {
+      Stop-Process -Id $visualProcess.Id -Force
+      $visualProcess.WaitForExit(5000) | Out-Null
+    }
+    Start-Sleep -Milliseconds 500
+  }
+}
+
+function Get-BrightMaskMetrics(
+  [System.Drawing.Bitmap]$Baseline,
+  [System.Drawing.Bitmap]$Candidate,
+  [int]$Left,
+  [int]$Top,
+  [int]$Right,
+  [int]$Bottom
+) {
+  $intersection = 0
+  $union = 0
+  $xor = 0
+  for ($y = $Top; $y -lt $Bottom; $y++) {
+    for ($x = $Left; $x -lt $Right; $x++) {
+      $before = $Baseline.GetPixel($x, $y)
+      $after = $Candidate.GetPixel($x, $y)
+      $beforeBright = [Math]::Max($before.R, [Math]::Max($before.G, $before.B)) -ge 96
+      $afterBright = [Math]::Max($after.R, [Math]::Max($after.G, $after.B)) -ge 96
+      if ($beforeBright -or $afterBright) { $union++ }
+      if ($beforeBright -and $afterBright) { $intersection++ }
+      if ($beforeBright -ne $afterBright) { $xor++ }
+    }
+  }
+  $iou = if ($union -eq 0) { 1.0 } else { [double]$intersection / [double]$union }
+  [PSCustomObject]@{ Intersection = $intersection; Union = $union; Xor = $xor; IoU = $iou }
+}
+
+function Write-VisualComparisonEvidence(
+  [string]$BaselinePath,
+  [string]$CandidatePath,
+  [string]$DifferencePath,
+  [string]$MetricsPath
+) {
+  $baseline = [System.Drawing.Bitmap]::FromFile((Resolve-Path $BaselinePath))
+  $candidate = [System.Drawing.Bitmap]::FromFile((Resolve-Path $CandidatePath))
+  try {
+    if ($baseline.Width -ne $candidate.Width -or $baseline.Height -ne $candidate.Height) {
+      throw "Visual comparison frames are not aligned: baseline=$($baseline.Width)x$($baseline.Height) candidate=$($candidate.Width)x$($candidate.Height)."
+    }
+    $difference = [System.Drawing.Bitmap]::new($baseline.Width, $baseline.Height)
+    try {
+      for ($y = 0; $y -lt $baseline.Height; $y++) {
+        for ($x = 0; $x -lt $baseline.Width; $x++) {
+          $before = $baseline.GetPixel($x, $y)
+          $after = $candidate.GetPixel($x, $y)
+          $red = [Math]::Min(255, [Math]::Abs([int]$before.R - [int]$after.R) * 4)
+          $green = [Math]::Min(255, [Math]::Abs([int]$before.G - [int]$after.G) * 4)
+          $blue = [Math]::Min(255, [Math]::Abs([int]$before.B - [int]$after.B) * 4)
+          $difference.SetPixel($x, $y, [System.Drawing.Color]::FromArgb(255, $red, $green, $blue))
+        }
+      }
+      $difference.Save($DifferencePath, [System.Drawing.Imaging.ImageFormat]::Png)
+    } finally {
+      $difference.Dispose()
+    }
+
+    $lower = Get-BrightMaskMetrics $baseline $candidate `
+      ([int]($baseline.Width * 0.28)) ([int]($baseline.Height * 0.46)) `
+      ([int]($baseline.Width * 0.72)) ([int]($baseline.Height * 0.76))
+    $upper = Get-BrightMaskMetrics $baseline $candidate `
+      ([int]($baseline.Width * 0.18)) ([int]($baseline.Height * 0.18)) `
+      ([int]($baseline.Width * 0.82)) ([int]($baseline.Height * 0.46))
+    $culture = [System.Globalization.CultureInfo]::InvariantCulture
+    $lowerIoU = $lower.IoU
+    $upperIoU = $upper.IoU
+    @(
+      "lowerIntersection=$($lower.Intersection)"
+      "lowerUnion=$($lower.Union)"
+      "lowerXor=$($lower.Xor)"
+      "lowerIoU=$($lowerIoU.ToString('F6', $culture))"
+      "upperIntersection=$($upper.Intersection)"
+      "upperUnion=$($upper.Union)"
+      "upperXor=$($upper.Xor)"
+      "upperIoU=$($upperIoU.ToString('F6', $culture))"
+    ) | Set-Content -LiteralPath $MetricsPath
+    "VISUAL_COMPARISON_METRICS lowerIoU=$($lowerIoU.ToString('F6', $culture)) upperIoU=$($upperIoU.ToString('F6', $culture)) lowerXor=$($lower.Xor) upperXor=$($upper.Xor)"
+    if ($lowerIoU -gt 0.93) {
+      throw "Lower accretion arc did not change visibly enough: lowerIoU=$lowerIoU."
+    }
+    if ($upperIoU -lt 0.98) {
+      throw "Lower-arc candidate changed the upper arc too much: upperIoU=$upperIoU."
+    }
+  } finally {
+    $baseline.Dispose()
+    $candidate.Dispose()
+  }
+}
+
 $resolvedExePath = (Resolve-Path $ExePath).Path
+$visualBaselinePath = Join-Path $OutputDirectory "visual-baseline.png"
+$visualCandidatePath = Join-Path $OutputDirectory "visual-candidate.png"
+$visualSplitPath = Join-Path $OutputDirectory "visual-split.png"
+$visualDifferencePath = Join-Path $OutputDirectory "visual-difference.png"
+$visualMetricsPath = Join-Path $OutputDirectory "visual-comparison-metrics.txt"
+Capture-VisualComparisonFrame $resolvedExePath "baseline" $visualBaselinePath
+Capture-VisualComparisonFrame $resolvedExePath "candidate" $visualCandidatePath
+Capture-VisualComparisonFrame $resolvedExePath "split" $visualSplitPath
+Write-VisualComparisonEvidence $visualBaselinePath $visualCandidatePath $visualDifferencePath $visualMetricsPath
+
 $diagnosticMarkerPath = [System.IO.Path]::ChangeExtension($resolvedExePath, ".smoke-diagnostics")
 Set-Content -LiteralPath $diagnosticMarkerPath -Value $diagnosticPath -NoNewline
 $env:BLACKHOLE_SMOKE_DIAGNOSTICS = "1"

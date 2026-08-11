@@ -29,6 +29,19 @@ export interface RenderProfile {
   pixelRatioCap: number;
 }
 
+export type VisualComparisonMode = "normal" | "baseline" | "candidate" | "split";
+
+export function normalizeVisualComparisonMode(value: unknown): VisualComparisonMode {
+  return value === "baseline" || value === "candidate" || value === "split" ? value : "normal";
+}
+
+export function getVisualComparisonSettings(mode: VisualComparisonMode) {
+  if (mode === "baseline") return { shaderMode: 0, fixedTime: 12 };
+  if (mode === "split") return { shaderMode: 2, fixedTime: 12 };
+  if (mode === "candidate") return { shaderMode: 1, fixedTime: 12 };
+  return { shaderMode: 1, fixedTime: null };
+}
+
 export function getRenderProfile(quality: RenderQuality, lowPowerMode = false): RenderProfile {
   if (lowPowerMode || quality === "low") {
     return { fps: 12, pixelRatioCap: 1 };
@@ -55,6 +68,7 @@ export function getRenderSize(
 interface RendererOptions {
   quality?: RenderQuality;
   lowPowerMode?: boolean;
+  visualComparisonMode?: VisualComparisonMode;
   onError?(message: string): void;
 }
 
@@ -69,6 +83,7 @@ function startBlackHoleSession(
   options: RendererSessionOptions = {},
 ) {
   const profile = getRenderProfile(options.quality ?? "balanced", options.lowPowerMode);
+  const visualComparison = getVisualComparisonSettings(options.visualComparisonMode ?? "normal");
   const gl = canvas.getContext("webgl2", {
     alpha: true,
     antialias: false,
@@ -128,10 +143,12 @@ function startBlackHoleSession(
       resolution: gl.getUniformLocation(program, "u_resolution"),
       time: gl.getUniformLocation(program, "u_time"),
       expanded: gl.getUniformLocation(program, "u_expanded"),
+      visualCompare: gl.getUniformLocation(program, "u_visual_compare"),
       sceneTexture: gl.getUniformLocation(program, "u_scene_texture"),
       sceneReady: gl.getUniformLocation(program, "u_scene_ready"),
     };
     gl.uniform1i(uniforms.sceneTexture, 0);
+    gl.uniform1f(uniforms.visualCompare, visualComparison.shaderMode);
 
     // Ghostty provides iChannel0. Here WebView2 decodes an SVG task-field
     // snapshot and uploads it directly to this texture; Canvas2D is never used.
@@ -287,7 +304,7 @@ function startBlackHoleSession(
       gl.bindFramebuffer(gl.FRAMEBUFFER, outputFramebuffer);
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.uniform2f(uniforms.resolution, canvas.width, canvas.height);
-      gl.uniform1f(uniforms.time, (now - startedAt) / 1000);
+      gl.uniform1f(uniforms.time, visualComparison.fixedTime ?? (now - startedAt) / 1000);
       refreshSceneTexture();
       gl.uniform1f(uniforms.expanded, getExpanded());
       gl.uniform1f(uniforms.sceneReady, sceneReady ? 1 : 0);
