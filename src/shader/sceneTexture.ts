@@ -72,12 +72,12 @@ export function buildSceneTextureSvg(snapshot: SceneTextureSnapshot) {
   const quadrantCounts = Object.fromEntries(
     QUADRANTS.map((quadrant) => [quadrant, tasks.filter((task) => task.quadrant === quadrant).length]),
   ) as Record<Quadrant, number>;
-  const lensRowGap = Math.max(34, (height - 136) / 10);
-  const lensRows = Array.from({ length: 11 }, (_, index) => {
-    const y = 72 + index * lensRowGap;
+  const lensRowGap = Math.max(24, (height - 108) / 17);
+  const lensRows = Array.from({ length: 18 }, (_, index) => {
+    const y = 58 + index * lensRowGap;
     const sequence = String(index).padStart(2, "0");
     const telemetry = `gravity.field/${sequence} q1:${quadrantCounts.q1} q2:${quadrantCounts.q2} q3:${quadrantCounts.q3} q4:${quadrantCounts.q4}`;
-    return `<text x="${marginX}" y="${y}" fill="#8ba7af" fill-opacity=".11">$ ${telemetry}</text>`;
+    return `<text x="${marginX}" y="${y}" fill="#8ba7af" fill-opacity=".42">$ ${telemetry}</text>`;
   }).join("");
 
   const quadrantBounds: Record<Quadrant, { left: number; right: number; headerY: number; rowsY: number }> = {
@@ -110,7 +110,6 @@ export function buildSceneTextureSvg(snapshot: SceneTextureSnapshot) {
   }).join("");
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-    <rect width="${width}" height="${height}" fill="#020508"/>
     <g fill="none" stroke="#738f9c" stroke-opacity=".22">
       <line x1="${marginX}" y1="${centerY}" x2="${width - marginX}" y2="${centerY}"/>
       <line x1="${centerX}" y1="${top}" x2="${centerX}" y2="${height - bottom}"/>

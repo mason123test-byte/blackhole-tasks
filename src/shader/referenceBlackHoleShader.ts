@@ -122,8 +122,9 @@ void rayTracedReference() {
       vec2 direction = screen / max(screenDistance, 0.00001);
       vec2 sampledScreen = screen - direction * deflection;
       vec2 sampledUv = mirrorUV(vec2(0.5) + sampledScreen / vec2(aspect, 1.0));
-      sceneColor = texture(u_scene_texture, sampledUv).rgb;
-      sceneAlpha = smoothstep(0.02, 0.22, lensWindow) * u_scene_ready;
+      vec4 sceneSample = texture(u_scene_texture, sampledUv);
+      sceneColor = sceneSample.rgb * 1.30;
+      sceneAlpha = sceneSample.a * lensWindow * u_scene_ready;
     }
     float lightAlpha = clamp(luma(starLight) * 2.0, 0.0, 1.0);
     float coverage = max(sceneAlpha, lightAlpha);
@@ -215,8 +216,9 @@ void rayTracedReference() {
       vec2 sampledScreen = mix(screen, escapedScreen, lensWindow);
       vec2 sampledUv = mirrorUV(vec2(0.5) + sampledScreen / vec2(aspect, 1.0));
       float towardScene = smoothstep(0.05, 0.35, -escapedDirection.z);
-      sceneColor = texture(u_scene_texture, sampledUv).rgb;
-      sceneAlpha = smoothstep(0.02, 0.22, lensWindow) * towardScene * u_scene_ready;
+      vec4 sceneSample = texture(u_scene_texture, sampledUv);
+      sceneColor = sceneSample.rgb * 1.30;
+      sceneAlpha = sceneSample.a * lensWindow * towardScene * u_scene_ready;
     }
   }
   vec3 diskLight = vec3(1.0) - exp(-emission * 1.40);
