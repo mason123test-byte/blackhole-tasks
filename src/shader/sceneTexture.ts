@@ -76,7 +76,13 @@ export function buildSceneTextureSvg(snapshot: SceneTextureSnapshot) {
   const lensRows = Array.from({ length: 18 }, (_, index) => {
     const y = 58 + index * lensRowGap;
     const sequence = String(index).padStart(2, "0");
-    const telemetry = `gravity.field/${sequence} q1:${quadrantCounts.q1} q2:${quadrantCounts.q2} q3:${quadrantCounts.q3} q4:${quadrantCounts.q4}`;
+    const telemetry = [
+      `gravity.field/${sequence}`,
+      `q1:${quadrantCounts.q1} q2:${quadrantCounts.q2} q3:${quadrantCounts.q3} q4:${quadrantCounts.q4}`,
+      `schwarzschild.trace/${sequence} impact:${(1.35 + index * 0.41).toFixed(2)}`,
+      `lens.map escaped-ray:${String(17 - index).padStart(2, "0")}`,
+      `task.orbit pointer-events/dom`,
+    ].join("  ::  ");
     return `<text x="${marginX}" y="${y}" fill="#8ba7af" fill-opacity=".42">$ ${telemetry}</text>`;
   }).join("");
 

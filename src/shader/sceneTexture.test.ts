@@ -35,6 +35,9 @@ describe("scene texture snapshot", () => {
     expect(svg).toContain('data-lens-field="terminal-guides"');
     expect(svg.match(/gravity\.field\//g)).toHaveLength(18);
     expect(svg).toContain("q1:1 q2:0 q3:0 q4:0");
+    expect(svg).toContain("schwarzschild.trace/00");
+    expect(svg).toContain("lens.map escaped-ray:17");
+    expect(svg).toContain("task.orbit pointer-events/dom");
     expect(svg).toContain('fill-opacity=".42"');
     expect(svg).not.toContain('fill="#020508"');
     expect(buildSceneTextureSvg({ ...snapshot, expanded: false })).not.toContain("gravity.field/");
