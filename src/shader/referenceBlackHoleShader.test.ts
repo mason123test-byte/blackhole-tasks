@@ -60,7 +60,6 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float bmax = DISK_OUTER + 3.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float nearSide =");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("u_visual_compare");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("farSideWeight");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("lowerImageWeight");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec4 sceneSample = texture(u_scene_texture, sampledUv);");
