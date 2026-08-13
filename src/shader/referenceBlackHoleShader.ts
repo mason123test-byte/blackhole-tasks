@@ -99,9 +99,10 @@ void rayTracedReference() {
     ? 0.0
     : (u_visual_compare > 1.5 ? step(0.0, screen.x) : 1.0);
 
-  // Keep the task-field rendering compact relative to the pinned Inferno
-  // reference while preserving the same Schwarzschild world-space mapping.
-  float shadowRadius = mix(0.112, 0.105, u_expanded);
+  // Keep baseline on the reference mapping; only the candidate is scaled down
+  // to match the pinned Inferno frame inside the task-field composition.
+  float referenceShadowRadius = mix(0.150, 0.140, u_expanded);
+  float shadowRadius = mix(referenceShadowRadius, mix(0.112, 0.105, u_expanded), candidateWeight);
   float worldScale = B_CRIT / shadowRadius;
   vec2 rayPlane = rotate2(vec2(screen.x, -screen.y), DISK_ROLL) * worldScale;
   float impact = length(rayPlane);
@@ -143,6 +144,7 @@ void rayTracedReference() {
     outColor = vec4(straightColor, coverage);
     return;
   }
+
   vec3 position = vec3(rayPlane, cameraZ);
   vec3 velocity = vec3(0.0, 0.0, -1.0);
   float angularMomentum2 = dot(rayPlane, rayPlane);
@@ -157,6 +159,7 @@ void rayTracedReference() {
   vec3 previousPosition = position;
   float dilation = mix(1.0, DILATION_MIN, u_expanded);
   float patternTime = u_time * dilation;
+  int diskCrossings = 0;
 
   for (int i = 0; i < N_STEPS; i++) {
     float radius2 = dot(position, position);
@@ -182,33 +185,38 @@ void rayTracedReference() {
       float crossing = previousSide / (previousSide - side);
       vec3 diskPoint = mix(previousPosition, position, crossing);
       float diskRadius = length(diskPoint);
-      float lowerFarWeight = candidateWeight * smoothstep(0.50, 0.64, referenceUv.y) * (1.0 - step(0.0, diskPoint.z));
-      float diskInner = mix(DISK_INNER, 1.45, lowerFarWeight);
-      float diskOuter = mix(DISK_OUTER, 9.25, lowerFarWeight);
-      if (diskRadius > diskInner && diskRadius < diskOuter) {
-        float band = smoothstep(diskInner, diskInner * 1.25, diskRadius)
-          * (1.0 - smoothstep(diskOuter * 0.70, diskOuter, diskRadius));
+      if (diskRadius > DISK_INNER && diskRadius < DISK_OUTER) {
+        float secondaryImageWeight = candidateWeight * step(1.0, float(diskCrossings));
+        float lowerSecondaryWeight = secondaryImageWeight * smoothstep(0.50, 0.68, referenceUv.y);
+        diskCrossings += 1;
+
+        float band = smoothstep(DISK_INNER, DISK_INNER * 1.25, diskRadius)
+          * (1.0 - smoothstep(DISK_OUTER * 0.70, DISK_OUTER, diskRadius));
         float phi = atan(dot(diskPoint, diskAxis), diskPoint.x);
         float turns = phi / (2.0 * PI);
-        float kepler = pow(diskInner / diskRadius, 1.5);
+        float kepler = pow(DISK_INNER / diskRadius, 1.5);
         float localTime = sqrt(max(1.0 - 1.5 / diskRadius, 0.02));
         float swirl = diskRadius * 7.0 * 0.12 - patternTime * kepler * 5.0 * localTime;
-        float streaks = vnoiseWrapY(vec2(diskRadius * 2.8, turns * 19.0 + swirl * 3.0), 19.0) * 0.65
-          + vnoiseWrapY(vec2(diskRadius, turns * 9.0 + swirl * 1.5 + 7.0), 9.0) * 0.35;
-        streaks = 0.35 + 0.95 * streaks * streaks;
+        float radialFrequency = mix(2.8, 1.65, candidateWeight);
+        float secondaryRadialFrequency = mix(1.0, 0.60, candidateWeight);
+        float streaks = vnoiseWrapY(vec2(diskRadius * radialFrequency, turns * 19.0 + swirl * 3.0), 19.0) * 0.65
+          + vnoiseWrapY(vec2(diskRadius * secondaryRadialFrequency, turns * 9.0 + swirl * 1.5 + 7.0), 9.0) * 0.35;
+        float streakContrast = mix(1.6, 0.70, candidateWeight);
+        streaks = 0.35 + streakContrast * streaks * streaks;
 
         vec3 gasDirection = normalize(cross(diskNormal, diskPoint));
         float beta = clamp(inversesqrt(max(2.0 * (diskRadius - 1.0), 0.2)), 0.0, 0.99);
         float shift = localTime / max(1.0 + beta * dot(gasDirection, normalize(velocity)), 0.05);
         shift = mix(1.0, shift, 0.60);
-        float profileBase = max(1.0 - sqrt(diskInner / diskRadius), 0.0);
-        float temperatureProfile = pow(diskInner / diskRadius, 0.75) * pow(profileBase, 0.25) / 0.488;
+        float profileBase = max(1.0 - sqrt(DISK_INNER / diskRadius), 0.0);
+        float temperatureProfile = pow(DISK_INNER / diskRadius, 0.75) * pow(profileBase, 0.25) / 0.488;
         vec3 diskColor = blackbody(5500.0 * temperatureProfile * shift);
         float boost = pow(shift, 2.5);
         float density = band * streaks;
+        float secondaryGain = mix(1.0, 1.16, lowerSecondaryWeight);
         emission += transmittance * diskColor
           * (4.84 * density * temperatureProfile * temperatureProfile * boost)
-          * mix(1.0, 1.08, lowerFarWeight);
+          * secondaryGain;
         transmittance *= 1.0 - clamp(0.90 * density, 0.0, 1.0);
       }
     }
@@ -237,7 +245,8 @@ void rayTracedReference() {
       sceneAlpha = sceneSample.a * lensWindow * towardScene * u_scene_ready;
     }
   }
-  vec3 diskLight = vec3(1.0) - exp(-emission * 1.10);
+  float exposure = mix(1.40, 1.24, candidateWeight);
+  vec3 diskLight = vec3(1.0) - exp(-emission * exposure);
   vec3 straightColor = sceneColor * transmittance + starLight * transmittance + diskLight;
   float lightAlpha = clamp((captured ? 1.0 : 0.0) + (1.0 - transmittance)
     + luma(diskLight) * 2.0 + luma(starLight) * 2.0, 0.0, 1.0);
