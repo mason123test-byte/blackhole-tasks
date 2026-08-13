@@ -99,9 +99,9 @@ void rayTracedReference() {
     ? 0.0
     : (u_visual_compare > 1.5 ? step(0.0, screen.x) : 1.0);
 
-  // Keep the expanded task field at the reference Inferno scale: its shadow
-  // is about 14% of the surface height and the r=8 disk fills most of it.
-  float shadowRadius = mix(0.150, 0.140, u_expanded);
+  // Keep the task-field rendering compact relative to the pinned Inferno
+  // reference while preserving the same Schwarzschild world-space mapping.
+  float shadowRadius = mix(0.112, 0.105, u_expanded);
   float worldScale = B_CRIT / shadowRadius;
   vec2 rayPlane = rotate2(vec2(screen.x, -screen.y), DISK_ROLL) * worldScale;
   float impact = length(rayPlane);
@@ -183,8 +183,8 @@ void rayTracedReference() {
       vec3 diskPoint = mix(previousPosition, position, crossing);
       float diskRadius = length(diskPoint);
       float lowerFarWeight = candidateWeight * smoothstep(0.50, 0.64, referenceUv.y) * (1.0 - step(0.0, diskPoint.z));
-      float diskInner = mix(DISK_INNER, 1.25, lowerFarWeight);
-      float diskOuter = mix(DISK_OUTER, 11.0, lowerFarWeight);
+      float diskInner = mix(DISK_INNER, 1.45, lowerFarWeight);
+      float diskOuter = mix(DISK_OUTER, 9.25, lowerFarWeight);
       if (diskRadius > diskInner && diskRadius < diskOuter) {
         float band = smoothstep(diskInner, diskInner * 1.25, diskRadius)
           * (1.0 - smoothstep(diskOuter * 0.70, diskOuter, diskRadius));
@@ -195,7 +195,7 @@ void rayTracedReference() {
         float swirl = diskRadius * 7.0 * 0.12 - patternTime * kepler * 5.0 * localTime;
         float streaks = vnoiseWrapY(vec2(diskRadius * 2.8, turns * 19.0 + swirl * 3.0), 19.0) * 0.65
           + vnoiseWrapY(vec2(diskRadius, turns * 9.0 + swirl * 1.5 + 7.0), 9.0) * 0.35;
-        streaks = 0.35 + 1.6 * streaks * streaks;
+        streaks = 0.35 + 0.95 * streaks * streaks;
 
         vec3 gasDirection = normalize(cross(diskNormal, diskPoint));
         float beta = clamp(inversesqrt(max(2.0 * (diskRadius - 1.0), 0.2)), 0.0, 0.99);
@@ -208,7 +208,7 @@ void rayTracedReference() {
         float density = band * streaks;
         emission += transmittance * diskColor
           * (4.84 * density * temperatureProfile * temperatureProfile * boost)
-          * mix(1.0, 1.35, lowerFarWeight);
+          * mix(1.0, 1.08, lowerFarWeight);
         transmittance *= 1.0 - clamp(0.90 * density, 0.0, 1.0);
       }
     }
@@ -237,7 +237,7 @@ void rayTracedReference() {
       sceneAlpha = sceneSample.a * lensWindow * towardScene * u_scene_ready;
     }
   }
-  vec3 diskLight = vec3(1.0) - exp(-emission * 1.40);
+  vec3 diskLight = vec3(1.0) - exp(-emission * 1.10);
   vec3 straightColor = sceneColor * transmittance + starLight * transmittance + diskLight;
   float lightAlpha = clamp((captured ? 1.0 : 0.0) + (1.0 - transmittance)
     + luma(diskLight) * 2.0 + luma(starLight) * 2.0, 0.0, 1.0);
