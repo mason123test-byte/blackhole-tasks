@@ -56,7 +56,10 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("LOWER_FAR_DISK_INNER");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_ROLL = 0.35;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float shadowRadius = mix(0.112, 0.105, u_expanded);",
+      "float referenceShadowRadius = mix(0.150, 0.140, u_expanded);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float shadowRadius = mix(referenceShadowRadius, mix(0.112, 0.105, u_expanded), candidateWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float bmax = DISK_OUTER + 3.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float nearSide =");
@@ -70,25 +73,34 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     );
   });
 
-  it("keeps the candidate lower far-side correction compact and softer", () => {
+  it("smooths the candidate disk while keeping the lower far-side correction physical", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("uniform float u_visual_compare;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float lowerFarWeight = candidateWeight * smoothstep(0.50, 0.64, referenceUv.y) * (1.0 - step(0.0, diskPoint.z));",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float diskInner = mix(DISK_INNER, 1.45, lowerFarWeight);",
+      "float diskInner = mix(DISK_INNER, 1.50, lowerFarWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float diskOuter = mix(DISK_OUTER, 9.25, lowerFarWeight);",
+      "float diskOuter = mix(DISK_OUTER, 8.85, lowerFarWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "streaks = 0.35 + 0.95 * streaks * streaks;",
+      "float radialFrequency = mix(2.8, 1.65, candidateWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "* mix(1.0, 1.08, lowerFarWeight);",
+      "float secondaryRadialFrequency = mix(1.0, 0.60, candidateWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "vec3 diskLight = vec3(1.0) - exp(-emission * 1.10);",
+      "float streakContrast = mix(1.6, 0.60, candidateWeight);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "streaks = 0.35 + streakContrast * streaks * streaks;",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "* mix(1.0, 1.02, lowerFarWeight);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float exposure = mix(1.40, 1.25, candidateWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("LOWER_FAR_DISK_INNER");
     expect(rendererSource).toContain(
