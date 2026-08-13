@@ -73,17 +73,25 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     );
   });
 
-  it("smooths the candidate disk while keeping the lower far-side correction physical", () => {
+  it("forms the candidate secondary disk image from repeated physical crossings", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("uniform float u_visual_compare;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("int diskCrossings = 0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float lowerFarWeight = candidateWeight * smoothstep(0.50, 0.64, referenceUv.y) * (1.0 - step(0.0, diskPoint.z));",
+      "if (diskRadius > DISK_INNER && diskRadius < DISK_OUTER)",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float diskInner = mix(DISK_INNER, 1.50, lowerFarWeight);",
+      "float secondaryImageWeight = candidateWeight * step(1.0, float(diskCrossings));",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float diskOuter = mix(DISK_OUTER, 8.85, lowerFarWeight);",
+      "float lowerSecondaryWeight = secondaryImageWeight * smoothstep(0.50, 0.68, referenceUv.y);",
     );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("diskCrossings += 1;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("lowerFarWeight");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float diskInner = mix(");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float diskOuter = mix(");
+  });
+
+  it("softens candidate streaks without changing the baseline Inferno texture", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float radialFrequency = mix(2.8, 1.65, candidateWeight);",
     );
@@ -91,18 +99,17 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
       "float secondaryRadialFrequency = mix(1.0, 0.60, candidateWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float streakContrast = mix(1.6, 0.60, candidateWeight);",
+      "float streakContrast = mix(1.6, 0.70, candidateWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "streaks = 0.35 + streakContrast * streaks * streaks;",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "* mix(1.0, 1.02, lowerFarWeight);",
+      "float secondaryGain = mix(1.0, 1.16, lowerSecondaryWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float exposure = mix(1.40, 1.25, candidateWeight);",
+      "float exposure = mix(1.40, 1.24, candidateWeight);",
     );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("LOWER_FAR_DISK_INNER");
     expect(rendererSource).toContain(
       "gl.uniform1f(uniforms.visualCompare, visualComparison.shaderMode);",
     );
