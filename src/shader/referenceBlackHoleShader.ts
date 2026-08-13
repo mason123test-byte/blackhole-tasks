@@ -159,7 +159,7 @@ void rayTracedReference() {
   vec3 previousPosition = position;
   float dilation = mix(1.0, DILATION_MIN, u_expanded);
   float patternTime = u_time * dilation;
-  int diskCrossings = 0;
+  int planeCrossings = 0;
 
   for (int i = 0; i < N_STEPS; i++) {
     float radius2 = dot(position, position);
@@ -185,10 +185,11 @@ void rayTracedReference() {
       float crossing = previousSide / (previousSide - side);
       vec3 diskPoint = mix(previousPosition, position, crossing);
       float diskRadius = length(diskPoint);
+      int crossingIndex = planeCrossings;
+      planeCrossings += 1;
       if (diskRadius > DISK_INNER && diskRadius < DISK_OUTER) {
-        float secondaryImageWeight = candidateWeight * step(1.0, float(diskCrossings));
+        float secondaryImageWeight = candidateWeight * step(1.0, float(crossingIndex));
         float lowerSecondaryWeight = secondaryImageWeight * smoothstep(0.50, 0.68, referenceUv.y);
-        diskCrossings += 1;
 
         float band = smoothstep(DISK_INNER, DISK_INNER * 1.25, diskRadius)
           * (1.0 - smoothstep(DISK_OUTER * 0.70, DISK_OUTER, diskRadius));
