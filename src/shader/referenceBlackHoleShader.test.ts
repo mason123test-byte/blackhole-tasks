@@ -73,19 +73,23 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     );
   });
 
-  it("forms the candidate secondary disk image from repeated physical crossings", () => {
+  it("classifies the secondary disk image by physical plane-crossing order", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("uniform float u_visual_compare;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("int diskCrossings = 0;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("int planeCrossings = 0;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "int crossingIndex = planeCrossings;",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("planeCrossings += 1;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "if (diskRadius > DISK_INNER && diskRadius < DISK_OUTER)",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float secondaryImageWeight = candidateWeight * step(1.0, float(diskCrossings));",
+      "float secondaryImageWeight = candidateWeight * step(1.0, float(crossingIndex));",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float lowerSecondaryWeight = secondaryImageWeight * smoothstep(0.50, 0.68, referenceUv.y);",
     );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("diskCrossings += 1;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("diskCrossings");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("lowerFarWeight");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float diskInner = mix(");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float diskOuter = mix(");
