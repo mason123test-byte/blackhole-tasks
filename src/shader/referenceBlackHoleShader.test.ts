@@ -85,7 +85,7 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float diskOuter = mix(");
   });
 
-  it("fills the lower U close to the shadow while tapering the far tail", () => {
+  it("fills the lower U close to the shadow while giving it a defined outer rim", () => {
     expect(lowerRadialWeight(1.0)).toBe(0);
     expect(lowerRadialWeight(1.5)).toBeGreaterThan(0.99);
     expect(lowerRadialWeight(2.5)).toBeGreaterThan(0.99);
@@ -107,10 +107,13 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
       "float lowerMajorAxisScale = mix(1.0, lowerTargetScale, lowerLensWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float lowerMinorAxisScale = mix(1.0, 1.28, lowerLensWeight);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "vec2 baseRayPlane = rotate2(vec2(screen.x, -screen.y), DISK_ROLL) * worldScale;",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "vec2 rayPlane = vec2(baseRayPlane.x * lowerMajorAxisScale, baseRayPlane.y);",
+      "vec2 rayPlane = vec2(baseRayPlane.x * lowerMajorAxisScale, baseRayPlane.y * lowerMinorAxisScale);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("traceScreen");
   });
