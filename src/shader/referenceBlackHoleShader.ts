@@ -112,8 +112,7 @@ void rayTracedReference() {
     vec3 starDirection = normalize(vec3(-(rayPlane / impact) * (2.0 / impact), -1.0));
     vec3 starLight = stars(starDirection) * STAR_GAIN * lensWindow;
     vec3 sceneColor = vec3(0.0);
-    float sceneAlpha = 0.0;
-    if (u_scene_ready > 0.5 && lensWindow >= 0.01) {
+    if (u_scene_ready > 0.5) {
       float finiteCamera = cameraZ * inversesqrt(cameraZ * cameraZ + impact * impact);
       float deflection = (2.0 / (worldScale * worldScale)) / max(screenDistance, 0.0001)
         * (1.29 * finiteCamera + 0.07)
@@ -121,22 +120,18 @@ void rayTracedReference() {
         * lensWindow;
       vec2 direction = screen / max(screenDistance, 0.00001);
       float aberration = 0.035 * smoothstep(1.0, 2.0, impact / bmax);
-      float sampledAlpha = 0.0;
       for (int channel = 0; channel < 3; channel++) {
         float bend = 1.0 + (float(channel) - 1.0) * aberration;
         vec2 sampledScreen = screen - direction * deflection * bend;
         vec2 sampledUv = mirrorUV(vec2(0.5) + sampledScreen / vec2(aspect, 1.0));
         vec4 sceneSample = texture(u_scene_texture, sampledUv);
         sceneColor[channel] = sceneSample[channel];
-        if (channel == 1) sampledAlpha = sceneSample.a;
       }
-      sceneColor *= 1.30;
-      sceneAlpha = sampledAlpha * lensWindow * u_scene_ready;
     }
-    float lightAlpha = clamp(luma(starLight) * 2.0, 0.0, 1.0);
-    float coverage = max(sceneAlpha, lightAlpha);
     vec3 straightColor = sceneColor + starLight;
-    outColor = vec4(straightColor, coverage);
+    float coverage = clamp(luma(starLight) * 2.0, 0.0, 1.0);
+    float outputAlpha = mix(coverage, 1.0, u_scene_ready);
+    outColor = vec4(straightColor, outputAlpha);
     return;
   }
 
@@ -220,7 +215,6 @@ void rayTracedReference() {
 
   vec3 sceneColor = vec3(0.0);
   vec3 starLight = vec3(0.0);
-  float sceneAlpha = 0.0;
   if (!captured) {
     vec3 escapedDirection = normalize(velocity);
     starLight = stars(escapedDirection) * STAR_GAIN * lensWindow;
@@ -231,10 +225,8 @@ void rayTracedReference() {
       vec2 escapedScreen = vec2(unrolled.x, -unrolled.y);
       vec2 sampledScreen = mix(screen, escapedScreen, lensWindow);
       vec2 sampledUv = mirrorUV(vec2(0.5) + sampledScreen / vec2(aspect, 1.0));
-      float towardScene = smoothstep(0.05, 0.35, -escapedDirection.z);
       vec4 sceneSample = texture(u_scene_texture, sampledUv);
-      sceneColor = sceneSample.rgb * 1.30;
-      sceneAlpha = sceneSample.a * lensWindow * towardScene * u_scene_ready;
+      sceneColor = sceneSample.rgb;
     }
   }
   float exposure = mix(1.40, 0.90, candidateWeight);
@@ -242,8 +234,9 @@ void rayTracedReference() {
   vec3 straightColor = sceneColor * transmittance + starLight * transmittance + diskLight;
   float lightAlpha = clamp((captured ? 1.0 : 0.0) + (1.0 - transmittance)
     + luma(diskLight) * 2.0 + luma(starLight) * 2.0, 0.0, 1.0);
-  float coverage = max(sceneAlpha, lightAlpha);
-  outColor = vec4(straightColor, coverage);
+  float coverage = lightAlpha;
+  float outputAlpha = mix(coverage, 1.0, u_scene_ready);
+  outColor = vec4(straightColor, outputAlpha);
 }
 
 void main() {
@@ -256,7 +249,7 @@ export const REFERENCE_BLACK_HOLE_INFO = Object.freeze({
   tracePadding: 3,
   starGain: 0,
   sceneInput: "svg-gpu-texture",
-  alphaMode: "reference-webgl-straight-alpha",
+  alphaMode: "reference-scene-opaque-alpha",
   reference: "https://github.com/s0xDk/ghostty-blackhole",
   webglReference: "https://s13k.dev/blackhole/",
 });
