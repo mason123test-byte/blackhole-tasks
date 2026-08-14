@@ -92,15 +92,12 @@ float luma(vec3 color) {
 
 void rayTracedReference() {
   float aspect = u_resolution.x / max(u_resolution.y, 1.0);
-  // Ghostty's fragment coordinates run top-down; WebGL texture UVs run bottom-up.
   vec2 referenceUv = vec2(v_uv.x, 1.0 - v_uv.y);
   vec2 screen = (referenceUv - 0.5) * vec2(aspect, 1.0);
   float candidateWeight = u_visual_compare < 0.5
     ? 0.0
     : (u_visual_compare > 1.5 ? step(0.0, screen.x) : 1.0);
 
-  // Keep baseline on the reference mapping; only the candidate is scaled down
-  // to match the pinned Inferno frame inside the task-field composition.
   float referenceShadowRadius = mix(0.150, 0.140, u_expanded);
   float shadowRadius = mix(referenceShadowRadius, mix(0.112, 0.105, u_expanded), candidateWeight);
   float worldScale = B_CRIT / shadowRadius;
@@ -111,8 +108,6 @@ void rayTracedReference() {
   float bmax = DISK_OUTER + 3.0;
   float cameraZ = 14.0;
 
-  // Match the reference shader's finite-camera weak-field handoff. Ghostty
-  // samples iChannel0 here; this build samples the GPU-uploaded scene texture.
   if (impact >= bmax) {
     vec3 starDirection = normalize(vec3(-(rayPlane / impact) * (2.0 / impact), -1.0));
     vec3 starLight = stars(starDirection) * STAR_GAIN * lensWindow;
@@ -159,7 +154,8 @@ void rayTracedReference() {
   vec3 previousPosition = position;
   float dilation = mix(1.0, DILATION_MIN, u_expanded);
   float patternTime = u_time * dilation;
-  int planeCrossings = 0;
+  float lowerScreenWeight = candidateWeight * smoothstep(0.50, 0.72, referenceUv.y);
+  float lowerEmissionGain = mix(1.0, 0.60, lowerScreenWeight);
 
   for (int i = 0; i < N_STEPS; i++) {
     float radius2 = dot(position, position);
@@ -185,12 +181,7 @@ void rayTracedReference() {
       float crossing = previousSide / (previousSide - side);
       vec3 diskPoint = mix(previousPosition, position, crossing);
       float diskRadius = length(diskPoint);
-      int crossingIndex = planeCrossings;
-      planeCrossings += 1;
       if (diskRadius > DISK_INNER && diskRadius < DISK_OUTER) {
-        float secondaryImageWeight = candidateWeight * step(1.0, float(crossingIndex));
-        float lowerSecondaryWeight = secondaryImageWeight * smoothstep(0.50, 0.68, referenceUv.y);
-
         float band = smoothstep(DISK_INNER, DISK_INNER * 1.25, diskRadius)
           * (1.0 - smoothstep(DISK_OUTER * 0.70, DISK_OUTER, diskRadius));
         float phi = atan(dot(diskPoint, diskAxis), diskPoint.x);
@@ -198,11 +189,11 @@ void rayTracedReference() {
         float kepler = pow(DISK_INNER / diskRadius, 1.5);
         float localTime = sqrt(max(1.0 - 1.5 / diskRadius, 0.02));
         float swirl = diskRadius * 7.0 * 0.12 - patternTime * kepler * 5.0 * localTime;
-        float radialFrequency = mix(2.8, 1.65, candidateWeight);
-        float secondaryRadialFrequency = mix(1.0, 0.60, candidateWeight);
+        float radialFrequency = mix(2.8, 1.50, candidateWeight);
+        float secondaryRadialFrequency = mix(1.0, 0.50, candidateWeight);
         float streaks = vnoiseWrapY(vec2(diskRadius * radialFrequency, turns * 19.0 + swirl * 3.0), 19.0) * 0.65
           + vnoiseWrapY(vec2(diskRadius * secondaryRadialFrequency, turns * 9.0 + swirl * 1.5 + 7.0), 9.0) * 0.35;
-        float streakContrast = mix(1.6, 0.70, candidateWeight);
+        float streakContrast = mix(1.6, 0.45, candidateWeight);
         streaks = 0.35 + streakContrast * streaks * streaks;
 
         vec3 gasDirection = normalize(cross(diskNormal, diskPoint));
@@ -214,10 +205,9 @@ void rayTracedReference() {
         vec3 diskColor = blackbody(5500.0 * temperatureProfile * shift);
         float boost = pow(shift, 2.5);
         float density = band * streaks;
-        float secondaryGain = mix(1.0, 1.16, lowerSecondaryWeight);
         emission += transmittance * diskColor
           * (4.84 * density * temperatureProfile * temperatureProfile * boost)
-          * secondaryGain;
+          * lowerEmissionGain;
         transmittance *= 1.0 - clamp(0.90 * density, 0.0, 1.0);
       }
     }
@@ -246,7 +236,7 @@ void rayTracedReference() {
       sceneAlpha = sceneSample.a * lensWindow * towardScene * u_scene_ready;
     }
   }
-  float exposure = mix(1.40, 1.24, candidateWeight);
+  float exposure = mix(1.40, 0.85, candidateWeight);
   vec3 diskLight = vec3(1.0) - exp(-emission * exposure);
   vec3 straightColor = sceneColor * transmittance + starLight * transmittance + diskLight;
   float lightAlpha = clamp((captured ? 1.0 : 0.0) + (1.0 - transmittance)
