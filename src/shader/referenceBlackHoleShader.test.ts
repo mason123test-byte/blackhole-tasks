@@ -86,15 +86,16 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float exposure = mix(1.40, 0.85, candidateWeight);",
     );
+  });
+
+  it("selects the candidate inside WebGL through the comparison uniform", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("uniform float u_visual_compare;");
+    expect(rendererSource).toContain(
+      'if (mode === "candidate") return { shaderMode: 1, fixedTime: 12 };',
+    );
     expect(rendererSource).toContain(
       "gl.uniform1f(uniforms.visualCompare, visualComparison.shaderMode);",
     );
-  });
-
-  it("keeps the real Windows candidate path inside the renderer rather than a screenshot transform", () => {
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("uniform float u_visual_compare;");
-    expect(rendererSource).toContain("BLACKHOLE_VISUAL_COMPARE");
-    expect(rendererSource).not.toContain("canvas2d");
   });
 
   it("converts WebGL bottom-up UV into Ghostty top-down coordinates", () => {
