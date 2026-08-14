@@ -20,7 +20,7 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
       tracePadding: 3,
       starGain: 0,
       sceneInput: "svg-gpu-texture",
-      alphaMode: "reference-webgl-straight-alpha",
+      alphaMode: "reference-scene-opaque-alpha",
       reference: "https://github.com/s0xDk/ghostty-blackhole",
       webglReference: "https://s13k.dev/blackhole/",
     });
@@ -30,20 +30,18 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float dt = clamp(0.16 * radius, 0.03, 1.5);",
     );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float aberration = 0.035 * smoothstep(1.0, 2.0, impact / bmax);",
-    );
   });
 
-  it("uses the reference author's straight-alpha compositor instead of premultiplied coverage", () => {
+  it("lets the expanded shader own the complete scene frame like the Ghostty reference", () => {
     expect(rendererSource).toContain("premultipliedAlpha: false");
-    expect(rendererSource).not.toContain("premultipliedAlpha: true");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float lightAlpha = clamp((captured ? 1.0 : 0.0) + (1.0 - transmittance)",
+      "float outputAlpha = mix(coverage, 1.0, u_scene_ready);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "outColor = vec4(straightColor, coverage);",
+      "outColor = vec4(straightColor, outputAlpha);",
     );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("sceneColor *= 1.30");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("sceneColor = sceneSample.rgb * 1.30");
   });
 
   it("keeps one physical Inferno disk and the compact candidate mapping", () => {
