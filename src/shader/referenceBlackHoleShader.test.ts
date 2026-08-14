@@ -76,7 +76,7 @@ describe("Interstellar Gargantua WebGL black-hole port", () => {
     expect(rendererSource).toContain("return { shaderMode: 1, fixedTime: null };");
   });
 
-  it("uses an unwarped ray plane for the Gargantua candidate", () => {
+  it("uses an unwarped ray plane for the Gargantua candidate while preserving the proven upper film treatment", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "vec2 gargantuaRayPlane = rotate2(vec2(screen.x, -screen.y), DISK_ROLL) * worldScale;",
     );
@@ -84,8 +84,9 @@ describe("Interstellar Gargantua WebGL black-hole port", () => {
       "vec2 rayPlane = mix(legacyRayPlane, gargantuaRayPlane, candidateWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float gargantuaWeight = candidateWeight;",
+      "float gargantuaStyleWeight = candidateWeight * smoothstep(0.50, 0.62, referenceUv.y);",
     );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float gargantuaWeight = candidateWeight;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("lowerMinorAxisScale = mix(1.0, 1.40, lowerLensWeight)");
   });
 
@@ -93,14 +94,14 @@ describe("Interstellar Gargantua WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("int diskCrossingIndex = 0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float crossingGain = 1.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("if (diskCrossingIndex > 0)");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("crossingGain = mix(1.0, 1.32, gargantuaWeight);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("crossingGain = mix(1.0, 1.32, gargantuaStyleWeight);");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("diskCrossingIndex += 1;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float discOpacity = mix(0.90, GARGANTUA_DISK_OPACITY, gargantuaWeight);",
+      "float discOpacity = mix(0.90, GARGANTUA_DISK_OPACITY, gargantuaStyleWeight);",
     );
   });
 
-  it("concentrates Gargantua light into a narrow bright annulus with faint long wings", () => {
+  it("concentrates the lower Gargantua image into a bright annulus while retaining the established upper arc", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float filmAnnulus = exp(-pow((diskRadius - GARGANTUA_ANNULUS_CENTER) / GARGANTUA_ANNULUS_WIDTH, 2.0));",
     );
@@ -111,19 +112,19 @@ describe("Interstellar Gargantua WebGL black-hole port", () => {
       "float filmEmissivity = filmOuterWing + 1.55 * filmAnnulus;",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float criticalBoost = 1.0 + gargantuaWeight * 0.48 * exp(-pow((impact - B_CRIT) / 0.24, 2.0));",
+      "float criticalBoost = 1.0 + gargantuaStyleWeight * 0.48 * exp(-pow((impact - B_CRIT) / 0.24, 2.0));",
     );
   });
 
-  it("suppresses the strong Doppler asymmetry omitted for the film look", () => {
+  it("suppresses strong Doppler asymmetry only where the film-style secondary image needs it", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float dopplerMix = mix(0.60, GARGANTUA_DOPPLER_MIX, gargantuaWeight);",
+      "float dopplerMix = mix(0.60, GARGANTUA_DOPPLER_MIX, gargantuaStyleWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("shift = mix(1.0, shift, dopplerMix);");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float beamPower = mix(2.5, 1.15, gargantuaWeight);",
+      "float beamPower = mix(2.5, 1.15, gargantuaStyleWeight);",
     );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float exposure = mix(1.20, 1.32, gargantuaWeight);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float exposure = mix(1.20, 1.32, gargantuaStyleWeight);");
   });
 
   it("filters final disk streak density without reducing its mean energy", () => {
