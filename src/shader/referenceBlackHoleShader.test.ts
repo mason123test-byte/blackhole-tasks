@@ -32,15 +32,26 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     );
   });
 
-  it("preserves the application background through straight alpha", () => {
+  it("preserves faint disk emission instead of multiplying it by coverage twice", () => {
     expect(rendererSource).toContain("premultipliedAlpha: false");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float coverage = max(sceneAlpha, lightAlpha);",
+      "float diskOpacity = clamp(1.0 - transmittance, 0.0, 1.0);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "outColor = vec4(straightColor, coverage);",
+      "float diskCoverage = max(diskOpacity, max(diskLight.r, max(diskLight.g, diskLight.b)));",
     );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("outputAlpha");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "vec3 premultipliedContribution = sceneColor * transmittance * sceneAlpha",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "vec3 straightColor = coverage > 0.0001 ? premultipliedContribution / coverage : vec3(0.0);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "outColor = vec4(clamp(straightColor, 0.0, 1.0), coverage);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain(
+      "vec3 straightColor = sceneColor * transmittance + starLight * transmittance + diskLight;",
+    );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("sceneColor *= 1.30");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("sceneColor = sceneSample.rgb * 1.30");
   });
