@@ -103,13 +103,14 @@ void rayTracedReference() {
     ? 0.0
     : (u_visual_compare > 1.5 ? step(0.0, screen.x) : 1.0);
 
-  float referenceShadowRadius = mix(0.150, 0.140, u_expanded);
-  float shadowRadius = mix(referenceShadowRadius, mix(0.112, 0.105, u_expanded), candidateWeight);
+  float shadowRadius = mix(0.112, 0.105, u_expanded);
   float worldScale = B_CRIT / shadowRadius;
   float screenDistance = length(screen);
+  float lowerRadialWeight = smoothstep(shadowRadius * 1.05, shadowRadius * 1.45, screenDistance)
+    * (1.0 - smoothstep(shadowRadius * 2.75, shadowRadius * 3.60, screenDistance));
   float lowerLensWeight = candidateWeight * smoothstep(0.50, 0.70, referenceUv.y)
-    * smoothstep(shadowRadius * 1.15, shadowRadius * 1.90, screenDistance);
-  float lowerTargetScale = mix(0.42, 0.72, smoothstep(-0.12, 0.12, screen.x));
+    * lowerRadialWeight;
+  float lowerTargetScale = mix(0.42, 0.60, smoothstep(-0.12, 0.12, screen.x));
   float lowerMajorAxisScale = mix(1.0, lowerTargetScale, lowerLensWeight);
   vec2 baseRayPlane = rotate2(vec2(screen.x, -screen.y), DISK_ROLL) * worldScale;
   vec2 rayPlane = vec2(baseRayPlane.x * lowerMajorAxisScale, baseRayPlane.y);
@@ -199,20 +200,18 @@ void rayTracedReference() {
         float streakContrast = 1.6;
         float rawStreaks = diskStreakSample(diskRadius, turns, swirl);
         float streaks = 0.35 + streakContrast * rawStreaks * rawStreaks;
-        if (candidateWeight > 0.5) {
-          float textureFilterRadius = 0.16;
-          float radiusMinus = max(DISK_INNER, diskRadius - textureFilterRadius);
-          float radiusPlus = min(DISK_OUTER, diskRadius + textureFilterRadius);
-          float swirlMinus = radiusMinus * 7.0 * 0.12 - patternTime * pow(DISK_INNER / radiusMinus, 1.5) * 5.0
-            * sqrt(max(1.0 - 1.5 / radiusMinus, 0.02));
-          float swirlPlus = radiusPlus * 7.0 * 0.12 - patternTime * pow(DISK_INNER / radiusPlus, 1.5) * 5.0
-            * sqrt(max(1.0 - 1.5 / radiusPlus, 0.02));
-          float rawStreaksMinus = diskStreakSample(radiusMinus, turns, swirlMinus);
-          float rawStreaksPlus = diskStreakSample(radiusPlus, turns, swirlPlus);
-          float streaksMinus = 0.35 + streakContrast * rawStreaksMinus * rawStreaksMinus;
-          float streaksPlus = 0.35 + streakContrast * rawStreaksPlus * rawStreaksPlus;
-          streaks = (streaksMinus + 2.0 * streaks + streaksPlus) * 0.25;
-        }
+        float textureFilterRadius = 0.16;
+        float radiusMinus = max(DISK_INNER, diskRadius - textureFilterRadius);
+        float radiusPlus = min(DISK_OUTER, diskRadius + textureFilterRadius);
+        float swirlMinus = radiusMinus * 7.0 * 0.12 - patternTime * pow(DISK_INNER / radiusMinus, 1.5) * 5.0
+          * sqrt(max(1.0 - 1.5 / radiusMinus, 0.02));
+        float swirlPlus = radiusPlus * 7.0 * 0.12 - patternTime * pow(DISK_INNER / radiusPlus, 1.5) * 5.0
+          * sqrt(max(1.0 - 1.5 / radiusPlus, 0.02));
+        float rawStreaksMinus = diskStreakSample(radiusMinus, turns, swirlMinus);
+        float rawStreaksPlus = diskStreakSample(radiusPlus, turns, swirlPlus);
+        float streaksMinus = 0.35 + streakContrast * rawStreaksMinus * rawStreaksMinus;
+        float streaksPlus = 0.35 + streakContrast * rawStreaksPlus * rawStreaksPlus;
+        streaks = (streaksMinus + 2.0 * streaks + streaksPlus) * 0.25;
 
         vec3 gasDirection = normalize(cross(diskNormal, diskPoint));
         float beta = clamp(inversesqrt(max(2.0 * (diskRadius - 1.0), 0.2)), 0.0, 0.99);
