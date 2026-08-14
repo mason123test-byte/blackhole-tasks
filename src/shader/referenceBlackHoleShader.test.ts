@@ -65,17 +65,19 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("sceneColor = sceneSample.rgb * 1.30");
   });
 
-  it("keeps one physical Inferno disk and the compact candidate mapping", () => {
+  it("keeps one physical Inferno disk and promotes proven compact tuning to the common baseline", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INNER = 1.8;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_OUTER = 8.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INCL = 1.50;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_ROLL = 0.35;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float referenceShadowRadius = mix(0.150, 0.140, u_expanded);",
+      "float shadowRadius = mix(0.112, 0.105, u_expanded);",
     );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float shadowRadius = mix(referenceShadowRadius, mix(0.112, 0.105, u_expanded), candidateWeight);",
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("referenceShadowRadius");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain(
+      "mix(referenceShadowRadius, mix(0.112, 0.105, u_expanded), candidateWeight)",
     );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("if (candidateWeight > 0.5)");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("planeCrossings");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("diskCrossings");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("lowerFarWeight");
