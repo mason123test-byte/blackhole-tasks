@@ -90,6 +90,11 @@ float luma(vec3 color) {
   return dot(color, vec3(0.299, 0.587, 0.114));
 }
 
+float diskStreakSample(float diskRadius, float turns, float swirl) {
+  return vnoiseWrapY(vec2(diskRadius * 2.8, turns * 19.0 + swirl * 3.0), 19.0) * 0.65
+    + vnoiseWrapY(vec2(diskRadius, turns * 9.0 + swirl * 1.5 + 7.0), 9.0) * 0.35;
+}
+
 void rayTracedReference() {
   float aspect = u_resolution.x / max(u_resolution.y, 1.0);
   vec2 referenceUv = vec2(v_uv.x, 1.0 - v_uv.y);
@@ -112,7 +117,8 @@ void rayTracedReference() {
     vec3 starDirection = normalize(vec3(-(rayPlane / impact) * (2.0 / impact), -1.0));
     vec3 starLight = stars(starDirection) * STAR_GAIN * lensWindow;
     vec3 sceneColor = vec3(0.0);
-    if (u_scene_ready > 0.5) {
+    float sceneAlpha = 0.0;
+    if (u_scene_ready > 0.5 && lensWindow >= 0.01) {
       float finiteCamera = cameraZ * inversesqrt(cameraZ * cameraZ + impact * impact);
       float deflection = (2.0 / (worldScale * worldScale)) / max(screenDistance, 0.0001)
         * (1.29 * finiteCamera + 0.07)
@@ -120,18 +126,21 @@ void rayTracedReference() {
         * lensWindow;
       vec2 direction = screen / max(screenDistance, 0.00001);
       float aberration = 0.035 * smoothstep(1.0, 2.0, impact / bmax);
+      float sampledAlpha = 0.0;
       for (int channel = 0; channel < 3; channel++) {
         float bend = 1.0 + (float(channel) - 1.0) * aberration;
         vec2 sampledScreen = screen - direction * deflection * bend;
         vec2 sampledUv = mirrorUV(vec2(0.5) + sampledScreen / vec2(aspect, 1.0));
         vec4 sceneSample = texture(u_scene_texture, sampledUv);
         sceneColor[channel] = sceneSample[channel];
+        if (channel == 1) sampledAlpha = sceneSample.a;
       }
+      sceneAlpha = sampledAlpha * lensWindow * u_scene_ready;
     }
+    float lightAlpha = clamp(luma(starLight) * 2.0, 0.0, 1.0);
+    float coverage = max(sceneAlpha, lightAlpha);
     vec3 straightColor = sceneColor + starLight;
-    float coverage = clamp(luma(starLight) * 2.0, 0.0, 1.0);
-    float outputAlpha = mix(coverage, 1.0, u_scene_ready);
-    outColor = vec4(straightColor, outputAlpha);
+    outColor = vec4(straightColor, coverage);
     return;
   }
 
@@ -150,7 +159,7 @@ void rayTracedReference() {
   float dilation = mix(1.0, DILATION_MIN, u_expanded);
   float patternTime = u_time * dilation;
   float lowerScreenWeight = candidateWeight * smoothstep(0.50, 0.72, referenceUv.y);
-  float lowerEmissionGain = mix(1.0, 0.45, lowerScreenWeight);
+  float lowerEmissionGain = mix(1.0, 0.85, lowerScreenWeight);
 
   for (int i = 0; i < N_STEPS; i++) {
     float radius2 = dot(position, position);
@@ -184,13 +193,21 @@ void rayTracedReference() {
         float kepler = pow(DISK_INNER / diskRadius, 1.5);
         float localTime = sqrt(max(1.0 - 1.5 / diskRadius, 0.02));
         float swirl = diskRadius * 7.0 * 0.12 - patternTime * kepler * 5.0 * localTime;
-        float radialFrequency = mix(2.8, 1.35, candidateWeight);
-        float secondaryRadialFrequency = mix(1.0, 0.40, candidateWeight);
-        float streaks = vnoiseWrapY(vec2(diskRadius * radialFrequency, turns * 19.0 + swirl * 3.0), 19.0) * 0.65
-          + vnoiseWrapY(vec2(diskRadius * secondaryRadialFrequency, turns * 9.0 + swirl * 1.5 + 7.0), 9.0) * 0.35;
-        float streakFloor = mix(0.35, 0.48, candidateWeight);
-        float streakContrast = mix(1.6, 0.28, candidateWeight);
-        streaks = streakFloor + streakContrast * streaks * streaks;
+        float streaks = diskStreakSample(diskRadius, turns, swirl);
+        if (candidateWeight > 0.5) {
+          float textureFilterRadius = 0.16;
+          float radiusMinus = max(DISK_INNER, diskRadius - textureFilterRadius);
+          float radiusPlus = min(DISK_OUTER, diskRadius + textureFilterRadius);
+          float swirlMinus = radiusMinus * 7.0 * 0.12 - patternTime * pow(DISK_INNER / radiusMinus, 1.5) * 5.0
+            * sqrt(max(1.0 - 1.5 / radiusMinus, 0.02));
+          float swirlPlus = radiusPlus * 7.0 * 0.12 - patternTime * pow(DISK_INNER / radiusPlus, 1.5) * 5.0
+            * sqrt(max(1.0 - 1.5 / radiusPlus, 0.02));
+          float streaksMinus = diskStreakSample(radiusMinus, turns, swirlMinus);
+          float streaksPlus = diskStreakSample(radiusPlus, turns, swirlPlus);
+          streaks = (streaksMinus + 2.0 * streaks + streaksPlus) * 0.25;
+        }
+        float streakContrast = mix(1.6, 1.00, candidateWeight);
+        streaks = 0.35 + streakContrast * streaks * streaks;
 
         vec3 gasDirection = normalize(cross(diskNormal, diskPoint));
         float beta = clamp(inversesqrt(max(2.0 * (diskRadius - 1.0), 0.2)), 0.0, 0.99);
@@ -215,6 +232,7 @@ void rayTracedReference() {
 
   vec3 sceneColor = vec3(0.0);
   vec3 starLight = vec3(0.0);
+  float sceneAlpha = 0.0;
   if (!captured) {
     vec3 escapedDirection = normalize(velocity);
     starLight = stars(escapedDirection) * STAR_GAIN * lensWindow;
@@ -225,18 +243,19 @@ void rayTracedReference() {
       vec2 escapedScreen = vec2(unrolled.x, -unrolled.y);
       vec2 sampledScreen = mix(screen, escapedScreen, lensWindow);
       vec2 sampledUv = mirrorUV(vec2(0.5) + sampledScreen / vec2(aspect, 1.0));
+      float towardScene = smoothstep(0.05, 0.35, -escapedDirection.z);
       vec4 sceneSample = texture(u_scene_texture, sampledUv);
       sceneColor = sceneSample.rgb;
+      sceneAlpha = sceneSample.a * lensWindow * towardScene * u_scene_ready;
     }
   }
-  float exposure = mix(1.40, 0.90, candidateWeight);
+  float exposure = mix(1.40, 1.25, candidateWeight);
   vec3 diskLight = vec3(1.0) - exp(-emission * exposure);
   vec3 straightColor = sceneColor * transmittance + starLight * transmittance + diskLight;
   float lightAlpha = clamp((captured ? 1.0 : 0.0) + (1.0 - transmittance)
     + luma(diskLight) * 2.0 + luma(starLight) * 2.0, 0.0, 1.0);
-  float coverage = lightAlpha;
-  float outputAlpha = mix(coverage, 1.0, u_scene_ready);
-  outColor = vec4(straightColor, outputAlpha);
+  float coverage = max(sceneAlpha, lightAlpha);
+  outColor = vec4(straightColor, coverage);
 }
 
 void main() {
@@ -249,7 +268,7 @@ export const REFERENCE_BLACK_HOLE_INFO = Object.freeze({
   tracePadding: 3,
   starGain: 0,
   sceneInput: "svg-gpu-texture",
-  alphaMode: "reference-scene-opaque-alpha",
+  alphaMode: "reference-webgl-straight-alpha",
   reference: "https://github.com/s0xDk/ghostty-blackhole",
   webglReference: "https://s13k.dev/blackhole/",
 });
