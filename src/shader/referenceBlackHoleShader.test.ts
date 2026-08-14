@@ -48,12 +48,10 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("min(premultiplied");
   });
 
-  it("keeps the reference Inferno constants and GPU scene-lensing boundary", () => {
+  it("keeps one physical Inferno disk and the compact candidate mapping", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INNER = 1.8;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_OUTER = 8.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INCL = 1.50;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("NEAR_DISK_INNER");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("LOWER_FAR_DISK_INNER");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_ROLL = 0.35;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float referenceShadowRadius = mix(0.150, 0.140, u_expanded);",
@@ -62,61 +60,41 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
       "float shadowRadius = mix(referenceShadowRadius, mix(0.112, 0.105, u_expanded), candidateWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float bmax = DISK_OUTER + 3.0;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float nearSide =");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("farSideWeight");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("lowerImageWeight");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec4 sceneSample = texture(u_scene_texture, sampledUv);");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("sceneAlpha = sceneSample.a * lensWindow");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("sceneColor = sceneSample.rgb * 1.30;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain(
-      "sceneAlpha = smoothstep(0.02, 0.22, lensWindow) * u_scene_ready;",
-    );
-  });
-
-  it("classifies the secondary disk image by physical plane-crossing order", () => {
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("uniform float u_visual_compare;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("int planeCrossings = 0;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "int crossingIndex = planeCrossings;",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("planeCrossings += 1;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "if (diskRadius > DISK_INNER && diskRadius < DISK_OUTER)",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float secondaryImageWeight = candidateWeight * step(1.0, float(crossingIndex));",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float lowerSecondaryWeight = secondaryImageWeight * smoothstep(0.50, 0.68, referenceUv.y);",
-    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("planeCrossings");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("diskCrossings");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("lowerFarWeight");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float diskInner = mix(");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float diskOuter = mix(");
   });
 
-  it("softens candidate streaks without changing the baseline Inferno texture", () => {
+  it("matches the reference frame's softer texture and upper/lower luminance balance", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float radialFrequency = mix(2.8, 1.65, candidateWeight);",
+      "float radialFrequency = mix(2.8, 1.50, candidateWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float secondaryRadialFrequency = mix(1.0, 0.60, candidateWeight);",
+      "float secondaryRadialFrequency = mix(1.0, 0.50, candidateWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float streakContrast = mix(1.6, 0.70, candidateWeight);",
+      "float streakContrast = mix(1.6, 0.45, candidateWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "streaks = 0.35 + streakContrast * streaks * streaks;",
+      "float lowerScreenWeight = candidateWeight * smoothstep(0.50, 0.72, referenceUv.y);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float secondaryGain = mix(1.0, 1.16, lowerSecondaryWeight);",
+      "float lowerEmissionGain = mix(1.0, 0.60, lowerScreenWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float exposure = mix(1.40, 1.24, candidateWeight);",
+      "float exposure = mix(1.40, 0.85, candidateWeight);",
     );
     expect(rendererSource).toContain(
       "gl.uniform1f(uniforms.visualCompare, visualComparison.shaderMode);",
     );
+  });
+
+  it("keeps the real Windows candidate path inside the renderer rather than a screenshot transform", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("uniform float u_visual_compare;");
+    expect(rendererSource).toContain("BLACKHOLE_VISUAL_COMPARE");
+    expect(rendererSource).not.toContain("canvas2d");
   });
 
   it("converts WebGL bottom-up UV into Ghostty top-down coordinates", () => {
