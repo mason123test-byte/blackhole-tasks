@@ -58,11 +58,11 @@ describe("Interstellar Gargantua WebGL black-hole port", () => {
     );
   });
 
-  it("keeps one thin physical disk and makes the normal candidate Gargantua-style", () => {
+  it("keeps one thin physical disk and aligns the normal candidate with Gargantua's film horizon", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INNER = 1.8;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_OUTER = 8.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INCL = 1.50;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_ROLL = 0.35;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_ROLL = 0.00;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_DOPPLER_MIX = 0.08;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_DISK_OPACITY = 0.58;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_ANNULUS_CENTER = 3.15;");
