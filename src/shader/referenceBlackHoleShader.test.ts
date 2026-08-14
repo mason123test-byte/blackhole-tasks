@@ -63,21 +63,19 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float diskOuter = mix(");
   });
 
-  it("filters candidate radial texture instead of changing disk topology", () => {
+  it("filters final Inferno streak density without reducing its mean energy", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float textureFilterRadius = 0.16;",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float streakContrast = 1.6;",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "streaks = (streaksMinus + 2.0 * streaks + streaksPlus) * 0.25;",
     );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("lowerEmissionGain");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float streakContrast = mix(1.6, 1.00, candidateWeight);",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float lowerEmissionGain = mix(1.0, 0.85, lowerScreenWeight);",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float exposure = mix(1.40, 1.25, candidateWeight);",
+      "float exposure = 1.40;",
     );
   });
 
