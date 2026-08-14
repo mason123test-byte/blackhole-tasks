@@ -29,7 +29,7 @@ uniform float u_visual_compare;
 const float DISK_INNER = 1.8;
 const float DISK_OUTER = 8.0;
 const float DISK_INCL = 1.50;
-const float DISK_ROLL = 0.35;
+const float DISK_ROLL = 0.00;
 const float STAR_GAIN = 0.0;
 const float DILATION_MIN = 0.20;
 const float GARGANTUA_DOPPLER_MIX = 0.08;
