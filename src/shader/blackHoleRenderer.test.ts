@@ -24,15 +24,16 @@ describe("black-hole render profiles", () => {
     expect(getRenderSize(240, 180, 1, 1)).toEqual({ width: 240, height: 180 });
   });
 
-  it("uses the reference Schwarzschild WebGL compositor with a GPU scene texture", () => {
+  it("uses the Gargantua-inspired geodesic WebGL compositor with a GPU scene texture", () => {
     expect(BLACK_HOLE_RENDERER_INFO).toMatchObject({
-      model: "schwarzschild-geodesic",
-      integrationSteps: 48,
+      model: "gargantua-inspired-schwarzschild-geodesic",
+      integrationSteps: 80,
       tracePadding: 3,
       starGain: 0,
       sceneInput: "svg-gpu-texture",
       alphaMode: "reference-webgl-straight-alpha",
-      webglReference: "https://s13k.dev/blackhole/",
+      styleReference: "https://arxiv.org/abs/1502.03808",
+      webglReference: "https://ebruneton.github.io/black_hole_shader/",
     });
   });
 
