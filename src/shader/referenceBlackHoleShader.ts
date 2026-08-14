@@ -250,11 +250,16 @@ void rayTracedReference() {
   }
   float exposure = 1.40;
   vec3 diskLight = vec3(1.0) - exp(-emission * exposure);
-  vec3 straightColor = sceneColor * transmittance + starLight * transmittance + diskLight;
-  float lightAlpha = clamp((captured ? 1.0 : 0.0) + (1.0 - transmittance)
-    + luma(diskLight) * 2.0 + luma(starLight) * 2.0, 0.0, 1.0);
+  float diskOpacity = clamp(1.0 - transmittance, 0.0, 1.0);
+  float diskCoverage = max(diskOpacity, max(diskLight.r, max(diskLight.g, diskLight.b)));
+  float starCoverage = clamp(luma(starLight) * 2.0, 0.0, 1.0);
+  float lightAlpha = clamp((captured ? 1.0 : 0.0) + max(diskCoverage, starCoverage), 0.0, 1.0);
   float coverage = max(sceneAlpha, lightAlpha);
-  outColor = vec4(straightColor, coverage);
+  vec3 premultipliedContribution = sceneColor * transmittance * sceneAlpha
+    + starLight * transmittance
+    + diskLight;
+  vec3 straightColor = coverage > 0.0001 ? premultipliedContribution / coverage : vec3(0.0);
+  outColor = vec4(clamp(straightColor, 0.0, 1.0), coverage);
 }
 
 void main() {
