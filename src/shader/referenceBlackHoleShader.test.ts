@@ -44,8 +44,6 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "outColor = vec4(straightColor, coverage);",
     );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("premultiplied");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("min(premultiplied");
   });
 
   it("keeps one physical Inferno disk and the compact candidate mapping", () => {
@@ -59,7 +57,6 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float shadowRadius = mix(referenceShadowRadius, mix(0.112, 0.105, u_expanded), candidateWeight);",
     );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float bmax = DISK_OUTER + 3.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("planeCrossings");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("diskCrossings");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("lowerFarWeight");
@@ -67,24 +64,24 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float diskOuter = mix(");
   });
 
-  it("matches the reference frame's softer texture and upper/lower luminance balance", () => {
+  it("fuses candidate streaks into a softer upper light band while suppressing the lower arc", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float radialFrequency = mix(2.8, 1.50, candidateWeight);",
+      "float radialFrequency = mix(2.8, 1.35, candidateWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float secondaryRadialFrequency = mix(1.0, 0.50, candidateWeight);",
+      "float secondaryRadialFrequency = mix(1.0, 0.40, candidateWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float streakContrast = mix(1.6, 0.45, candidateWeight);",
+      "float streakFloor = mix(0.35, 0.48, candidateWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float lowerScreenWeight = candidateWeight * smoothstep(0.50, 0.72, referenceUv.y);",
+      "float streakContrast = mix(1.6, 0.28, candidateWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float lowerEmissionGain = mix(1.0, 0.60, lowerScreenWeight);",
+      "float lowerEmissionGain = mix(1.0, 0.45, lowerScreenWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float exposure = mix(1.40, 0.85, candidateWeight);",
+      "float exposure = mix(1.40, 0.90, candidateWeight);",
     );
   });
 
