@@ -127,7 +127,7 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("lowerEmissionGain");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float exposure = 1.40;",
+      "float exposure = 1.20;",
     );
   });
 
