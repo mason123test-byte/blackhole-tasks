@@ -107,7 +107,7 @@ void rayTracedReference() {
   float candidateWeight = u_visual_compare < 0.5
     ? 0.0
     : (u_visual_compare > 1.5 ? step(0.0, screen.x) : 1.0);
-  float gargantuaWeight = candidateWeight;
+  float gargantuaStyleWeight = candidateWeight * smoothstep(0.50, 0.62, referenceUv.y);
 
   float shadowRadius = mix(0.112, 0.105, u_expanded);
   float worldScale = B_CRIT / shadowRadius;
@@ -115,7 +115,9 @@ void rayTracedReference() {
 
   // Baseline mode is retained only for the Windows A/B capture. The normal
   // application path is candidateWeight=1 and therefore uses the single,
-  // unwarped Gargantua ray plane below.
+  // unwarped Gargantua ray plane below. Film-style photometric treatment is
+  // localized below the shadow because the established upper arc already
+  // matches Gargantua's warm layered far-side image well.
   float legacyLowerRadialWeight = smoothstep(shadowRadius * 1.05, shadowRadius * 1.45, screenDistance)
     * (1.0 - smoothstep(shadowRadius * 2.75, shadowRadius * 3.60, screenDistance));
   float legacyLowerLensWeight = (1.0 - candidateWeight) * smoothstep(0.50, 0.70, referenceUv.y)
@@ -235,36 +237,34 @@ void rayTracedReference() {
         vec3 gasDirection = normalize(cross(diskNormal, diskPoint));
         float beta = clamp(inversesqrt(max(2.0 * (diskRadius - 1.0), 0.2)), 0.0, 0.99);
         float shift = localTime / max(1.0 + beta * dot(gasDirection, normalize(velocity)), 0.05);
-        float dopplerMix = mix(0.60, GARGANTUA_DOPPLER_MIX, gargantuaWeight);
+        float dopplerMix = mix(0.60, GARGANTUA_DOPPLER_MIX, gargantuaStyleWeight);
         shift = mix(1.0, shift, dopplerMix);
         float profileBase = max(1.0 - sqrt(DISK_INNER / diskRadius), 0.0);
         float temperatureProfile = pow(DISK_INNER / diskRadius, 0.75) * pow(profileBase, 0.25) / 0.488;
         vec3 diskColor = blackbody(5500.0 * temperatureProfile * shift);
-        float beamPower = mix(2.5, 1.15, gargantuaWeight);
+        float beamPower = mix(2.5, 1.15, gargantuaStyleWeight);
         float boost = pow(shift, beamPower);
         float density = band * streaks;
 
-        // Gargantua's memorable silhouette comes from a bright, relatively
-        // narrow inner annulus plus a much fainter extended disk. The latter
-        // keeps the long straight wings while the lensed images remain bands
-        // with readable inner and outer edges instead of filled blobs.
+        // Gargantua's lower secondary image benefits from a bright, relatively
+        // narrow inner annulus plus a much fainter extended disk. The upper
+        // image keeps the proven warmer layered response instead of being
+        // globally over-whitened by the film treatment.
         float filmAnnulus = exp(-pow((diskRadius - GARGANTUA_ANNULUS_CENTER) / GARGANTUA_ANNULUS_WIDTH, 2.0));
         float filmOuterWing = 0.18 + 0.22 * smoothstep(3.5, DISK_OUTER, diskRadius);
         float filmEmissivity = filmOuterWing + 1.55 * filmAnnulus;
-        float emissivity = mix(1.0, filmEmissivity, gargantuaWeight);
+        float emissivity = mix(1.0, filmEmissivity, gargantuaStyleWeight);
 
-        // Near the critical impact parameter the same disk is strongly
-        // magnified into the thin high-contrast rim visible around Gargantua.
-        float criticalBoost = 1.0 + gargantuaWeight * 0.48 * exp(-pow((impact - B_CRIT) / 0.24, 2.0));
+        float criticalBoost = 1.0 + gargantuaStyleWeight * 0.48 * exp(-pow((impact - B_CRIT) / 0.24, 2.0));
         float crossingGain = 1.0;
         if (diskCrossingIndex > 0) {
-          crossingGain = mix(1.0, 1.32, gargantuaWeight);
+          crossingGain = mix(1.0, 1.32, gargantuaStyleWeight);
         }
 
         emission += transmittance * diskColor
           * (4.84 * density * temperatureProfile * temperatureProfile * boost
             * emissivity * criticalBoost * crossingGain);
-        float discOpacity = mix(0.90, GARGANTUA_DISK_OPACITY, gargantuaWeight);
+        float discOpacity = mix(0.90, GARGANTUA_DISK_OPACITY, gargantuaStyleWeight);
         transmittance *= 1.0 - clamp(discOpacity * density, 0.0, 1.0);
         diskCrossingIndex += 1;
       }
@@ -294,7 +294,7 @@ void rayTracedReference() {
       sceneAlpha = sceneSample.a * lensWindow * towardScene * u_scene_ready;
     }
   }
-  float exposure = mix(1.20, 1.32, gargantuaWeight);
+  float exposure = mix(1.20, 1.32, gargantuaStyleWeight);
   vec3 diskLight = vec3(1.0) - exp(-emission * exposure);
   float diskOpacity = clamp(1.0 - transmittance, 0.0, 1.0);
   float diskCoverage = max(diskOpacity, max(diskLight.r, max(diskLight.g, diskLight.b)));
