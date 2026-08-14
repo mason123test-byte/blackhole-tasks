@@ -20,7 +20,7 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
       tracePadding: 3,
       starGain: 0,
       sceneInput: "svg-gpu-texture",
-      alphaMode: "reference-scene-opaque-alpha",
+      alphaMode: "reference-webgl-straight-alpha",
       reference: "https://github.com/s0xDk/ghostty-blackhole",
       webglReference: "https://s13k.dev/blackhole/",
     });
@@ -32,14 +32,15 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     );
   });
 
-  it("lets the expanded shader own the complete scene frame like the Ghostty reference", () => {
+  it("preserves the application background through straight alpha", () => {
     expect(rendererSource).toContain("premultipliedAlpha: false");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float outputAlpha = mix(coverage, 1.0, u_scene_ready);",
+      "float coverage = max(sceneAlpha, lightAlpha);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "outColor = vec4(straightColor, outputAlpha);",
+      "outColor = vec4(straightColor, coverage);",
     );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("outputAlpha");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("sceneColor *= 1.30");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("sceneColor = sceneSample.rgb * 1.30");
   });
@@ -62,24 +63,21 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float diskOuter = mix(");
   });
 
-  it("fuses candidate streaks into a softer upper light band while suppressing the lower arc", () => {
+  it("filters candidate radial texture instead of changing disk topology", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float radialFrequency = mix(2.8, 1.35, candidateWeight);",
+      "float textureFilterRadius = 0.16;",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float secondaryRadialFrequency = mix(1.0, 0.40, candidateWeight);",
+      "streaks = (streaksMinus + 2.0 * streaks + streaksPlus) * 0.25;",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float streakFloor = mix(0.35, 0.48, candidateWeight);",
+      "float streakContrast = mix(1.6, 1.00, candidateWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float streakContrast = mix(1.6, 0.28, candidateWeight);",
+      "float lowerEmissionGain = mix(1.0, 0.85, lowerScreenWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float lowerEmissionGain = mix(1.0, 0.45, lowerScreenWeight);",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float exposure = mix(1.40, 0.90, candidateWeight);",
+      "float exposure = mix(1.40, 1.25, candidateWeight);",
     );
   });
 
