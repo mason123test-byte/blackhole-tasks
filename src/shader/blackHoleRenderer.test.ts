@@ -31,7 +31,7 @@ describe("black-hole render profiles", () => {
       tracePadding: 3,
       starGain: 0,
       sceneInput: "svg-gpu-texture",
-      alphaMode: "reference-webgl-straight-alpha",
+      alphaMode: "reference-scene-opaque-alpha",
       webglReference: "https://s13k.dev/blackhole/",
     });
   });
