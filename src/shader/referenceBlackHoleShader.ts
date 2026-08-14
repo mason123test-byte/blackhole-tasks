@@ -1,6 +1,7 @@
 // The physical rendering equations are adapted from s0xDk/ghostty-blackhole
-// (MIT). Application-only interaction and WebGL lifecycle stay in
-// blackHoleRenderer.ts so this source remains reviewable against the reference.
+// (MIT). The Gargantua presentation is informed by James, von Tunzelmann,
+// Franklin & Thorne (2015) and Bruneton's real-time black-hole shader.
+// Application-only interaction and WebGL lifecycle stay in blackHoleRenderer.ts.
 export const REFERENCE_BLACK_HOLE_VERTEX = `#version 300 es
 in vec2 a_position;
 out vec2 v_uv;
@@ -23,7 +24,7 @@ uniform float u_visual_compare;
 
 #define PI 3.14159265359
 #define B_CRIT 2.5980762
-#define N_STEPS 48
+#define N_STEPS 80
 
 const float DISK_INNER = 1.8;
 const float DISK_OUTER = 8.0;
@@ -31,6 +32,10 @@ const float DISK_INCL = 1.50;
 const float DISK_ROLL = 0.35;
 const float STAR_GAIN = 0.0;
 const float DILATION_MIN = 0.20;
+const float GARGANTUA_DOPPLER_MIX = 0.08;
+const float GARGANTUA_DISK_OPACITY = 0.58;
+const float GARGANTUA_ANNULUS_CENTER = 3.15;
+const float GARGANTUA_ANNULUS_WIDTH = 0.85;
 
 float hash21(vec2 p) {
   p = fract(p * vec2(234.34, 435.345));
@@ -102,19 +107,30 @@ void rayTracedReference() {
   float candidateWeight = u_visual_compare < 0.5
     ? 0.0
     : (u_visual_compare > 1.5 ? step(0.0, screen.x) : 1.0);
+  float gargantuaWeight = candidateWeight;
 
   float shadowRadius = mix(0.112, 0.105, u_expanded);
   float worldScale = B_CRIT / shadowRadius;
   float screenDistance = length(screen);
-  float lowerRadialWeight = smoothstep(shadowRadius * 1.05, shadowRadius * 1.45, screenDistance)
+
+  // Baseline mode is retained only for the Windows A/B capture. The normal
+  // application path is candidateWeight=1 and therefore uses the single,
+  // unwarped Gargantua ray plane below.
+  float legacyLowerRadialWeight = smoothstep(shadowRadius * 1.05, shadowRadius * 1.45, screenDistance)
     * (1.0 - smoothstep(shadowRadius * 2.75, shadowRadius * 3.60, screenDistance));
-  float lowerLensWeight = candidateWeight * smoothstep(0.50, 0.70, referenceUv.y)
-    * lowerRadialWeight;
-  float lowerTargetScale = mix(0.42, 0.60, smoothstep(-0.12, 0.12, screen.x));
-  float lowerMajorAxisScale = mix(1.0, lowerTargetScale, lowerLensWeight);
-  float lowerMinorAxisScale = mix(1.0, 1.40, lowerLensWeight);
-  vec2 baseRayPlane = rotate2(vec2(screen.x, -screen.y), DISK_ROLL) * worldScale;
-  vec2 rayPlane = vec2(baseRayPlane.x * lowerMajorAxisScale, baseRayPlane.y * lowerMinorAxisScale);
+  float legacyLowerLensWeight = (1.0 - candidateWeight) * smoothstep(0.50, 0.70, referenceUv.y)
+    * legacyLowerRadialWeight;
+  float legacyLowerTargetScale = mix(0.42, 0.60, smoothstep(-0.12, 0.12, screen.x));
+  float legacyLowerMajorScale = mix(1.0, legacyLowerTargetScale, legacyLowerLensWeight);
+  float legacyLowerMinorScale = mix(1.0, 1.40, legacyLowerLensWeight);
+  vec2 legacyBaseRayPlane = rotate2(vec2(screen.x, -screen.y), DISK_ROLL) * worldScale;
+  vec2 legacyRayPlane = vec2(
+    legacyBaseRayPlane.x * legacyLowerMajorScale,
+    legacyBaseRayPlane.y * legacyLowerMinorScale
+  );
+  vec2 gargantuaRayPlane = rotate2(vec2(screen.x, -screen.y), DISK_ROLL) * worldScale;
+  vec2 rayPlane = mix(legacyRayPlane, gargantuaRayPlane, candidateWeight);
+
   float impact = length(rayPlane);
   float lensWindow = exp(-pow(screenDistance / (7.0 * shadowRadius), 2.0));
   float bmax = DISK_OUTER + 3.0;
@@ -165,6 +181,7 @@ void rayTracedReference() {
   vec3 previousPosition = position;
   float dilation = mix(1.0, DILATION_MIN, u_expanded);
   float patternTime = u_time * dilation;
+  int diskCrossingIndex = 0;
 
   for (int i = 0; i < N_STEPS; i++) {
     float radius2 = dot(position, position);
@@ -176,7 +193,8 @@ void rayTracedReference() {
     if (radius2 > 4.0 * cameraZ * cameraZ) break;
 
     float radius = sqrt(radius2);
-    float dt = clamp(0.16 * radius, 0.03, 1.5);
+    float photonSphereRefinement = 1.0 - smoothstep(1.65, 3.20, radius);
+    float dt = clamp(0.16 * radius, 0.03, 1.5) * mix(1.0, 0.55, photonSphereRefinement);
     vec3 acceleration = -1.5 * angularMomentum2 * position / (radius2 * radius2 * radius);
     velocity += acceleration * (0.5 * dt);
     position += velocity * dt;
@@ -217,15 +235,38 @@ void rayTracedReference() {
         vec3 gasDirection = normalize(cross(diskNormal, diskPoint));
         float beta = clamp(inversesqrt(max(2.0 * (diskRadius - 1.0), 0.2)), 0.0, 0.99);
         float shift = localTime / max(1.0 + beta * dot(gasDirection, normalize(velocity)), 0.05);
-        shift = mix(1.0, shift, 0.60);
+        float dopplerMix = mix(0.60, GARGANTUA_DOPPLER_MIX, gargantuaWeight);
+        shift = mix(1.0, shift, dopplerMix);
         float profileBase = max(1.0 - sqrt(DISK_INNER / diskRadius), 0.0);
         float temperatureProfile = pow(DISK_INNER / diskRadius, 0.75) * pow(profileBase, 0.25) / 0.488;
         vec3 diskColor = blackbody(5500.0 * temperatureProfile * shift);
-        float boost = pow(shift, 2.5);
+        float beamPower = mix(2.5, 1.15, gargantuaWeight);
+        float boost = pow(shift, beamPower);
         float density = band * streaks;
+
+        // Gargantua's memorable silhouette comes from a bright, relatively
+        // narrow inner annulus plus a much fainter extended disk. The latter
+        // keeps the long straight wings while the lensed images remain bands
+        // with readable inner and outer edges instead of filled blobs.
+        float filmAnnulus = exp(-pow((diskRadius - GARGANTUA_ANNULUS_CENTER) / GARGANTUA_ANNULUS_WIDTH, 2.0));
+        float filmOuterWing = 0.18 + 0.22 * smoothstep(3.5, DISK_OUTER, diskRadius);
+        float filmEmissivity = filmOuterWing + 1.55 * filmAnnulus;
+        float emissivity = mix(1.0, filmEmissivity, gargantuaWeight);
+
+        // Near the critical impact parameter the same disk is strongly
+        // magnified into the thin high-contrast rim visible around Gargantua.
+        float criticalBoost = 1.0 + gargantuaWeight * 0.48 * exp(-pow((impact - B_CRIT) / 0.24, 2.0));
+        float crossingGain = 1.0;
+        if (diskCrossingIndex > 0) {
+          crossingGain = mix(1.0, 1.32, gargantuaWeight);
+        }
+
         emission += transmittance * diskColor
-          * (4.84 * density * temperatureProfile * temperatureProfile * boost);
-        transmittance *= 1.0 - clamp(0.90 * density, 0.0, 1.0);
+          * (4.84 * density * temperatureProfile * temperatureProfile * boost
+            * emissivity * criticalBoost * crossingGain);
+        float discOpacity = mix(0.90, GARGANTUA_DISK_OPACITY, gargantuaWeight);
+        transmittance *= 1.0 - clamp(discOpacity * density, 0.0, 1.0);
+        diskCrossingIndex += 1;
       }
     }
     previousSide = side;
@@ -253,7 +294,7 @@ void rayTracedReference() {
       sceneAlpha = sceneSample.a * lensWindow * towardScene * u_scene_ready;
     }
   }
-  float exposure = 1.20;
+  float exposure = mix(1.20, 1.32, gargantuaWeight);
   vec3 diskLight = vec3(1.0) - exp(-emission * exposure);
   float diskOpacity = clamp(1.0 - transmittance, 0.0, 1.0);
   float diskCoverage = max(diskOpacity, max(diskLight.r, max(diskLight.g, diskLight.b)));
@@ -272,12 +313,13 @@ void main() {
 }`;
 
 export const REFERENCE_BLACK_HOLE_INFO = Object.freeze({
-  model: "schwarzschild-geodesic",
-  integrationSteps: 48,
+  model: "gargantua-inspired-schwarzschild-geodesic",
+  integrationSteps: 80,
   tracePadding: 3,
   starGain: 0,
   sceneInput: "svg-gpu-texture",
   alphaMode: "reference-webgl-straight-alpha",
   reference: "https://github.com/s0xDk/ghostty-blackhole",
-  webglReference: "https://s13k.dev/blackhole/",
+  styleReference: "https://arxiv.org/abs/1502.03808",
+  webglReference: "https://ebruneton.github.io/black_hole_shader/",
 });
