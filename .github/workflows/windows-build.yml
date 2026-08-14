@@ -65,20 +65,6 @@ jobs:
       - name: Build Tauri installers
         run: npm run tauri build
 
-      - name: Capture pinned reference Inferno frame
-        shell: pwsh
-        run: |
-          $referenceCommit = "b49fa0ab2eaf0644a690f4cb386d70c21eb9f969"
-          New-Item -ItemType Directory -Force -Path "output/reference" | Out-Null
-          New-Item -ItemType Directory -Force -Path "output/windows-smoke" | Out-Null
-          Invoke-WebRequest `
-            -Uri "https://raw.githubusercontent.com/s0xDk/ghostty-blackhole/$referenceCommit/demo.gif" `
-            -OutFile "output/reference/demo.gif"
-          ./scripts/extract-reference-inferno.ps1 `
-            -InputPath "output/reference/demo.gif" `
-            -OutputPath "output/windows-smoke/reference-inferno.png" `
-            -ReferenceCommit $referenceCommit
-
       - name: Interaction-test native Windows app
         shell: pwsh
         run: |
