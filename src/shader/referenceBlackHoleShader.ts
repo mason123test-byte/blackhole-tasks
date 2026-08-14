@@ -158,8 +158,6 @@ void rayTracedReference() {
   vec3 previousPosition = position;
   float dilation = mix(1.0, DILATION_MIN, u_expanded);
   float patternTime = u_time * dilation;
-  float lowerScreenWeight = candidateWeight * smoothstep(0.50, 0.72, referenceUv.y);
-  float lowerEmissionGain = mix(1.0, 0.85, lowerScreenWeight);
 
   for (int i = 0; i < N_STEPS; i++) {
     float radius2 = dot(position, position);
@@ -193,7 +191,9 @@ void rayTracedReference() {
         float kepler = pow(DISK_INNER / diskRadius, 1.5);
         float localTime = sqrt(max(1.0 - 1.5 / diskRadius, 0.02));
         float swirl = diskRadius * 7.0 * 0.12 - patternTime * kepler * 5.0 * localTime;
-        float streaks = diskStreakSample(diskRadius, turns, swirl);
+        float streakContrast = 1.6;
+        float rawStreaks = diskStreakSample(diskRadius, turns, swirl);
+        float streaks = 0.35 + streakContrast * rawStreaks * rawStreaks;
         if (candidateWeight > 0.5) {
           float textureFilterRadius = 0.16;
           float radiusMinus = max(DISK_INNER, diskRadius - textureFilterRadius);
@@ -202,12 +202,12 @@ void rayTracedReference() {
             * sqrt(max(1.0 - 1.5 / radiusMinus, 0.02));
           float swirlPlus = radiusPlus * 7.0 * 0.12 - patternTime * pow(DISK_INNER / radiusPlus, 1.5) * 5.0
             * sqrt(max(1.0 - 1.5 / radiusPlus, 0.02));
-          float streaksMinus = diskStreakSample(radiusMinus, turns, swirlMinus);
-          float streaksPlus = diskStreakSample(radiusPlus, turns, swirlPlus);
+          float rawStreaksMinus = diskStreakSample(radiusMinus, turns, swirlMinus);
+          float rawStreaksPlus = diskStreakSample(radiusPlus, turns, swirlPlus);
+          float streaksMinus = 0.35 + streakContrast * rawStreaksMinus * rawStreaksMinus;
+          float streaksPlus = 0.35 + streakContrast * rawStreaksPlus * rawStreaksPlus;
           streaks = (streaksMinus + 2.0 * streaks + streaksPlus) * 0.25;
         }
-        float streakContrast = mix(1.6, 1.00, candidateWeight);
-        streaks = 0.35 + streakContrast * streaks * streaks;
 
         vec3 gasDirection = normalize(cross(diskNormal, diskPoint));
         float beta = clamp(inversesqrt(max(2.0 * (diskRadius - 1.0), 0.2)), 0.0, 0.99);
@@ -219,8 +219,7 @@ void rayTracedReference() {
         float boost = pow(shift, 2.5);
         float density = band * streaks;
         emission += transmittance * diskColor
-          * (4.84 * density * temperatureProfile * temperatureProfile * boost)
-          * lowerEmissionGain;
+          * (4.84 * density * temperatureProfile * temperatureProfile * boost);
         transmittance *= 1.0 - clamp(0.90 * density, 0.0, 1.0);
       }
     }
@@ -249,7 +248,7 @@ void rayTracedReference() {
       sceneAlpha = sceneSample.a * lensWindow * towardScene * u_scene_ready;
     }
   }
-  float exposure = mix(1.40, 1.25, candidateWeight);
+  float exposure = 1.40;
   vec3 diskLight = vec3(1.0) - exp(-emission * exposure);
   vec3 straightColor = sceneColor * transmittance + starLight * transmittance + diskLight;
   float lightAlpha = clamp((captured ? 1.0 : 0.0) + (1.0 - transmittance)
