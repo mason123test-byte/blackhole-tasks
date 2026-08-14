@@ -155,7 +155,7 @@ void rayTracedReference() {
   float dilation = mix(1.0, DILATION_MIN, u_expanded);
   float patternTime = u_time * dilation;
   float lowerScreenWeight = candidateWeight * smoothstep(0.50, 0.72, referenceUv.y);
-  float lowerEmissionGain = mix(1.0, 0.60, lowerScreenWeight);
+  float lowerEmissionGain = mix(1.0, 0.45, lowerScreenWeight);
 
   for (int i = 0; i < N_STEPS; i++) {
     float radius2 = dot(position, position);
@@ -189,12 +189,13 @@ void rayTracedReference() {
         float kepler = pow(DISK_INNER / diskRadius, 1.5);
         float localTime = sqrt(max(1.0 - 1.5 / diskRadius, 0.02));
         float swirl = diskRadius * 7.0 * 0.12 - patternTime * kepler * 5.0 * localTime;
-        float radialFrequency = mix(2.8, 1.50, candidateWeight);
-        float secondaryRadialFrequency = mix(1.0, 0.50, candidateWeight);
+        float radialFrequency = mix(2.8, 1.35, candidateWeight);
+        float secondaryRadialFrequency = mix(1.0, 0.40, candidateWeight);
         float streaks = vnoiseWrapY(vec2(diskRadius * radialFrequency, turns * 19.0 + swirl * 3.0), 19.0) * 0.65
           + vnoiseWrapY(vec2(diskRadius * secondaryRadialFrequency, turns * 9.0 + swirl * 1.5 + 7.0), 9.0) * 0.35;
-        float streakContrast = mix(1.6, 0.45, candidateWeight);
-        streaks = 0.35 + streakContrast * streaks * streaks;
+        float streakFloor = mix(0.35, 0.48, candidateWeight);
+        float streakContrast = mix(1.6, 0.28, candidateWeight);
+        streaks = streakFloor + streakContrast * streaks * streaks;
 
         vec3 gasDirection = normalize(cross(diskNormal, diskPoint));
         float beta = clamp(inversesqrt(max(2.0 * (diskRadius - 1.0), 0.2)), 0.0, 0.99);
@@ -236,7 +237,7 @@ void rayTracedReference() {
       sceneAlpha = sceneSample.a * lensWindow * towardScene * u_scene_ready;
     }
   }
-  float exposure = mix(1.40, 0.85, candidateWeight);
+  float exposure = mix(1.40, 0.90, candidateWeight);
   vec3 diskLight = vec3(1.0) - exp(-emission * exposure);
   vec3 straightColor = sceneColor * transmittance + starLight * transmittance + diskLight;
   float lightAlpha = clamp((captured ? 1.0 : 0.0) + (1.0 - transmittance)
