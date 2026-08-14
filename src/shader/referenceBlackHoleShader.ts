@@ -109,9 +109,9 @@ void rayTracedReference() {
   float screenDistance = length(screen);
   float lowerLensWeight = candidateWeight * smoothstep(0.50, 0.70, referenceUv.y)
     * smoothstep(shadowRadius * 1.05, shadowRadius * 1.55, screenDistance);
-  float lowerHorizontalScale = mix(1.0, 0.68, lowerLensWeight);
-  vec2 traceScreen = vec2(screen.x * lowerHorizontalScale, screen.y);
-  vec2 rayPlane = rotate2(vec2(traceScreen.x, -traceScreen.y), DISK_ROLL) * worldScale;
+  float lowerMajorAxisScale = mix(1.0, 0.50, lowerLensWeight);
+  vec2 baseRayPlane = rotate2(vec2(screen.x, -screen.y), DISK_ROLL) * worldScale;
+  vec2 rayPlane = vec2(baseRayPlane.x * lowerMajorAxisScale, baseRayPlane.y);
   float impact = length(rayPlane);
   float lensWindow = exp(-pow(screenDistance / (7.0 * shadowRadius), 2.0));
   float bmax = DISK_OUTER + 3.0;
