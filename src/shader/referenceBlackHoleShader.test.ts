@@ -12,6 +12,15 @@ const rendererSource = readFileSync(
   "utf8",
 );
 
+const smoothstep = (edge0: number, edge1: number, value: number) => {
+  const t = Math.min(1, Math.max(0, (value - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+};
+
+const lowerRadialWeight = (shadowRadii: number) =>
+  smoothstep(1.05, 1.45, shadowRadii) *
+  (1 - smoothstep(2.75, 3.6, shadowRadii));
+
 describe("Ghostty Inferno WebGL black-hole port", () => {
   it("uses the Ghostty shader's physical integration profile", () => {
     expect(REFERENCE_BLACK_HOLE_INFO).toEqual({
@@ -74,15 +83,23 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float diskOuter = mix(");
   });
 
-  it("extends both lower wings along the disk axis without overextending the right tail", () => {
+  it("fills the lower U close to the shadow while tapering the far tail", () => {
+    expect(lowerRadialWeight(1.0)).toBe(0);
+    expect(lowerRadialWeight(1.5)).toBeGreaterThan(0.99);
+    expect(lowerRadialWeight(2.5)).toBeGreaterThan(0.99);
+    expect(lowerRadialWeight(3.6)).toBe(0);
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float lowerRadialWeight = smoothstep(shadowRadius * 1.05, shadowRadius * 1.45, screenDistance)",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "* (1.0 - smoothstep(shadowRadius * 2.75, shadowRadius * 3.60, screenDistance));",
+    );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float lowerLensWeight = candidateWeight * smoothstep(0.50, 0.70, referenceUv.y)",
     );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("* lowerRadialWeight;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "* smoothstep(shadowRadius * 1.15, shadowRadius * 1.90, screenDistance);",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float lowerTargetScale = mix(0.42, 0.72, smoothstep(-0.12, 0.12, screen.x));",
+      "float lowerTargetScale = mix(0.42, 0.60, smoothstep(-0.12, 0.12, screen.x));",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float lowerMajorAxisScale = mix(1.0, lowerTargetScale, lowerLensWeight);",
