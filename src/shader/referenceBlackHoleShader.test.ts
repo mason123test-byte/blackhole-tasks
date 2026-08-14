@@ -12,32 +12,27 @@ const rendererSource = readFileSync(
   "utf8",
 );
 
-const smoothstep = (edge0: number, edge1: number, value: number) => {
-  const t = Math.min(1, Math.max(0, (value - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-};
-
-const lowerRadialWeight = (shadowRadii: number) =>
-  smoothstep(1.05, 1.45, shadowRadii) *
-  (1 - smoothstep(2.75, 3.6, shadowRadii));
-
-describe("Ghostty Inferno WebGL black-hole port", () => {
-  it("uses the Ghostty shader's physical integration profile", () => {
+describe("Interstellar Gargantua WebGL black-hole port", () => {
+  it("uses a refined physical geodesic integration profile", () => {
     expect(REFERENCE_BLACK_HOLE_INFO).toEqual({
-      model: "schwarzschild-geodesic",
-      integrationSteps: 48,
+      model: "gargantua-inspired-schwarzschild-geodesic",
+      integrationSteps: 80,
       tracePadding: 3,
       starGain: 0,
       sceneInput: "svg-gpu-texture",
       alphaMode: "reference-webgl-straight-alpha",
       reference: "https://github.com/s0xDk/ghostty-blackhole",
-      webglReference: "https://s13k.dev/blackhole/",
+      styleReference: "https://arxiv.org/abs/1502.03808",
+      webglReference: "https://ebruneton.github.io/black_hole_shader/",
     });
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("#define N_STEPS 48");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("#define N_STEPS 80");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float STAR_GAIN = 0.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DILATION_MIN = 0.20;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float dt = clamp(0.16 * radius, 0.03, 1.5);",
+      "float photonSphereRefinement = 1.0 - smoothstep(1.65, 3.20, radius);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float dt = clamp(0.16 * radius, 0.03, 1.5) * mix(1.0, 0.55, photonSphereRefinement);",
     );
   });
 
@@ -61,84 +56,86 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain(
       "vec3 straightColor = sceneColor * transmittance + starLight * transmittance + diskLight;",
     );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("sceneColor *= 1.30");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("sceneColor = sceneSample.rgb * 1.30");
   });
 
-  it("keeps one physical Inferno disk and promotes proven compact tuning to the common baseline", () => {
+  it("keeps one thin physical disk and makes the normal candidate Gargantua-style", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INNER = 1.8;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_OUTER = 8.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INCL = 1.50;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_ROLL = 0.35;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_DOPPLER_MIX = 0.08;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_DISK_OPACITY = 0.58;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_ANNULUS_CENTER = 3.15;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_ANNULUS_WIDTH = 0.85;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float shadowRadius = mix(0.112, 0.105, u_expanded);",
     );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("referenceShadowRadius");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain(
-      "mix(referenceShadowRadius, mix(0.112, 0.105, u_expanded), candidateWeight)",
+    expect(rendererSource).toContain(
+      'if (mode === "candidate") return { shaderMode: 1, fixedTime: 12 };',
     );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("if (candidateWeight > 0.5)");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("planeCrossings");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("diskCrossings");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("lowerFarWeight");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float diskInner = mix(");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float diskOuter = mix(");
+    expect(rendererSource).toContain("return { shaderMode: 1, fixedTime: null };");
   });
 
-  it("fills the lower U close to the shadow while giving it a defined outer rim", () => {
-    expect(lowerRadialWeight(1.0)).toBe(0);
-    expect(lowerRadialWeight(1.5)).toBeGreaterThan(0.99);
-    expect(lowerRadialWeight(2.5)).toBeGreaterThan(0.99);
-    expect(lowerRadialWeight(3.6)).toBe(0);
+  it("uses an unwarped ray plane for the Gargantua candidate", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float lowerRadialWeight = smoothstep(shadowRadius * 1.05, shadowRadius * 1.45, screenDistance)",
+      "vec2 gargantuaRayPlane = rotate2(vec2(screen.x, -screen.y), DISK_ROLL) * worldScale;",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "* (1.0 - smoothstep(shadowRadius * 2.75, shadowRadius * 3.60, screenDistance));",
+      "vec2 rayPlane = mix(legacyRayPlane, gargantuaRayPlane, candidateWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float lowerLensWeight = candidateWeight * smoothstep(0.50, 0.70, referenceUv.y)",
+      "float gargantuaWeight = candidateWeight;",
     );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("* lowerRadialWeight;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float lowerTargetScale = mix(0.42, 0.60, smoothstep(-0.12, 0.12, screen.x));",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float lowerMajorAxisScale = mix(1.0, lowerTargetScale, lowerLensWeight);",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float lowerMinorAxisScale = mix(1.0, 1.40, lowerLensWeight);",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "vec2 baseRayPlane = rotate2(vec2(screen.x, -screen.y), DISK_ROLL) * worldScale;",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "vec2 rayPlane = vec2(baseRayPlane.x * lowerMajorAxisScale, baseRayPlane.y * lowerMinorAxisScale);",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("traceScreen");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("lowerMinorAxisScale = mix(1.0, 1.40, lowerLensWeight)");
   });
 
-  it("filters final Inferno streak density without reducing its mean energy", () => {
+  it("separates ordered disk crossings so the secondary lensed image remains visible", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("int diskCrossingIndex = 0;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float crossingGain = 1.0;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("if (diskCrossingIndex > 0)");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("crossingGain = mix(1.0, 1.32, gargantuaWeight);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("diskCrossingIndex += 1;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float textureFilterRadius = 0.16;",
+      "float discOpacity = mix(0.90, GARGANTUA_DISK_OPACITY, gargantuaWeight);",
+    );
+  });
+
+  it("concentrates Gargantua light into a narrow bright annulus with faint long wings", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float filmAnnulus = exp(-pow((diskRadius - GARGANTUA_ANNULUS_CENTER) / GARGANTUA_ANNULUS_WIDTH, 2.0));",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float streakContrast = 1.6;",
+      "float filmOuterWing = 0.18 + 0.22 * smoothstep(3.5, DISK_OUTER, diskRadius);",
     );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float filmEmissivity = filmOuterWing + 1.55 * filmAnnulus;",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float criticalBoost = 1.0 + gargantuaWeight * 0.48 * exp(-pow((impact - B_CRIT) / 0.24, 2.0));",
+    );
+  });
+
+  it("suppresses the strong Doppler asymmetry omitted for the film look", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float dopplerMix = mix(0.60, GARGANTUA_DOPPLER_MIX, gargantuaWeight);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("shift = mix(1.0, shift, dopplerMix);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float beamPower = mix(2.5, 1.15, gargantuaWeight);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float exposure = mix(1.20, 1.32, gargantuaWeight);");
+  });
+
+  it("filters final disk streak density without reducing its mean energy", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float textureFilterRadius = 0.16;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float streakContrast = 1.6;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "streaks = (streaksMinus + 2.0 * streaks + streaksPlus) * 0.25;",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("lowerEmissionGain");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float exposure = 1.20;",
     );
   });
 
   it("selects the candidate inside WebGL through the comparison uniform", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("uniform float u_visual_compare;");
-    expect(rendererSource).toContain(
-      'if (mode === "candidate") return { shaderMode: 1, fixedTime: 12 };',
-    );
     expect(rendererSource).toContain(
       "gl.uniform1f(uniforms.visualCompare, visualComparison.shaderMode);",
     );
