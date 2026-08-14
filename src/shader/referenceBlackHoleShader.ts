@@ -252,7 +252,7 @@ void rayTracedReference() {
       sceneAlpha = sceneSample.a * lensWindow * towardScene * u_scene_ready;
     }
   }
-  float exposure = 1.40;
+  float exposure = 1.20;
   vec3 diskLight = vec3(1.0) - exp(-emission * exposure);
   float diskOpacity = clamp(1.0 - transmittance, 0.0, 1.0);
   float diskCoverage = max(diskOpacity, max(diskLight.r, max(diskLight.g, diskLight.b)));
