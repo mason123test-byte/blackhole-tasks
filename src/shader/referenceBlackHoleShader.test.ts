@@ -74,6 +74,24 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float diskOuter = mix(");
   });
 
+  it("extends the lower lensed image horizontally without touching the central shadow", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float lowerLensWeight = candidateWeight * smoothstep(0.50, 0.70, referenceUv.y)",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "* smoothstep(shadowRadius * 1.05, shadowRadius * 1.55, screenDistance);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float lowerHorizontalScale = mix(1.0, 0.68, lowerLensWeight);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "vec2 traceScreen = vec2(screen.x * lowerHorizontalScale, screen.y);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "vec2 rayPlane = rotate2(vec2(traceScreen.x, -traceScreen.y), DISK_ROLL) * worldScale;",
+    );
+  });
+
   it("filters final Inferno streak density without reducing its mean energy", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float textureFilterRadius = 0.16;",
