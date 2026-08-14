@@ -107,7 +107,7 @@ describe("Ghostty Inferno WebGL black-hole port", () => {
       "float lowerMajorAxisScale = mix(1.0, lowerTargetScale, lowerLensWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float lowerMinorAxisScale = mix(1.0, 1.28, lowerLensWeight);",
+      "float lowerMinorAxisScale = mix(1.0, 1.40, lowerLensWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "vec2 baseRayPlane = rotate2(vec2(screen.x, -screen.y), DISK_ROLL) * worldScale;",
