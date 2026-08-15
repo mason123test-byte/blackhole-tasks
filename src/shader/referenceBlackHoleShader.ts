@@ -37,6 +37,7 @@ const float KERR_ERROR_TOL = 0.00035;
 const int KERR_MAX_RETRIES = 5;
 const float OBSERVER_R = 74.1;
 const float OBSERVER_THETA = 1.511;
+const float CAMERA_VERTICAL_FOV = 0.36651915;
 
 const float DISK_INNER = 9.26;
 const float DISK_OUTER = 18.70;
@@ -282,8 +283,8 @@ float kerrErrorRatio(
 }
 
 void initDngrCameraRay(
-  float alpha,
-  float beta,
+  float cameraRight,
+  float cameraUp,
   out float r,
   out float theta,
   out float phi,
@@ -296,10 +297,9 @@ void initDngrCameraRay(
   theta = OBSERVER_THETA;
   phi = 0.0;
 
-  // Our positive integration parameter follows Odyssey's backward-tracing sign
-  // convention. The direction itself is a pinhole projection onto the DNGR
-  // camera's local sky: +r here integrates inward because dr/ds=-Delta pr/rho^2.
-  vec3 localSky = normalize(vec3(1.0, beta / OBSERVER_R, -alpha / OBSERVER_R));
+  // Positive integration parameter follows Odyssey's backward-tracing sign
+  // convention. The pinhole camera supplies a FIDO-local sky direction.
+  vec3 localSky = normalize(vec3(1.0, cameraUp, -cameraRight));
   float nFidoRadial = localSky.x;
   float nFidoTheta = localSky.y;
   float nFidoPhi = localSky.z;
@@ -363,22 +363,29 @@ void rayTracedReference() {
     ? 0.0
     : (u_visual_compare > 1.5 ? step(0.0, screen.x) : 1.0);
 
+  // The baseline keeps the old implicit impact-parameter framing for A/B only.
   float shadowRadius = mix(0.112, 0.105, u_expanded);
   float worldScale = B_CRIT / shadowRadius;
-
-  float alpha = screen.x * worldScale;
-  float beta = -screen.y * worldScale;
+  float baselineAlpha = screen.x * worldScale;
+  float baselineBeta = -screen.y * worldScale;
   float baselineLowerWarp = (1.0 - candidateWeight)
     * smoothstep(0.0, shadowRadius * 0.65, screen.y)
     * (1.0 - smoothstep(shadowRadius * 3.6, shadowRadius * 5.2, length(screen)));
-  beta *= mix(1.0, 1.20, baselineLowerWarp);
+  baselineBeta *= mix(1.0, 1.20, baselineLowerWarp);
+  vec2 baselineCameraPlane = vec2(baselineAlpha, baselineBeta) / OBSERVER_R;
+
+  // Production candidate: explicit pinhole projection. 21 degrees keeps the
+  // r=18.7M outer disk close to the horizontal frame at this 920x700 aspect.
+  float cameraHalfTan = tan(0.5 * CAMERA_VERTICAL_FOV);
+  vec2 candidateCameraPlane = vec2(screen.x * 2.0, -screen.y * 2.0) * cameraHalfTan;
+  vec2 cameraPlane = mix(baselineCameraPlane, candidateCameraPlane, candidateWeight);
 
   vec4 sceneSample = u_scene_ready > 0.5
     ? texture(u_scene_texture, clamp(referenceUv, vec2(0.0), vec2(1.0)))
     : vec4(0.0);
 
-  float impact = length(vec2(alpha, beta));
-  if (impact > DISK_OUTER + 10.0) {
+  float cameraImpact = OBSERVER_R * length(cameraPlane);
+  if (cameraImpact > DISK_OUTER + 10.0) {
     outColor = sceneSample;
     return;
   }
@@ -390,7 +397,7 @@ void rayTracedReference() {
   float ptheta;
   float L;
   float kappa;
-  initDngrCameraRay(alpha, beta, r, theta, phi, pr, ptheta, L, kappa);
+  initDngrCameraRay(cameraPlane.x, cameraPlane.y, r, theta, phi, pr, ptheta, L, kappa);
 
   float previousR = r;
   float previousPhi = phi;
@@ -536,5 +543,6 @@ export const REFERENCE_BLACK_HOLE_INFO = {
   styleReference: "https://arxiv.org/abs/1502.03808",
   physicsReference: "https://github.com/hungyipu/Odyssey",
   cameraReference: "DNGR Appendix A.1 fixed-event FIDO local sky",
+  cameraVerticalFovDeg: 21,
   webglReference: "https://ebruneton.github.io/black_hole_shader/",
 } as const;
