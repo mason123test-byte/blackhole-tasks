@@ -37,6 +37,8 @@ const float GARGANTUA_DISK_TEMP = 4500.0;
 const float GARGANTUA_DISK_OPACITY = 0.48;
 const float GARGANTUA_ANNULUS_CENTER = 2.80;
 const float GARGANTUA_ANNULUS_WIDTH = 0.58;
+const float GARGANTUA_VEILING_HALO = 0.070;
+const float GARGANTUA_HORIZON_FLARE = 0.055;
 
 float hash21(vec2 p) {
   p = fract(p * vec2(234.34, 435.345));
@@ -116,7 +118,7 @@ void rayTracedReference() {
   float screenDistance = length(screen);
 
   // Baseline mode is retained only for the Windows A/B capture. The movie's
-  // no-frequency-shift 4500 K photometry is now a shared foundation, so this
+  // no-frequency-shift 4500 K photometry is a shared foundation, so this
   // comparison continues to isolate lower-image geometry and emissivity.
   float legacyLowerRadialWeight = smoothstep(shadowRadius * 1.05, shadowRadius * 1.45, screenDistance)
     * (1.0 - smoothstep(shadowRadius * 2.75, shadowRadius * 3.60, screenDistance));
@@ -293,14 +295,31 @@ void rayTracedReference() {
   }
   float exposure = mix(1.20, 1.28, gargantuaStyleWeight);
   vec3 diskLight = vec3(1.0) - exp(-emission * exposure);
+
+  // Interstellar's final imagery adds a camera-optics veiling flare after the
+  // no-frequency-shift disk treatment. This low-energy analytic approximation
+  // is common to A/B and changes only the camera glow, never ray geometry.
+  vec2 flarePlane = vec2(
+    screen.x / (shadowRadius * 3.8),
+    screen.y / (shadowRadius * 3.1)
+  );
+  float veilingHalo = exp(-dot(flarePlane, flarePlane));
+  float horizonFlare = exp(-pow(screen.y / (shadowRadius * 0.22), 2.0))
+    * exp(-pow(screen.x / (shadowRadius * 4.8), 2.0));
+  float flareIntensity = GARGANTUA_VEILING_HALO * veilingHalo
+    + GARGANTUA_HORIZON_FLARE * horizonFlare;
+  vec3 flareLight = blackbody(GARGANTUA_DISK_TEMP) * flareIntensity;
+
   float diskOpacity = clamp(1.0 - transmittance, 0.0, 1.0);
   float diskCoverage = max(diskOpacity, max(diskLight.r, max(diskLight.g, diskLight.b)));
+  float flareCoverage = max(flareLight.r, max(flareLight.g, flareLight.b));
   float starCoverage = clamp(luma(starLight) * 2.0, 0.0, 1.0);
-  float lightAlpha = clamp((captured ? 1.0 : 0.0) + max(diskCoverage, starCoverage), 0.0, 1.0);
+  float lightAlpha = clamp((captured ? 1.0 : 0.0) + max(diskCoverage, max(starCoverage, flareCoverage)), 0.0, 1.0);
   float coverage = max(sceneAlpha, lightAlpha);
   vec3 premultipliedContribution = sceneColor * transmittance * sceneAlpha
     + starLight * transmittance
-    + diskLight;
+    + diskLight
+    + flareLight;
   vec3 straightColor = coverage > 0.0001 ? premultipliedContribution / coverage : vec3(0.0);
   outColor = vec4(clamp(straightColor, 0.0, 1.0), coverage);
 }
