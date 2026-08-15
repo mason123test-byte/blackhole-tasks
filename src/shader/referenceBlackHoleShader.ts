@@ -282,6 +282,55 @@ float kerrErrorRatio(
   return worst / KERR_ERROR_TOL;
 }
 
+float hermiteScalar(
+  float value0,
+  float value1,
+  float slope0,
+  float slope1,
+  float h,
+  float t
+) {
+  float t2 = t * t;
+  float t3 = t2 * t;
+  float h00 = 2.0 * t3 - 3.0 * t2 + 1.0;
+  float h10 = t3 - 2.0 * t2 + t;
+  float h01 = -2.0 * t3 + 3.0 * t2;
+  float h11 = t3 - t2;
+  return h00 * value0 + h10 * h * slope0 + h01 * value1 + h11 * h * slope1;
+}
+
+float refineEquatorialCrossing(
+  float theta0,
+  float theta1,
+  float dtheta0,
+  float dtheta1,
+  float h
+) {
+  float lo = 0.0;
+  float hi = 1.0;
+  float fLo = theta0 - 0.5 * PI;
+  float fHi = theta1 - 0.5 * PI;
+
+  for (int j = 0; j < 4; j++) {
+    float span = hi - lo;
+    float denominator = fHi - fLo;
+    float secant = abs(denominator) > 1e-7
+      ? lo - fLo * span / denominator
+      : 0.5 * (lo + hi);
+    float t = clamp(secant, lo + 0.08 * span, hi - 0.08 * span);
+    float f = hermiteScalar(theta0, theta1, dtheta0, dtheta1, h, t) - 0.5 * PI;
+    if (f * fLo <= 0.0) {
+      hi = t;
+      fHi = f;
+    } else {
+      lo = t;
+      fLo = f;
+    }
+  }
+
+  return 0.5 * (lo + hi);
+}
+
 void initDngrCameraRay(
   float cameraRight,
   float cameraUp,
@@ -400,6 +449,7 @@ void rayTracedReference() {
   initDngrCameraRay(cameraPlane.x, cameraPlane.y, r, theta, phi, pr, ptheta, L, kappa);
 
   float previousR = r;
+  float previousTheta = theta;
   float previousPhi = phi;
   float previousSide = theta - 0.5 * PI;
 
@@ -476,7 +526,9 @@ void rayTracedReference() {
       break;
     }
 
+    float acceptedH = h;
     previousR = r;
+    previousTheta = theta;
     previousPhi = phi;
     r = acceptedState.x;
     theta = acceptedState.y;
@@ -493,10 +545,22 @@ void rayTracedReference() {
 
     float side = theta - 0.5 * PI;
     if (side * previousSide < 0.0 && diskCrossingCount < MAX_DISK_CROSSINGS) {
-      float crossing = previousSide / (previousSide - side);
-      float diskRadius = mix(previousR, r, crossing);
+      float dr1;
+      float dtheta1;
+      float dphi1;
+      float dpr1;
+      float dptheta1;
+      kerrDerivatives(r, theta, pr, ptheta, L, kappa, dr1, dtheta1, dphi1, dpr1, dptheta1);
+      float crossing = refineEquatorialCrossing(
+        previousTheta,
+        theta,
+        dtheta0,
+        dtheta1,
+        acceptedH
+      );
+      float diskRadius = hermiteScalar(previousR, r, dr0, dr1, acceptedH, crossing);
       if (diskRadius > DISK_INNER && diskRadius < DISK_OUTER) {
-        float diskPhi = mix(previousPhi, phi, crossing);
+        float diskPhi = hermiteScalar(previousPhi, phi, dphi0, dphi1, acceptedH, crossing);
         vec3 diskColor;
         float diskAlpha;
         sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha);
