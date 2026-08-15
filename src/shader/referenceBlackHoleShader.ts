@@ -109,6 +109,30 @@ void kerrDerivatives(
   dptheta = -safeSin * cosTheta * (L * L / (sin2 * sin2) - KERR_A2) / sigma;
 }
 
+void normalizePolarStage(inout float theta, inout float ptheta) {
+  if (theta < 0.0) {
+    theta = -theta;
+    ptheta = -ptheta;
+  }
+  if (theta > PI) {
+    theta = 2.0 * PI - theta;
+    ptheta = -ptheta;
+  }
+}
+
+void normalizePolarState(inout float theta, inout float phi, inout float ptheta) {
+  if (theta < 0.0) {
+    theta = -theta;
+    phi += PI;
+    ptheta = -ptheta;
+  }
+  if (theta > PI) {
+    theta = 2.0 * PI - theta;
+    phi += PI;
+    ptheta = -ptheta;
+  }
+}
+
 void rk4KerrStep(
   inout float r,
   inout float theta,
@@ -127,9 +151,10 @@ void rk4KerrStep(
   kerrDerivatives(r, theta, pr, ptheta, L, kappa, k1r, k1theta, k1phi, k1pr, k1ptheta);
 
   float r2 = r + 0.5 * h * k1r;
-  float theta2 = clamp(theta + 0.5 * h * k1theta, 1e-4, PI - 1e-4);
+  float theta2 = theta + 0.5 * h * k1theta;
   float pr2 = pr + 0.5 * h * k1pr;
   float ptheta2 = ptheta + 0.5 * h * k1ptheta;
+  normalizePolarStage(theta2, ptheta2);
   float k2r;
   float k2theta;
   float k2phi;
@@ -138,9 +163,10 @@ void rk4KerrStep(
   kerrDerivatives(r2, theta2, pr2, ptheta2, L, kappa, k2r, k2theta, k2phi, k2pr, k2ptheta);
 
   float r3 = r + 0.5 * h * k2r;
-  float theta3 = clamp(theta + 0.5 * h * k2theta, 1e-4, PI - 1e-4);
+  float theta3 = theta + 0.5 * h * k2theta;
   float pr3 = pr + 0.5 * h * k2pr;
   float ptheta3 = ptheta + 0.5 * h * k2ptheta;
+  normalizePolarStage(theta3, ptheta3);
   float k3r;
   float k3theta;
   float k3phi;
@@ -149,9 +175,10 @@ void rk4KerrStep(
   kerrDerivatives(r3, theta3, pr3, ptheta3, L, kappa, k3r, k3theta, k3phi, k3pr, k3ptheta);
 
   float r4 = r + h * k3r;
-  float theta4 = clamp(theta + h * k3theta, 1e-4, PI - 1e-4);
+  float theta4 = theta + h * k3theta;
   float pr4 = pr + h * k3pr;
   float ptheta4 = ptheta + h * k3ptheta;
+  normalizePolarStage(theta4, ptheta4);
   float k4r;
   float k4theta;
   float k4phi;
@@ -161,10 +188,11 @@ void rk4KerrStep(
 
   float sixth = h / 6.0;
   r += sixth * (k1r + 2.0 * k2r + 2.0 * k3r + k4r);
-  theta = clamp(theta + sixth * (k1theta + 2.0 * k2theta + 2.0 * k3theta + k4theta), 1e-4, PI - 1e-4);
+  theta += sixth * (k1theta + 2.0 * k2theta + 2.0 * k3theta + k4theta);
   phi += sixth * (k1phi + 2.0 * k2phi + 2.0 * k3phi + k4phi);
   pr += sixth * (k1pr + 2.0 * k2pr + 2.0 * k3pr + k4pr);
   ptheta += sixth * (k1ptheta + 2.0 * k2ptheta + 2.0 * k3ptheta + k4ptheta);
+  normalizePolarState(theta, phi, ptheta);
 }
 
 void initDngrCameraRay(
@@ -178,18 +206,13 @@ void initDngrCameraRay(
   out float L,
   out float kappa
 ) {
-  // DNGR finite-camera model: every pixel begins at the same camera event.
   r = OBSERVER_R;
   theta = OBSERVER_THETA;
   phi = 0.0;
 
-  // The virtual image plane is used only to define a direction on the camera's
-  // local sky. It never changes the Boyer-Lindquist ray origin.
   vec3 cameraSkyDirection = normalize(vec3(-OBSERVER_R, alpha, beta));
   vec3 incomingCameraDirection = -cameraSkyDirection;
 
-  // With the camera momentarily at rest relative to the local FIDO and its
-  // screen-right axis aligned with +phi, DNGR A.10 reduces to these components.
   float nFidoRadial = incomingCameraDirection.x;
   float nFidoTheta = -incomingCameraDirection.z;
   float nFidoPhi = incomingCameraDirection.y;
@@ -209,7 +232,6 @@ void initDngrCameraRay(
   float omega = 2.0 * KERR_A * r / (sigmaMetric * sigmaMetric);
   float varpi = sigmaMetric * safeSin / rho;
 
-  // Canonical momentum with conserved photon energy normalized to unity.
   float cameraEnergy = 1.0 / (lapse + omega * varpi * nFidoPhi);
   pr = cameraEnergy * (rho / sqrtDelta) * nFidoRadial;
   ptheta = cameraEnergy * rho * nFidoTheta;
