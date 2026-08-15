@@ -37,7 +37,7 @@ const float KERR_ERROR_TOL = 0.00035;
 const int KERR_MAX_RETRIES = 5;
 const float OBSERVER_R = 74.1;
 const float OBSERVER_THETA = 1.511;
-const float CAMERA_VERTICAL_FOV = 0.54105207;
+const float CAMERA_VERTICAL_FOV = 0.36651915;
 
 const float DISK_INNER = 9.26;
 const float DISK_OUTER = 18.70;
@@ -374,8 +374,8 @@ void rayTracedReference() {
   baselineBeta *= mix(1.0, 1.20, baselineLowerWarp);
   vec2 baselineCameraPlane = vec2(baselineAlpha, baselineBeta) / OBSERVER_R;
 
-  // Production candidate: explicit pinhole projection. 31 degrees leaves the
-  // Kerr-lensed disk enough frame margin to match Figure 15(a) composition.
+  // Production candidate: explicit pinhole projection. 21 degrees keeps the
+  // r=18.7M outer disk close to the horizontal frame at this 920x700 aspect.
   float cameraHalfTan = tan(0.5 * CAMERA_VERTICAL_FOV);
   vec2 candidateCameraPlane = vec2(screen.x * 2.0, -screen.y * 2.0) * cameraHalfTan;
   vec2 cameraPlane = mix(baselineCameraPlane, candidateCameraPlane, candidateWeight);
@@ -543,6 +543,6 @@ export const REFERENCE_BLACK_HOLE_INFO = {
   styleReference: "https://arxiv.org/abs/1502.03808",
   physicsReference: "https://github.com/hungyipu/Odyssey",
   cameraReference: "DNGR Appendix A.1 fixed-event FIDO local sky",
-  cameraVerticalFovDeg: 31,
+  cameraVerticalFovDeg: 21,
   webglReference: "https://ebruneton.github.io/black_hole_shader/",
 } as const;
