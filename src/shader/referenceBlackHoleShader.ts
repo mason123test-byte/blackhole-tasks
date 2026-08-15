@@ -32,7 +32,8 @@ const float DISK_INCL = 1.50;
 const float DISK_ROLL = 0.00;
 const float STAR_GAIN = 0.0;
 const float DILATION_MIN = 0.20;
-const float GARGANTUA_DOPPLER_MIX = 0.08;
+const float GARGANTUA_DOPPLER_MIX = 0.0;
+const float GARGANTUA_DISK_TEMP = 4500.0;
 const float GARGANTUA_DISK_OPACITY = 0.48;
 const float GARGANTUA_ANNULUS_CENTER = 2.80;
 const float GARGANTUA_ANNULUS_WIDTH = 0.58;
@@ -108,6 +109,7 @@ void rayTracedReference() {
     ? 0.0
     : (u_visual_compare > 1.5 ? step(0.0, screen.x) : 1.0);
   float gargantuaStyleWeight = candidateWeight * smoothstep(0.50, 0.62, referenceUv.y);
+  float filmPhotometricWeight = candidateWeight;
 
   float shadowRadius = mix(0.112, 0.105, u_expanded);
   float worldScale = B_CRIT / shadowRadius;
@@ -115,9 +117,9 @@ void rayTracedReference() {
 
   // Baseline mode is retained only for the Windows A/B capture. The normal
   // application path is candidateWeight=1 and therefore uses the single,
-  // unwarped Gargantua ray plane below. Film-style photometric treatment is
-  // localized below the shadow because the established upper arc already
-  // matches Gargantua's warm layered far-side image well.
+  // unwarped Gargantua ray plane below. Film-style geometric treatment remains
+  // localized below the shadow while the movie's photometric choices apply to
+  // the entire candidate disk.
   float legacyLowerRadialWeight = smoothstep(shadowRadius * 1.05, shadowRadius * 1.45, screenDistance)
     * (1.0 - smoothstep(shadowRadius * 2.75, shadowRadius * 3.60, screenDistance));
   float legacyLowerLensWeight = (1.0 - candidateWeight) * smoothstep(0.50, 0.70, referenceUv.y)
@@ -237,18 +239,20 @@ void rayTracedReference() {
         vec3 gasDirection = normalize(cross(diskNormal, diskPoint));
         float beta = clamp(inversesqrt(max(2.0 * (diskRadius - 1.0), 0.2)), 0.0, 0.99);
         float shift = localTime / max(1.0 + beta * dot(gasDirection, normalize(velocity)), 0.05);
-        float dopplerMix = mix(0.60, GARGANTUA_DOPPLER_MIX, gargantuaStyleWeight);
+        float dopplerMix = mix(0.60, GARGANTUA_DOPPLER_MIX, filmPhotometricWeight);
         shift = mix(1.0, shift, dopplerMix);
         float profileBase = max(1.0 - sqrt(DISK_INNER / diskRadius), 0.0);
         float temperatureProfile = pow(DISK_INNER / diskRadius, 0.75) * pow(profileBase, 0.25) / 0.488;
-        vec3 diskColor = blackbody(5500.0 * temperatureProfile * shift);
-        float beamPower = mix(2.5, 1.15, gargantuaStyleWeight);
+        vec3 physicalDiskColor = blackbody(5500.0 * temperatureProfile * shift);
+        vec3 diskColor = mix(physicalDiskColor, blackbody(GARGANTUA_DISK_TEMP), filmPhotometricWeight);
+        float beamPower = mix(2.5, 1.0, filmPhotometricWeight);
         float boost = pow(shift, beamPower);
         float density = band * streaks;
 
         // Gargantua's lower higher-order image is concentrated tightly around
         // the critical-curve neighborhood while retaining a faint disk wing.
-        // The upper image keeps the proven warmer layered response.
+        // The upper image keeps the established geometry; movie photometry is
+        // applied globally above via filmPhotometricWeight.
         float filmAnnulus = exp(-pow((diskRadius - GARGANTUA_ANNULUS_CENTER) / GARGANTUA_ANNULUS_WIDTH, 2.0));
         float filmOuterWing = 0.13 + 0.15 * smoothstep(3.5, DISK_OUTER, diskRadius);
         float filmEmissivity = filmOuterWing + 1.38 * filmAnnulus;
