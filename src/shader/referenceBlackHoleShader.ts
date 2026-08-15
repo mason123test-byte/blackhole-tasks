@@ -1,5 +1,5 @@
 // Kerr null-geodesic equations follow Pu, Yun, Younsi & Yoon's public Odyssey GPU tracer.
-// Gargantua presentation follows James, von Tunzelmann, Franklin & Thorne (2015).
+// Gargantua geometry follows James, von Tunzelmann, Franklin & Thorne (2015), figure 15(a).
 // Application interaction and WebGL lifecycle stay in blackHoleRenderer.ts.
 export const REFERENCE_BLACK_HOLE_VERTEX = `#version 300 es
 in vec2 a_position;
@@ -25,16 +25,16 @@ uniform float u_visual_compare;
 
 #define PI 3.14159265359
 #define B_CRIT 5.1961524
-#define N_STEPS 112
+#define N_STEPS 144
 
 const float KERR_A = 0.60;
 const float KERR_A2 = KERR_A * KERR_A;
 const float KERR_HORIZON = 1.80;
-const float OBSERVER_R = 28.0;
-const float OBSERVER_THETA = 1.50;
+const float OBSERVER_R = 74.1;
+const float OBSERVER_THETA = 1.511;
 
-const float DISK_INNER = 3.6;
-const float DISK_OUTER = 16.0;
+const float DISK_INNER = 9.26;
+const float DISK_OUTER = 18.70;
 const float STAR_GAIN = 0.0;
 const float DILATION_MIN = 0.20;
 const float GARGANTUA_DOPPLER_MIX = 0.0;
@@ -227,11 +227,11 @@ void rayTracedReference() {
       break;
     }
 
-    float nearHole = 1.0 - smoothstep(2.2, 8.0, r);
+    float nearHole = 1.0 - smoothstep(3.2, 14.0, r);
     float angularRefinement = clamp(abs(dphi0) * 0.45 + abs(dtheta0) * 1.5, 0.0, 3.0);
-    float h = mix(0.44, 0.075, nearHole);
+    float h = mix(1.20, 0.055, nearHole);
     h /= 1.0 + angularRefinement;
-    h = clamp(h, 0.035, 0.44);
+    h = clamp(h, 0.028, 1.20);
 
     float midR = r + 0.5 * h * dr0;
     float midTheta = clamp(theta + 0.5 * h * dtheta0, 1e-4, PI - 1e-4);
@@ -312,7 +312,7 @@ void main() {
 
 export const REFERENCE_BLACK_HOLE_INFO = {
   model: "interstellar-gargantua-kerr-geodesic",
-  integrationSteps: 112,
+  integrationSteps: 144,
   tracePadding: 3,
   starGain: 0,
   sceneInput: "svg-gpu-texture",
