@@ -24,16 +24,16 @@ describe("black-hole render profiles", () => {
     expect(getRenderSize(240, 180, 1, 1)).toEqual({ width: 240, height: 180 });
   });
 
-  it("uses the Gargantua-inspired spin-corrected WebGL compositor with a GPU scene texture", () => {
+  it("uses the finite-observer Kerr Gargantua WebGL renderer with a GPU scene texture", () => {
     expect(BLACK_HOLE_RENDERER_INFO).toMatchObject({
-      model: "gargantua-inspired-spin-corrected-geodesic",
-      integrationSteps: 80,
+      model: "interstellar-gargantua-kerr-geodesic",
+      integrationSteps: 112,
       tracePadding: 3,
       starGain: 0,
       sceneInput: "svg-gpu-texture",
       alphaMode: "reference-webgl-straight-alpha",
       styleReference: "https://arxiv.org/abs/1502.03808",
-      webglReference: "https://ebruneton.github.io/black_hole_shader/",
+      physicsReference: "https://github.com/hungyipu/Odyssey",
     });
   });
 
