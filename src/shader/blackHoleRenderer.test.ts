@@ -9,10 +9,6 @@ import {
   getVisualComparisonSettings,
 } from "./blackHoleRenderer";
 
-const rendererSource = readFileSync(
-  resolve(process.cwd(), "src/shader/blackHoleRenderer.ts"),
-  "utf8",
-);
 const blackHoleCanvasSource = readFileSync(
   resolve(process.cwd(), "src/components/orb/BlackHoleCanvas.tsx"),
   "utf8",
@@ -53,11 +49,6 @@ describe("black-hole render profiles", () => {
     expect(getVisualComparisonSettings("baseline")).toEqual({ shaderMode: 0, fixedTime: 12 });
     expect(getVisualComparisonSettings("candidate")).toEqual({ shaderMode: 1, fixedTime: 12 });
     expect(getVisualComparisonSettings("split")).toEqual({ shaderMode: 2, fixedTime: 12 });
-    expect(rendererSource).toContain("const fixedVisualFrame = visualComparison.fixedTime !== null;");
-    expect(rendererSource).toContain("const reportedEnergy = fixedVisualFrame && !sceneReady ? 0 : energy;");
-    expect(rendererSource).toContain("rendererReady = reportedEnergy > 100;");
-    expect(rendererSource).toContain("const visualFrameComplete = fixedVisualFrame && rendererReady && sceneReady;");
-    expect(rendererSource).toContain("if (!visualFrameComplete) schedule();");
   });
 
   it("expands visual-comparison windows before starting the expensive WebGL frame", () => {
@@ -65,6 +56,16 @@ describe("black-hole render profiles", () => {
     expect(blackHoleCanvasSource).toContain('await invoke("set_scene_expanded", { expanded: true });');
     expect(blackHoleCanvasSource).toContain('if (visualComparisonMode !== "normal" && !expanded) return;');
     expect(blackHoleCanvasSource).toContain('[expanded, lowPowerMode, onError, quality, visualComparisonMode]');
+  });
+
+  it("stops diagnostic rendering after the first validated expanded frame", () => {
+    expect(blackHoleCanvasSource).toContain('const visualFramePattern = /renderer=webgl2\\|frame=ready\\|energy=(\\d+)\\|size=(\\d+)x(\\d+)/;');
+    expect(blackHoleCanvasSource).toContain('if (visualComparisonMode === "normal") return stopRenderer;');
+    expect(blackHoleCanvasSource).toContain('const freezeTimer = window.setInterval(() => {');
+    expect(blackHoleCanvasSource).toContain('Number(match[1]) > 100');
+    expect(blackHoleCanvasSource).toContain('Number(match[2]) >= 800');
+    expect(blackHoleCanvasSource).toContain('Number(match[3]) >= 600');
+    expect(blackHoleCanvasSource).toContain('stopRenderer();');
   });
 
   it("keeps framebuffer reconstruction out of the production compositor", () => {
