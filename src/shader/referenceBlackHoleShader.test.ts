@@ -75,12 +75,20 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float KERR_MIN_STEP = 0.006;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float KERR_MAX_STEP = 1.55;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float KERR_ERROR_TOL = 0.00035;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const int KERR_MAX_RETRIES = 5;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("void rkckKerrTrial(");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float errorRatio = kerrErrorRatio(");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("if (errorRatio > 1.0 && h > KERR_MIN_STEP * 1.01) {");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("continue;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("pow(errorRatio, -0.25)");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("pow(max(errorRatio, 1e-6), -0.20)");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("pow(max(acceptedErrorRatio, 1e-6), -0.20)");
+  });
+
+  it("retries rejected Cash-Karp trials without spending a completed geodesic step", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("bool acceptedStep = false;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("for (int retry = 0; retry < KERR_MAX_RETRIES; retry++) {");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("if (errorRatio <= 1.0 || h <= KERR_MIN_STEP * 1.01) {");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("acceptedStep = true;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("if (!acceptedStep) {");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("break;");
   });
 
   it("prevents finite-precision steps from jumping through the Kerr polar barrier", () => {
