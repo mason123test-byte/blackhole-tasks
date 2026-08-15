@@ -32,6 +32,8 @@ const float DISK_INCL = 1.50;
 const float DISK_ROLL = 0.00;
 const float STAR_GAIN = 0.0;
 const float DILATION_MIN = 0.20;
+const float GARGANTUA_SPIN = 0.60;
+const float FRAME_DRAG_GAIN = 0.035;
 const float GARGANTUA_DOPPLER_MIX = 0.0;
 const float GARGANTUA_DISK_TEMP = 4500.0;
 const float GARGANTUA_DISK_OPACITY = 0.48;
@@ -200,11 +202,15 @@ void rayTracedReference() {
     float photonSphereRefinement = 1.0 - smoothstep(1.65, 3.20, radius);
     float dt = clamp(0.16 * radius, 0.03, 1.5) * mix(1.0, 0.55, photonSphereRefinement);
     vec3 acceleration = -1.5 * angularMomentum2 * position / (radius2 * radius2 * radius);
+    float frameDragScale = candidateWeight * GARGANTUA_SPIN * FRAME_DRAG_GAIN / max(radius2 * radius, 0.25);
+    acceleration += frameDragScale * cross(diskNormal, velocity);
     velocity += acceleration * (0.5 * dt);
     position += velocity * dt;
     radius2 = max(dot(position, position), 0.0001);
     radius = sqrt(radius2);
     acceleration = -1.5 * angularMomentum2 * position / (radius2 * radius2 * radius);
+    frameDragScale = candidateWeight * GARGANTUA_SPIN * FRAME_DRAG_GAIN / max(radius2 * radius, 0.25);
+    acceleration += frameDragScale * cross(diskNormal, velocity);
     velocity += acceleration * (0.5 * dt);
 
     float side = dot(position, diskNormal);
@@ -329,7 +335,7 @@ void main() {
 }`;
 
 export const REFERENCE_BLACK_HOLE_INFO = Object.freeze({
-  model: "gargantua-inspired-schwarzschild-geodesic",
+  model: "gargantua-inspired-spin-corrected-geodesic",
   integrationSteps: 80,
   tracePadding: 3,
   starGain: 0,
