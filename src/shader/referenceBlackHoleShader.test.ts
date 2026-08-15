@@ -16,7 +16,7 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
   it("uses a real Kerr null-geodesic state instead of heuristic frame dragging", () => {
     expect(REFERENCE_BLACK_HOLE_INFO).toMatchObject({
       model: "interstellar-gargantua-kerr-geodesic",
-      integrationSteps: 144,
+      integrationSteps: 112,
       tracePadding: 3,
       starGain: 0,
       sceneInput: "svg-gpu-texture",
@@ -24,7 +24,7 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
       styleReference: "https://arxiv.org/abs/1502.03808",
       physicsReference: "https://github.com/hungyipu/Odyssey",
     });
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("#define N_STEPS 144");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("#define N_STEPS 112");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float KERR_A = 0.60;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float KERR_A2 = KERR_A * KERR_A;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("void kerrDerivatives(");
@@ -51,10 +51,12 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("dptheta = -safeSin * cosTheta * (L * L / (sin2 * sin2) - KERR_A2) / sigma;");
   });
 
-  it("spends the integration budget near the critical region instead of the distant observer", () => {
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float nearHole = 1.0 - smoothstep(3.2, 14.0, r);");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float h = mix(1.20, 0.055, nearHole);");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("h = clamp(h, 0.028, 1.20);");
+  it("uses fourth-order Kerr stepping to suppress critical-curve integration artifacts", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("void rk4KerrStep(");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("rk4KerrStep(r, theta, phi, pr, ptheta, L, kappa, h);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float h = mix(1.35, 0.065, nearHole);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("h = clamp(h, 0.032, 1.35);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float midR =");
   });
 
   it("uses one opaque thin equatorial disk and lets Kerr geometry create the multiple images", () => {
