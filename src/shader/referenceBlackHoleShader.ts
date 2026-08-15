@@ -33,9 +33,9 @@ const float DISK_ROLL = 0.00;
 const float STAR_GAIN = 0.0;
 const float DILATION_MIN = 0.20;
 const float GARGANTUA_DOPPLER_MIX = 0.08;
-const float GARGANTUA_DISK_OPACITY = 0.58;
-const float GARGANTUA_ANNULUS_CENTER = 3.15;
-const float GARGANTUA_ANNULUS_WIDTH = 0.85;
+const float GARGANTUA_DISK_OPACITY = 0.52;
+const float GARGANTUA_ANNULUS_CENTER = 2.95;
+const float GARGANTUA_ANNULUS_WIDTH = 0.68;
 
 float hash21(vec2 p) {
   p = fract(p * vec2(234.34, 435.345));
@@ -251,14 +251,14 @@ void rayTracedReference() {
         // image keeps the proven warmer layered response instead of being
         // globally over-whitened by the film treatment.
         float filmAnnulus = exp(-pow((diskRadius - GARGANTUA_ANNULUS_CENTER) / GARGANTUA_ANNULUS_WIDTH, 2.0));
-        float filmOuterWing = 0.18 + 0.22 * smoothstep(3.5, DISK_OUTER, diskRadius);
-        float filmEmissivity = filmOuterWing + 1.55 * filmAnnulus;
+        float filmOuterWing = 0.15 + 0.18 * smoothstep(3.5, DISK_OUTER, diskRadius);
+        float filmEmissivity = filmOuterWing + 1.45 * filmAnnulus;
         float emissivity = mix(1.0, filmEmissivity, gargantuaStyleWeight);
 
-        float criticalBoost = 1.0 + gargantuaStyleWeight * 0.48 * exp(-pow((impact - B_CRIT) / 0.24, 2.0));
+        float criticalBoost = 1.0 + gargantuaStyleWeight * 0.38 * exp(-pow((impact - B_CRIT) / 0.18, 2.0));
         float crossingGain = 1.0;
         if (diskCrossingIndex > 0) {
-          crossingGain = mix(1.0, 1.32, gargantuaStyleWeight);
+          crossingGain = mix(1.0, 1.24, gargantuaStyleWeight);
         }
 
         emission += transmittance * diskColor
@@ -294,7 +294,7 @@ void rayTracedReference() {
       sceneAlpha = sceneSample.a * lensWindow * towardScene * u_scene_ready;
     }
   }
-  float exposure = mix(1.20, 1.32, gargantuaStyleWeight);
+  float exposure = mix(1.20, 1.30, gargantuaStyleWeight);
   vec3 diskLight = vec3(1.0) - exp(-emission * exposure);
   float diskOpacity = clamp(1.0 - transmittance, 0.0, 1.0);
   float diskCoverage = max(diskOpacity, max(diskLight.r, max(diskLight.g, diskLight.b)));
