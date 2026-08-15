@@ -13,9 +13,9 @@ const rendererSource = readFileSync(
 );
 
 describe("Interstellar Gargantua WebGL black-hole port", () => {
-  it("uses a refined physical geodesic integration profile", () => {
+  it("uses a refined spin-corrected geodesic integration profile", () => {
     expect(REFERENCE_BLACK_HOLE_INFO).toEqual({
-      model: "gargantua-inspired-schwarzschild-geodesic",
+      model: "gargantua-inspired-spin-corrected-geodesic",
       integrationSteps: 80,
       tracePadding: 3,
       starGain: 0,
@@ -28,12 +28,25 @@ describe("Interstellar Gargantua WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("#define N_STEPS 80");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float STAR_GAIN = 0.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DILATION_MIN = 0.20;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_SPIN = 0.60;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float FRAME_DRAG_GAIN = 0.035;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float photonSphereRefinement = 1.0 - smoothstep(1.65, 3.20, radius);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float dt = clamp(0.16 * radius, 0.03, 1.5) * mix(1.0, 0.55, photonSphereRefinement);",
     );
+  });
+
+  it("applies moderate film spin through ray acceleration instead of screen warping", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float frameDragScale = candidateWeight * GARGANTUA_SPIN * FRAME_DRAG_GAIN / max(radius2 * radius, 0.25);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "acceleration += frameDragScale * cross(diskNormal, velocity);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("kerrScreenOffset");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("kerrMirror");
   });
 
   it("preserves faint disk emission instead of multiplying it by coverage twice", () => {
