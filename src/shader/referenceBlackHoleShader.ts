@@ -109,17 +109,15 @@ void rayTracedReference() {
     ? 0.0
     : (u_visual_compare > 1.5 ? step(0.0, screen.x) : 1.0);
   float gargantuaStyleWeight = candidateWeight * smoothstep(0.50, 0.62, referenceUv.y);
-  float filmPhotometricWeight = candidateWeight;
+  float filmPhotometricWeight = 1.0;
 
   float shadowRadius = mix(0.112, 0.105, u_expanded);
   float worldScale = B_CRIT / shadowRadius;
   float screenDistance = length(screen);
 
-  // Baseline mode is retained only for the Windows A/B capture. The normal
-  // application path is candidateWeight=1 and therefore uses the single,
-  // unwarped Gargantua ray plane below. Film-style geometric treatment remains
-  // localized below the shadow while the movie's photometric choices apply to
-  // the entire candidate disk.
+  // Baseline mode is retained only for the Windows A/B capture. The movie's
+  // no-frequency-shift 4500 K photometry is now a shared foundation, so this
+  // comparison continues to isolate lower-image geometry and emissivity.
   float legacyLowerRadialWeight = smoothstep(shadowRadius * 1.05, shadowRadius * 1.45, screenDistance)
     * (1.0 - smoothstep(shadowRadius * 2.75, shadowRadius * 3.60, screenDistance));
   float legacyLowerLensWeight = (1.0 - candidateWeight) * smoothstep(0.50, 0.70, referenceUv.y)
@@ -249,10 +247,6 @@ void rayTracedReference() {
         float boost = pow(shift, beamPower);
         float density = band * streaks;
 
-        // Gargantua's lower higher-order image is concentrated tightly around
-        // the critical-curve neighborhood while retaining a faint disk wing.
-        // The upper image keeps the established geometry; movie photometry is
-        // applied globally above via filmPhotometricWeight.
         float filmAnnulus = exp(-pow((diskRadius - GARGANTUA_ANNULUS_CENTER) / GARGANTUA_ANNULUS_WIDTH, 2.0));
         float filmOuterWing = 0.13 + 0.15 * smoothstep(3.5, DISK_OUTER, diskRadius);
         float filmEmissivity = filmOuterWing + 1.38 * filmAnnulus;
