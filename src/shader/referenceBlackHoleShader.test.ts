@@ -29,7 +29,7 @@ describe("Interstellar Gargantua WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float STAR_GAIN = 0.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DILATION_MIN = 0.20;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_SPIN = 0.60;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float FRAME_DRAG_GAIN = 0.035;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float FRAME_DRAG_GAIN = 0.018;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float photonSphereRefinement = 1.0 - smoothstep(1.65, 3.20, radius);",
     );
