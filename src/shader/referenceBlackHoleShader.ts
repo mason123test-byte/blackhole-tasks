@@ -26,11 +26,14 @@ uniform float u_visual_compare;
 
 #define PI 3.14159265359
 #define B_CRIT 5.1961524
-#define N_STEPS 112
+#define N_STEPS 176
 
 const float KERR_A = 0.60;
 const float KERR_A2 = KERR_A * KERR_A;
 const float KERR_HORIZON = 1.80;
+const float KERR_MIN_STEP = 0.006;
+const float KERR_MAX_STEP = 1.55;
+const float KERR_ERROR_TOL = 0.00035;
 const float OBSERVER_R = 74.1;
 const float OBSERVER_THETA = 1.511;
 
@@ -93,7 +96,7 @@ void kerrDerivatives(
 ) {
   float r2 = r * r;
   float twoR = 2.0 * r;
-  float safeSin = max(abs(sin(theta)), 1e-5);
+  float safeSin = max(abs(sin(theta)), 1e-4);
   float cosTheta = cos(theta);
   float sin2 = safeSin * safeSin;
   float sigma = r2 + KERR_A2 * cosTheta * cosTheta;
@@ -134,66 +137,147 @@ void normalizePolarState(inout float theta, inout float phi, inout float ptheta)
   }
 }
 
-void rk4KerrStep(
-  inout float r,
-  inout float theta,
-  inout float phi,
-  inout float pr,
-  inout float ptheta,
+void kerrPackedDerivatives(
+  vec4 state,
+  float ptheta,
   float L,
   float kappa,
-  float h
+  out vec4 derivative,
+  out float dptheta
 ) {
-  float k1r;
-  float k1theta;
-  float k1phi;
-  float k1pr;
-  float k1ptheta;
-  kerrDerivatives(r, theta, pr, ptheta, L, kappa, k1r, k1theta, k1phi, k1pr, k1ptheta);
+  float dr;
+  float dtheta;
+  float dphi;
+  float dpr;
+  kerrDerivatives(state.x, state.y, state.w, ptheta, L, kappa, dr, dtheta, dphi, dpr, dptheta);
+  derivative = vec4(dr, dtheta, dphi, dpr);
+}
 
-  float r2 = r + 0.5 * h * k1r;
-  float theta2 = theta + 0.5 * h * k1theta;
-  float pr2 = pr + 0.5 * h * k1pr;
-  float ptheta2 = ptheta + 0.5 * h * k1ptheta;
-  normalizePolarStage(theta2, ptheta2);
-  float k2r;
-  float k2theta;
-  float k2phi;
-  float k2pr;
-  float k2ptheta;
-  kerrDerivatives(r2, theta2, pr2, ptheta2, L, kappa, k2r, k2theta, k2phi, k2pr, k2ptheta);
+void normalizePackedStage(inout vec4 state, inout float ptheta) {
+  float theta = state.y;
+  normalizePolarStage(theta, ptheta);
+  state.y = theta;
+}
 
-  float r3 = r + 0.5 * h * k2r;
-  float theta3 = theta + 0.5 * h * k2theta;
-  float pr3 = pr + 0.5 * h * k2pr;
-  float ptheta3 = ptheta + 0.5 * h * k2ptheta;
-  normalizePolarStage(theta3, ptheta3);
-  float k3r;
-  float k3theta;
-  float k3phi;
-  float k3pr;
-  float k3ptheta;
-  kerrDerivatives(r3, theta3, pr3, ptheta3, L, kappa, k3r, k3theta, k3phi, k3pr, k3ptheta);
+void rkckKerrTrial(
+  vec4 state,
+  float ptheta,
+  float L,
+  float kappa,
+  float h,
+  out vec4 stateOut,
+  out float pthetaOut,
+  out vec4 stateError,
+  out float pthetaError
+) {
+  vec4 k1;
+  float q1;
+  kerrPackedDerivatives(state, ptheta, L, kappa, k1, q1);
 
-  float r4 = r + h * k3r;
-  float theta4 = theta + h * k3theta;
-  float pr4 = pr + h * k3pr;
-  float ptheta4 = ptheta + h * k3ptheta;
-  normalizePolarStage(theta4, ptheta4);
-  float k4r;
-  float k4theta;
-  float k4phi;
-  float k4pr;
-  float k4ptheta;
-  kerrDerivatives(r4, theta4, pr4, ptheta4, L, kappa, k4r, k4theta, k4phi, k4pr, k4ptheta);
+  vec4 s2 = state + h * (0.2 * k1);
+  float p2 = ptheta + h * (0.2 * q1);
+  normalizePackedStage(s2, p2);
+  vec4 k2;
+  float q2;
+  kerrPackedDerivatives(s2, p2, L, kappa, k2, q2);
 
-  float sixth = h / 6.0;
-  r += sixth * (k1r + 2.0 * k2r + 2.0 * k3r + k4r);
-  theta += sixth * (k1theta + 2.0 * k2theta + 2.0 * k3theta + k4theta);
-  phi += sixth * (k1phi + 2.0 * k2phi + 2.0 * k3phi + k4phi);
-  pr += sixth * (k1pr + 2.0 * k2pr + 2.0 * k3pr + k4pr);
-  ptheta += sixth * (k1ptheta + 2.0 * k2ptheta + 2.0 * k3ptheta + k4ptheta);
-  normalizePolarState(theta, phi, ptheta);
+  vec4 s3 = state + h * (0.075 * k1 + 0.225 * k2);
+  float p3 = ptheta + h * (0.075 * q1 + 0.225 * q2);
+  normalizePackedStage(s3, p3);
+  vec4 k3;
+  float q3;
+  kerrPackedDerivatives(s3, p3, L, kappa, k3, q3);
+
+  vec4 s4 = state + h * (0.3 * k1 - 0.9 * k2 + 1.2 * k3);
+  float p4 = ptheta + h * (0.3 * q1 - 0.9 * q2 + 1.2 * q3);
+  normalizePackedStage(s4, p4);
+  vec4 k4;
+  float q4;
+  kerrPackedDerivatives(s4, p4, L, kappa, k4, q4);
+
+  vec4 s5 = state + h * (
+    -0.2037037037 * k1
+    + 2.5 * k2
+    - 2.5925925926 * k3
+    + 1.2962962963 * k4
+  );
+  float p5 = ptheta + h * (
+    -0.2037037037 * q1
+    + 2.5 * q2
+    - 2.5925925926 * q3
+    + 1.2962962963 * q4
+  );
+  normalizePackedStage(s5, p5);
+  vec4 k5;
+  float q5;
+  kerrPackedDerivatives(s5, p5, L, kappa, k5, q5);
+
+  vec4 s6 = state + h * (
+    0.0294958044 * k1
+    + 0.3417968750 * k2
+    + 0.0415943287 * k3
+    + 0.4003454138 * k4
+    + 0.0617675781 * k5
+  );
+  float p6 = ptheta + h * (
+    0.0294958044 * q1
+    + 0.3417968750 * q2
+    + 0.0415943287 * q3
+    + 0.4003454138 * q4
+    + 0.0617675781 * q5
+  );
+  normalizePackedStage(s6, p6);
+  vec4 k6;
+  float q6;
+  kerrPackedDerivatives(s6, p6, L, kappa, k6, q6);
+
+  stateOut = state + h * (
+    0.0978835979 * k1
+    + 0.4025764895 * k3
+    + 0.2104377104 * k4
+    + 0.2891022021 * k6
+  );
+  pthetaOut = ptheta + h * (
+    0.0978835979 * q1
+    + 0.4025764895 * q3
+    + 0.2104377104 * q4
+    + 0.2891022021 * q6
+  );
+
+  vec4 fourthOrder = state + h * (
+    0.1021773727 * k1
+    + 0.3839079034 * k3
+    + 0.2445927373 * k4
+    + 0.0193219866 * k5
+    + 0.25 * k6
+  );
+  float fourthPtheta = ptheta + h * (
+    0.1021773727 * q1
+    + 0.3839079034 * q3
+    + 0.2445927373 * q4
+    + 0.0193219866 * q5
+    + 0.25 * q6
+  );
+
+  stateError = stateOut - fourthOrder;
+  pthetaError = pthetaOut - fourthPtheta;
+}
+
+float kerrErrorRatio(
+  vec4 state,
+  float ptheta,
+  vec4 derivative,
+  float dptheta,
+  float h,
+  vec4 stateError,
+  float pthetaError
+) {
+  vec4 scale = abs(state) + abs(derivative * h) + vec4(1e-3, 1e-4, 1e-3, 1e-3);
+  vec4 scaledError = abs(stateError) / scale;
+  float pthetaScale = abs(ptheta) + abs(dptheta * h) + 1e-3;
+  float worst = max(max(scaledError.x, scaledError.y), max(scaledError.z, scaledError.w));
+  worst = max(worst, abs(pthetaError) / pthetaScale);
+  return worst / KERR_ERROR_TOL;
 }
 
 void initOdysseyObserverRay(
@@ -320,6 +404,7 @@ void rayTracedReference() {
   float transmittance = 1.0;
   float dilation = mix(1.0, DILATION_MIN, u_expanded);
   float patternTime = u_time * dilation;
+  float h = 0.90;
 
   for (int i = 0; i < N_STEPS; i++) {
     if (r <= KERR_HORIZON + 0.015) {
@@ -338,15 +423,52 @@ void rayTracedReference() {
       break;
     }
 
-    float nearHole = 1.0 - smoothstep(3.2, 14.0, r);
-    float angularRefinement = clamp(abs(dphi0) * 0.40 + abs(dtheta0) * 1.35, 0.0, 2.5);
-    float h = mix(1.35, 0.065, nearHole);
-    h /= 1.0 + angularRefinement;
-    h = clamp(h, 0.032, 1.35);
+    h = clamp(h, KERR_MIN_STEP, KERR_MAX_STEP);
+    float axisDistance = min(theta, PI - theta);
+    float axisStepLimit = 0.20 * axisDistance / max(abs(dtheta0), 1e-4);
+    h = min(h, max(KERR_MIN_STEP, axisStepLimit));
+    float angularStepLimit = 0.24 / max(abs(dtheta0) + abs(dphi0), 1e-4);
+    h = min(h, max(KERR_MIN_STEP, angularStepLimit));
+    float horizonDistance = max(r - KERR_HORIZON, 0.02);
+    float radialStepLimit = 0.25 * horizonDistance / max(abs(dr0), 1e-4);
+    h = min(h, max(KERR_MIN_STEP, radialStepLimit));
+
+    vec4 state = vec4(r, theta, phi, pr);
+    vec4 derivative = vec4(dr0, dtheta0, dphi0, dpr0);
+    vec4 trialState;
+    float trialPtheta;
+    vec4 stateError;
+    float pthetaError;
+    rkckKerrTrial(state, ptheta, L, kappa, h, trialState, trialPtheta, stateError, pthetaError);
+
+    float errorRatio = kerrErrorRatio(
+      state,
+      ptheta,
+      derivative,
+      dptheta0,
+      h,
+      stateError,
+      pthetaError
+    );
+    if (errorRatio > 1.0 && h > KERR_MIN_STEP * 1.01) {
+      h = max(KERR_MIN_STEP, h * clamp(0.90 * pow(errorRatio, -0.25), 0.20, 0.80));
+      continue;
+    }
 
     previousR = r;
     previousPhi = phi;
-    rk4KerrStep(r, theta, phi, pr, ptheta, L, kappa, h);
+    r = trialState.x;
+    theta = trialState.y;
+    phi = trialState.z;
+    pr = trialState.w;
+    ptheta = trialPtheta;
+    normalizePolarState(theta, phi, ptheta);
+
+    h = clamp(
+      h * clamp(0.90 * pow(max(errorRatio, 1e-6), -0.20), 0.55, 1.80),
+      KERR_MIN_STEP,
+      KERR_MAX_STEP
+    );
 
     float side = theta - 0.5 * PI;
     if (side * previousSide < 0.0 && diskCrossingCount < MAX_DISK_CROSSINGS) {
@@ -391,7 +513,7 @@ void main() {
 
 export const REFERENCE_BLACK_HOLE_INFO = {
   model: "interstellar-gargantua-kerr-geodesic",
-  integrationSteps: 112,
+  integrationSteps: 176,
   tracePadding: 3,
   starGain: 0,
   sceneInput: "svg-gpu-texture",
