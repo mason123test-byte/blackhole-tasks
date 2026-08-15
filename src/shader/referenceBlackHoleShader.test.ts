@@ -23,7 +23,7 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
       alphaMode: "reference-webgl-straight-alpha",
       styleReference: "https://arxiv.org/abs/1502.03808",
       physicsReference: "https://github.com/hungyipu/Odyssey",
-      cameraReference: "Odyssey finite-observer image-plane initial conditions",
+      cameraReference: "DNGR Appendix A.1 fixed-event FIDO local sky",
     });
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("#define N_STEPS 176");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float KERR_A = 0.60;");
@@ -40,26 +40,29 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_OUTER = 18.70;");
   });
 
-  it("uses Odyssey finite-observer image-plane coordinates instead of mixing image lengths with a local-sky direction", () => {
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("void initOdysseyObserverRay(");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float imageX = sqrt(OBSERVER_R * OBSERVER_R + KERR_A2) * sinObserver - beta * cosObserver;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float imageY = alpha;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float imageZ = OBSERVER_R * cosObserver + beta * sinObserver;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("r = sqrt(0.5 * (imageU + sqrt(imageU * imageU + spinZ * spinZ)));");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("theta = acos(clamp(imageZ / r, -1.0, 1.0));");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("phi = atan(imageY, imageX);");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("cameraSkyDirection");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("incomingCameraDirection");
+  it("launches every production ray from the same DNGR camera event and varies only local-sky direction", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("void initDngrCameraRay(");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("r = OBSERVER_R;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("theta = OBSERVER_THETA;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("phi = 0.0;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec3 localSky = normalize(vec3(1.0, beta / OBSERVER_R, -alpha / OBSERVER_R));");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float imageX =");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float imageY =");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float imageZ =");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("initOdysseyObserverRay");
   });
 
-  it("derives canonical Kerr momenta from the finite observer screen normal exactly once", () => {
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float rayRDot = -(-imageRadius * imageRadius * cosObserver * cosTheta + r * imageRadius * projected * sinTheta) / sigma;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float rayThetaDot = -(cosObserver * r * sinTheta + imageRadius * projected * cosTheta) / sigma;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float rayPhiDot = -sinObserver * sin(phi) / (imageRadius * safeSin);");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float energy2 = sigmaMinusTwoR * (rayRDot * rayRDot / delta + rayThetaDot * rayThetaDot)");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("pr = rayRDot * sigma / delta / energy;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("ptheta = rayThetaDot * sigma / energy;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("L = ((sigma * delta * rayPhiDot - 2.0 * KERR_A * r * energy) * sin2 / sigmaMinusTwoR) / energy;");
+  it("converts the fixed-event FIDO local-sky direction into Kerr canonical momenta", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float nFidoRadial = localSky.x;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float nFidoTheta = localSky.y;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float nFidoPhi = localSky.z;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float lapse = rho * sqrtDelta / sigmaMetric;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float omega = 2.0 * KERR_A * r / (sigmaMetric * sigmaMetric);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float varpi = sigmaMetric * safeSin / rho;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float cameraEnergy = 1.0 / (lapse + omega * varpi * nFidoPhi);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("pr = cameraEnergy * (rho / sqrtDelta) * nFidoRadial;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("ptheta = cameraEnergy * rho * nFidoTheta;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("L = cameraEnergy * varpi * nFidoPhi;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("kappa = ptheta * ptheta + KERR_A2 * sin2 + L * L / sin2;");
   });
 
