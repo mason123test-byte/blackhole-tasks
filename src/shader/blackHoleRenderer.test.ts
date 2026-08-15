@@ -24,10 +24,10 @@ describe("black-hole render profiles", () => {
     expect(getRenderSize(240, 180, 1, 1)).toEqual({ width: 240, height: 180 });
   });
 
-  it("uses the published-geometry Kerr Gargantua WebGL renderer with stable RK4 stepping", () => {
+  it("uses the published-geometry Kerr Gargantua WebGL renderer with error-controlled stepping", () => {
     expect(BLACK_HOLE_RENDERER_INFO).toMatchObject({
       model: "interstellar-gargantua-kerr-geodesic",
-      integrationSteps: 112,
+      integrationSteps: 176,
       tracePadding: 3,
       starGain: 0,
       sceneInput: "svg-gpu-texture",
