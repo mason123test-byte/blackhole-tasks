@@ -60,7 +60,8 @@ describe("Interstellar Gargantua WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_OUTER = 8.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INCL = 1.50;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_ROLL = 0.00;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_DOPPLER_MIX = 0.08;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_DOPPLER_MIX = 0.0;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_DISK_TEMP = 4500.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_DISK_OPACITY = 0.48;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_ANNULUS_CENTER = 2.80;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_ANNULUS_WIDTH = 0.58;");
@@ -73,7 +74,7 @@ describe("Interstellar Gargantua WebGL black-hole port", () => {
     expect(rendererSource).toContain("return { shaderMode: 1, fixedTime: null };");
   });
 
-  it("uses an unwarped ray plane for the Gargantua candidate while preserving the proven upper film treatment", () => {
+  it("uses an unwarped ray plane for the Gargantua candidate while preserving the proven upper geometry", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "vec2 gargantuaRayPlane = rotate2(vec2(screen.x, -screen.y), DISK_ROLL) * worldScale;",
     );
@@ -109,13 +110,20 @@ describe("Interstellar Gargantua WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float exposure = mix(1.20, 1.28, gargantuaStyleWeight);");
   });
 
-  it("suppresses strong Doppler asymmetry only where the film-style secondary image needs it", () => {
+  it("matches the film choice to omit frequency-shift colour and brightness asymmetry", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float filmPhotometricWeight = candidateWeight;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float dopplerMix = mix(0.60, GARGANTUA_DOPPLER_MIX, gargantuaStyleWeight);",
+      "float dopplerMix = mix(0.60, GARGANTUA_DOPPLER_MIX, filmPhotometricWeight);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("shift = mix(1.0, shift, dopplerMix);");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float beamPower = mix(2.5, 1.15, gargantuaStyleWeight);",
+      "vec3 physicalDiskColor = blackbody(5500.0 * temperatureProfile * shift);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "vec3 diskColor = mix(physicalDiskColor, blackbody(GARGANTUA_DISK_TEMP), filmPhotometricWeight);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float beamPower = mix(2.5, 1.0, filmPhotometricWeight);",
     );
   });
 
