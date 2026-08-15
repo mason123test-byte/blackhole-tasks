@@ -16,7 +16,7 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
   it("uses a real Kerr null-geodesic state instead of heuristic frame dragging", () => {
     expect(REFERENCE_BLACK_HOLE_INFO).toMatchObject({
       model: "interstellar-gargantua-kerr-geodesic",
-      integrationSteps: 112,
+      integrationSteps: 176,
       tracePadding: 3,
       starGain: 0,
       sceneInput: "svg-gpu-texture",
@@ -25,7 +25,7 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
       physicsReference: "https://github.com/hungyipu/Odyssey",
       cameraReference: "Odyssey finite-observer image-plane initial conditions",
     });
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("#define N_STEPS 112");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("#define N_STEPS 176");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float KERR_A = 0.60;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float KERR_A2 = KERR_A * KERR_A;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("void kerrDerivatives(");
@@ -71,11 +71,22 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("dptheta = -safeSin * cosTheta * (L * L / (sin2 * sin2) - KERR_A2) / sigma;");
   });
 
-  it("uses fourth-order Kerr stepping to suppress critical-curve integration artifacts", () => {
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("void rk4KerrStep(");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("rk4KerrStep(r, theta, phi, pr, ptheta, L, kappa, h);");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float h = mix(1.35, 0.065, nearHole);");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("h = clamp(h, 0.032, 1.35);");
+  it("uses error-controlled Kerr stepping around critical and almost-trapped rays", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float KERR_MIN_STEP = 0.006;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float KERR_MAX_STEP = 1.55;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float KERR_ERROR_TOL = 0.00035;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("void rkckKerrTrial(");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float errorRatio = kerrErrorRatio(");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("if (errorRatio > 1.0 && h > KERR_MIN_STEP * 1.01) {");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("continue;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("pow(errorRatio, -0.25)");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("pow(max(errorRatio, 1e-6), -0.20)");
+  });
+
+  it("prevents finite-precision steps from jumping through the Kerr polar barrier", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float axisDistance = min(theta, PI - theta);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float axisStepLimit = 0.20 * axisDistance / max(abs(dtheta0), 1e-4);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("h = min(h, max(KERR_MIN_STEP, axisStepLimit));");
   });
 
   it("keeps tracing through a translucent thin disk so Kerr geometry can contribute multiple image orders", () => {
