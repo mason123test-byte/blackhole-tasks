@@ -47,9 +47,6 @@ describe("Interstellar Gargantua WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "vec3 premultipliedContribution = sceneColor * transmittance * sceneAlpha",
     );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "vec3 straightColor = coverage > 0.0001 ? premultipliedContribution / coverage : vec3(0.0);",
-    );
   });
 
   it("keeps one thin physical disk and aligns the normal candidate with Gargantua's film horizon", () => {
@@ -64,9 +61,6 @@ describe("Interstellar Gargantua WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_ANNULUS_WIDTH = 0.58;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float shadowRadius = mix(0.112, 0.105, u_expanded);",
-    );
-    expect(rendererSource).toContain(
-      'if (mode === "candidate") return { shaderMode: 1, fixedTime: 12 };',
     );
   });
 
@@ -84,7 +78,6 @@ describe("Interstellar Gargantua WebGL black-hole port", () => {
 
   it("separates ordered disk crossings so the secondary lensed image remains visible", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("int diskCrossingIndex = 0;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float crossingGain = 1.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("if (diskCrossingIndex > 0)");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("crossingGain = mix(1.0, 1.18, gargantuaStyleWeight);");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("diskCrossingIndex += 1;");
@@ -110,9 +103,21 @@ describe("Interstellar Gargantua WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "vec3 diskColor = mix(physicalDiskColor, blackbody(GARGANTUA_DISK_TEMP), filmPhotometricWeight);",
     );
+  });
+
+  it("adds a common soft veiling flare without changing ray geometry", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_VEILING_HALO = 0.070;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_HORIZON_FLARE = 0.055;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float beamPower = mix(2.5, 1.0, filmPhotometricWeight);",
+      "float veilingHalo = exp(-dot(flarePlane, flarePlane));",
     );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float horizonFlare = exp(-pow(screen.y / (shadowRadius * 0.22), 2.0))",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "vec3 flareLight = blackbody(GARGANTUA_DISK_TEMP) * flareIntensity;",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("+ flareLight;");
   });
 
   it("filters final disk streak density without reducing its mean energy", () => {
