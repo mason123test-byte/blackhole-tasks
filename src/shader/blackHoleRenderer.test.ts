@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   BLACK_HOLE_RENDERER_INFO,
@@ -6,6 +8,11 @@ import {
   getRenderSize,
   getVisualComparisonSettings,
 } from "./blackHoleRenderer";
+
+const blackHoleCanvasSource = readFileSync(
+  resolve(process.cwd(), "src/components/orb/BlackHoleCanvas.tsx"),
+  "utf8",
+);
 
 describe("black-hole render profiles", () => {
   it("uses the reference author's WebGL pixel-ratio ceiling", () => {
@@ -42,6 +49,13 @@ describe("black-hole render profiles", () => {
     expect(getVisualComparisonSettings("baseline")).toEqual({ shaderMode: 0, fixedTime: 12 });
     expect(getVisualComparisonSettings("candidate")).toEqual({ shaderMode: 1, fixedTime: 12 });
     expect(getVisualComparisonSettings("split")).toEqual({ shaderMode: 2, fixedTime: 12 });
+  });
+
+  it("expands visual-comparison windows before starting the expensive WebGL frame", () => {
+    expect(blackHoleCanvasSource).toContain('if (mode !== "normal") {');
+    expect(blackHoleCanvasSource).toContain('await invoke("set_scene_expanded", { expanded: true });');
+    expect(blackHoleCanvasSource).toContain('if (visualComparisonMode !== "normal" && !expanded) return;');
+    expect(blackHoleCanvasSource).toContain('[expanded, lowPowerMode, onError, quality, visualComparisonMode]');
   });
 
   it("keeps framebuffer reconstruction out of the production compositor", () => {
