@@ -107,7 +107,7 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
   it("keeps the film presentation warm and suppresses strong Doppler asymmetry", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_DOPPLER_MIX = 0.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_DISK_TEMP = 4500.0;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec3 diskColor = blackbody(GARGANTUA_DISK_TEMP);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec3 thermalColor = blackbody(GARGANTUA_DISK_TEMP);");
   });
 
   it("preserves straight-alpha WebGL composition and renderer controls", () => {
