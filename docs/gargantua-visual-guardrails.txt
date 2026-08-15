@@ -155,6 +155,44 @@ ERROR 10 — 允许 heuristic frame dragging 同时污染上下结构
 - 一旦出现上拱明显污染、能量异常、下弧下坠，而不是正确的 Kerr multiple-image deformation，就降低/撤销 heuristic，并转向真实 Kerr 方程。
 - 不得为了“有自旋”而保留错误的视觉结果。
 
+ERROR 11 — 混用 DNGR local-sky 与 Odyssey finite-observer 初值
+-----------------------------------------------------------
+错误做法：
+- camera event / local tetrad 来自 DNGR，同时又把 Odyssey finite image-plane 的坐标或长度塞进同一套初值。
+- 把两个各自自洽的 ray initialization 模型各取一半进行拼接。
+
+后果：
+- 屏幕方向、canonical momentum 与 observer geometry 不再属于同一个物理模型，critical rays 和多重像会出现错误形变或数值伪影。
+
+以后必须做到：
+- 一套 ray 初值必须完整采用同一个物理模型。
+- 采用 DNGR fixed-event FIDO local-sky 时，screen direction 必须完整经过同一 tetrad/canonical-momentum 变换。
+- 采用 Odyssey finite-observer image-plane 时，也必须完整沿用 Odyssey 的 image-plane → BL coordinates → canonical momentum 路径，不能与 DNGR local-sky 混拼。
+
+ERROR 12 — 半透明薄盘第一次 valid crossing 就 break
+--------------------------------------------------
+错误做法：
+- ray 第一次穿过 equatorial thin disk 后立即停止 tracing。
+
+后果：
+- secondary / higher-order disk images 被直接丢失，即便 Kerr geodesic 本身能够继续产生后续真实交点。
+
+以后必须做到：
+- 半透明盘需要继续 tracing 后续 valid crossings。
+- direct / secondary / higher-order contribution 必须按 ray 顺序通过 optical depth / transmittance 合成，不能把后续交点伪造成独立屏幕圆环。
+
+ERROR 13 — 把“下方 secondary image 比较圆”本身判定为错误
+-----------------------------------------------------
+错误做法：
+- 看到下方结构接近圆形就认为一定不符合 Gargantua，并尝试人工拉扁、扭成 U 形或做非圆 deformation。
+
+后果：
+- Figure 15(a) 本身就有明显的、较圆的 secondary image；人为追求“非圆”会再次破坏真实 Kerr topology。
+
+以后必须做到：
+- 判断重点是 secondary image 的尺寸、厚度、critical-curve proximity、稳定性以及它与 direct disk / upper arc 的连接关系。
+- 不得为了消除“圆形感”使用 screen-space deformation；圆形本身不是失败条件。
+
 每次修改前强制检查
 ================
 
@@ -178,15 +216,16 @@ ERROR 10 — 允许 heuristic frame dragging 同时污染上下结构
 
 当前最重要的未解决问题
 ====================
-- 下半部分仍然保留较强的规则环/同心感，与电影 Gargantua 的 secondary/higher-order disk image 形状差距明显。
-- 目前 Schwarzschild + heuristic frame dragging 不能保证 Kerr multiple-image topology。
-- 下一阶段应优先实现真正 Kerr null-geodesic integration（或等价的 Kerr transfer/LUT 解法），而不是继续缩 annulus 或调 exposure。
+- 当前已采用真实 Kerr null-geodesic integration 与多次 disk crossings；后续判断重点转为 critical / almost-trapped ray 稳定性、secondary/higher-order image 厚度与 Figure 15(a) 的连接关系。
+- 不能再使用 Schwarzschild heuristic、screen-space lower deformation 或 annulus 假环回退解决视觉问题。
+- camera framing、critical-curve sampling、intersection interpolation 和 ray-bundle/filtering 仍需以真实 Windows 图逐轮验证。
 
 下一阶段正确方向
 ================
 1. 保留单 WebGL2 renderer 与 thin disk。
-2. 移除 production candidate 中对下半区域的 legacy screen-space geometry 依赖。
-3. 用 Kerr metric 的 constants of motion / Hamiltonian null-geodesic integration，或可靠的 Kerr transfer-function/LUT 方法替换 heuristic spin correction。
-4. 显式得到 direct / primary / secondary / higher-order disk intersections。
-5. 先让几何接近 Gargantua，再做 4500K、弱 Doppler、camera flare、streak texture 等电影 photometry。
-6. 每轮必须以真实 Windows artifact 与权威 Gargantua 参考画面做视觉判断。
+2. 保持 production candidate 中下半结构完全来自真实 Kerr ray propagation 与 disk crossings。
+3. 保持完整、自洽的 camera initialization model，不再混用 DNGR / Odyssey 初值。
+4. 显式保留 direct / primary / secondary / higher-order disk intersections，并按 transmittance 顺序合成。
+5. 优先完善 adaptive integration、critical / almost-trapped ray sampling、disk intersection interpolation 与 higher-order anti-aliasing。
+6. 几何稳定后再做 4500K、弱 Doppler、camera flare、streak texture 等电影 photometry。
+7. 每轮必须以真实 Windows artifact 与权威 Gargantua Figure 15(a) 做视觉判断。
