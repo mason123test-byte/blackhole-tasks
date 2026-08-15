@@ -1,5 +1,6 @@
 // Kerr null-geodesic equations follow Pu, Yun, Younsi & Yoon's public Odyssey GPU tracer.
-// Gargantua geometry follows James, von Tunzelmann, Franklin & Thorne (2015), figure 15(a).
+// Gargantua camera geometry follows James, von Tunzelmann, Franklin & Thorne (2015),
+// with every candidate ray launched from one camera event through its local FIDO sky.
 // Application interaction and WebGL lifecycle stay in blackHoleRenderer.ts.
 export const REFERENCE_BLACK_HOLE_VERTEX = `#version 300 es
 in vec2 a_position;
@@ -166,7 +167,7 @@ void rk4KerrStep(
   ptheta += sixth * (k1ptheta + 2.0 * k2ptheta + 2.0 * k3ptheta + k4ptheta);
 }
 
-void initKerrRay(
+void initDngrCameraRay(
   float alpha,
   float beta,
   out float r,
@@ -177,47 +178,42 @@ void initKerrRay(
   out float L,
   out float kappa
 ) {
-  float observerSin = sin(OBSERVER_THETA);
-  float observerCos = cos(OBSERVER_THETA);
-  float imageX = sqrt(OBSERVER_R * OBSERVER_R + KERR_A2) * sin(OBSERVER_THETA) - beta * cos(OBSERVER_THETA);
-  float imageY = alpha;
-  float imageZ = OBSERVER_R * cos(OBSERVER_THETA) + beta * sin(OBSERVER_THETA);
-  float u = imageX * imageX + imageY * imageY + imageZ * imageZ - KERR_A2;
+  // DNGR finite-camera model: every pixel begins at the same camera event.
+  r = OBSERVER_R;
+  theta = OBSERVER_THETA;
+  phi = 0.0;
 
-  r = sqrt(max((u + sqrt(max(u * u + 4.0 * KERR_A2 * imageZ * imageZ, 0.0))) * 0.5, 1e-6));
-  theta = acos(clamp(imageZ / max(r, 1e-6), -1.0, 1.0));
-  phi = atan(imageY, imageX);
+  // The virtual image plane is used only to define a direction on the camera's
+  // local sky. It never changes the Boyer-Lindquist ray origin.
+  vec3 cameraSkyDirection = normalize(vec3(-OBSERVER_R, alpha, beta));
+  vec3 incomingCameraDirection = -cameraSkyDirection;
+
+  // With the camera momentarily at rest relative to the local FIDO and its
+  // screen-right axis aligned with +phi, DNGR A.10 reduces to these components.
+  float nFidoRadial = incomingCameraDirection.x;
+  float nFidoTheta = -incomingCameraDirection.z;
+  float nFidoPhi = incomingCameraDirection.y;
 
   float safeSin = max(abs(sin(theta)), 1e-5);
   float cosTheta = cos(theta);
   float sin2 = safeSin * safeSin;
-  float sigma = r * r + KERR_A2 * cosTheta * cosTheta;
-  float radialFrame = sqrt(KERR_A2 + r * r);
-  float v = -observerSin * cos(phi);
-  float zDot = -1.0;
+  float r2 = r * r;
+  float rho = sqrt(r2 + KERR_A2 * cosTheta * cosTheta);
+  float delta = max(r2 - 2.0 * r + KERR_A2, 1e-5);
+  float sqrtDelta = sqrt(delta);
+  float sigmaMetric = sqrt(
+    (r2 + KERR_A2) * (r2 + KERR_A2)
+      - KERR_A2 * delta * sin2
+  );
+  float lapse = rho * sqrtDelta / sigmaMetric;
+  float omega = 2.0 * KERR_A * r / (sigmaMetric * sigmaMetric);
+  float varpi = sigmaMetric * safeSin / rho;
 
-  float rdot = zDot * (
-    -radialFrame * radialFrame * observerCos * cosTheta
-    + r * radialFrame * v * safeSin
-  ) / sigma;
-  float thetadot = zDot * (
-    observerCos * r * safeSin
-    + radialFrame * v * cosTheta
-  ) / sigma;
-  float phidot = zDot * observerSin * sin(phi) / max(radialFrame * safeSin, 1e-5);
-
-  float delta = max(r * r - 2.0 * r + KERR_A2, 1e-5);
-  float sigmaMinusTwoR = sigma - 2.0 * r;
-  pr = rdot * sigma / delta;
-  ptheta = thetadot * sigma;
-
-  float energy2 = sigmaMinusTwoR * (rdot * rdot / delta + thetadot * thetadot)
-    + delta * sin2 * phidot * phidot;
-  float energy = sqrt(max(energy2, 1e-8));
-  pr /= energy;
-  ptheta /= energy;
-
-  L = ((sigma * delta * phidot - 2.0 * KERR_A * r * energy) * sin2 / max(sigmaMinusTwoR, 1e-5)) / energy;
+  // Canonical momentum with conserved photon energy normalized to unity.
+  float cameraEnergy = 1.0 / (lapse + omega * varpi * nFidoPhi);
+  pr = cameraEnergy * (rho / sqrtDelta) * nFidoRadial;
+  ptheta = cameraEnergy * rho * nFidoTheta;
+  L = cameraEnergy * varpi * nFidoPhi;
   kappa = ptheta * ptheta + KERR_A2 * sin2 + L * L / sin2;
 }
 
@@ -257,7 +253,7 @@ void rayTracedReference() {
   float ptheta;
   float L;
   float kappa;
-  initKerrRay(alpha, beta, r, theta, phi, pr, ptheta, L, kappa);
+  initDngrCameraRay(alpha, beta, r, theta, phi, pr, ptheta, L, kappa);
 
   float previousR = r;
   float previousPhi = phi;
@@ -360,5 +356,6 @@ export const REFERENCE_BLACK_HOLE_INFO = {
   reference: "https://github.com/s0xDk/ghostty-blackhole",
   styleReference: "https://arxiv.org/abs/1502.03808",
   physicsReference: "https://github.com/hungyipu/Odyssey",
+  cameraReference: "DNGR Appendix A.1 local-sky/FIDO camera",
   webglReference: "https://ebruneton.github.io/black_hole_shader/",
 } as const;
