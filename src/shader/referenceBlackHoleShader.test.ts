@@ -23,6 +23,7 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
       alphaMode: "reference-webgl-straight-alpha",
       styleReference: "https://arxiv.org/abs/1502.03808",
       physicsReference: "https://github.com/hungyipu/Odyssey",
+      cameraReference: "DNGR Appendix A.1 local-sky/FIDO camera",
     });
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("#define N_STEPS 112");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float KERR_A = 0.60;");
@@ -32,14 +33,36 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("frameDragScale");
   });
 
-  it("matches the published DNGR figure-15 camera geometry", () => {
+  it("matches the published DNGR figure-15 camera and disk geometry", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float OBSERVER_R = 74.1;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float OBSERVER_THETA = 1.511;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INNER = 9.26;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_OUTER = 18.70;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float imageX = sqrt(OBSERVER_R * OBSERVER_R + KERR_A2) * sin(OBSERVER_THETA) - beta * cos(OBSERVER_THETA);");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float imageY = alpha;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float imageZ = OBSERVER_R * cos(OBSERVER_THETA) + beta * sin(OBSERVER_THETA);");
+  });
+
+  it("starts every candidate ray at one DNGR camera event and varies only its local-sky direction", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("void initDngrCameraRay(");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("r = OBSERVER_R;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("theta = OBSERVER_THETA;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("phi = 0.0;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec3 cameraSkyDirection = normalize(vec3(-OBSERVER_R, alpha, beta));");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec3 incomingCameraDirection = -cameraSkyDirection;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float imageX =");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float imageY =");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float imageZ =");
+  });
+
+  it("converts the local camera ray through the FIDO tetrad into Kerr canonical momenta", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float nFidoRadial = incomingCameraDirection.x;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float nFidoTheta = -incomingCameraDirection.z;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float nFidoPhi = incomingCameraDirection.y;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float lapse = rho * sqrtDelta / sigmaMetric;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float omega = 2.0 * KERR_A * r / (sigmaMetric * sigmaMetric);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float varpi = sigmaMetric * safeSin / rho;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float cameraEnergy = 1.0 / (lapse + omega * varpi * nFidoPhi);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("pr = cameraEnergy * (rho / sqrtDelta) * nFidoRadial;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("ptheta = cameraEnergy * rho * nFidoTheta;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("L = cameraEnergy * varpi * nFidoPhi;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("kappa = ptheta * ptheta + KERR_A2 * sin2 + L * L / sin2;");
   });
 
@@ -70,7 +93,7 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("GARGANTUA_ANNULUS_WIDTH");
   });
 
-  it("keeps production candidate rays unwarped while allowing legacy lower A/B distortion only in baseline mode", () => {
+  it("keeps production candidate rays free of lower-half screen-space geometry hacks", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float alpha = screen.x * worldScale;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float beta = -screen.y * worldScale;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float baselineLowerWarp = (1.0 - candidateWeight)");
