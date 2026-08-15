@@ -9,6 +9,10 @@ import {
   getVisualComparisonSettings,
 } from "./blackHoleRenderer";
 
+const rendererSource = readFileSync(
+  resolve(process.cwd(), "src/shader/blackHoleRenderer.ts"),
+  "utf8",
+);
 const blackHoleCanvasSource = readFileSync(
   resolve(process.cwd(), "src/components/orb/BlackHoleCanvas.tsx"),
   "utf8",
@@ -49,6 +53,11 @@ describe("black-hole render profiles", () => {
     expect(getVisualComparisonSettings("baseline")).toEqual({ shaderMode: 0, fixedTime: 12 });
     expect(getVisualComparisonSettings("candidate")).toEqual({ shaderMode: 1, fixedTime: 12 });
     expect(getVisualComparisonSettings("split")).toEqual({ shaderMode: 2, fixedTime: 12 });
+    expect(rendererSource).toContain("const fixedVisualFrame = visualComparison.fixedTime !== null;");
+    expect(rendererSource).toContain("const reportedEnergy = fixedVisualFrame && !sceneReady ? 0 : energy;");
+    expect(rendererSource).toContain("rendererReady = reportedEnergy > 100;");
+    expect(rendererSource).toContain("const visualFrameComplete = fixedVisualFrame && rendererReady && sceneReady;");
+    expect(rendererSource).toContain("if (!visualFrameComplete) schedule();");
   });
 
   it("expands visual-comparison windows before starting the expensive WebGL frame", () => {
