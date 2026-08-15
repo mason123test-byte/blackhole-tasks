@@ -24,10 +24,12 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
       styleReference: "https://arxiv.org/abs/1502.03808",
       physicsReference: "https://github.com/hungyipu/Odyssey",
       cameraReference: "DNGR Appendix A.1 fixed-event FIDO local sky",
+      cameraVerticalFovDeg: 21,
     });
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("#define N_STEPS 176");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float KERR_A = 0.60;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float KERR_A2 = KERR_A * KERR_A;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float CAMERA_VERTICAL_FOV = 0.36651915;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("void kerrDerivatives(");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("FRAME_DRAG_GAIN");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("frameDragScale");
@@ -45,11 +47,21 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("r = OBSERVER_R;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("theta = OBSERVER_THETA;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("phi = 0.0;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec3 localSky = normalize(vec3(1.0, beta / OBSERVER_R, -alpha / OBSERVER_R));");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec3 localSky = normalize(vec3(1.0, cameraUp, -cameraRight));");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float imageX =");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float imageY =");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float imageZ =");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("initOdysseyObserverRay");
+  });
+
+  it("uses an explicit pinhole field of view for production rays instead of the legacy shadow-radius scale", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float cameraHalfTan = tan(0.5 * CAMERA_VERTICAL_FOV);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec2 candidateCameraPlane = vec2(screen.x * 2.0, -screen.y * 2.0) * cameraHalfTan;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float baselineAlpha = screen.x * worldScale;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float baselineBeta = -screen.y * worldScale;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec2 baselineCameraPlane = vec2(baselineAlpha, baselineBeta) / OBSERVER_R;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec2 cameraPlane = mix(baselineCameraPlane, candidateCameraPlane, candidateWeight);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float cameraImpact = OBSERVER_R * length(cameraPlane);");
   });
 
   it("converts the fixed-event FIDO local-sky direction into Kerr canonical momenta", () => {
@@ -113,10 +125,8 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
   });
 
   it("keeps production candidate rays free of lower-half screen-space geometry hacks", () => {
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float alpha = screen.x * worldScale;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float beta = -screen.y * worldScale;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float baselineLowerWarp = (1.0 - candidateWeight)");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("beta *= mix(1.0, 1.20, baselineLowerWarp);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("baselineBeta *= mix(1.0, 1.20, baselineLowerWarp);");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("lowerMajorAxisScale");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("lowerMinorAxisScale");
   });
