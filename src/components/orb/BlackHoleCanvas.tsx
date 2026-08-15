@@ -36,7 +36,13 @@ export function BlackHoleCanvas({
     if (!("__TAURI_INTERNALS__" in window)) return;
     let active = true;
     void invoke<string>("get_visual_comparison_mode")
-      .then((mode) => { if (active) setVisualComparisonMode(normalizeVisualComparisonMode(mode)); })
+      .then(async (rawMode) => {
+        const mode = normalizeVisualComparisonMode(rawMode);
+        if (mode !== "normal") {
+          await invoke("set_scene_expanded", { expanded: true });
+        }
+        if (active) setVisualComparisonMode(mode);
+      })
       .catch((error) => {
         console.error("无法读取视觉对比模式：", error);
         if (active) setVisualComparisonMode("normal");
@@ -51,13 +57,14 @@ export function BlackHoleCanvas({
 
   useEffect(() => {
     if (!ref.current || visualComparisonMode === null) return;
+    if (visualComparisonMode !== "normal" && !expanded) return;
     return startBlackHole(
       ref.current,
       () => expandedRef.current,
       () => sceneRef.current,
       { quality, lowPowerMode, visualComparisonMode, onError },
     );
-  }, [lowPowerMode, onError, quality, visualComparisonMode]);
+  }, [expanded, lowPowerMode, onError, quality, visualComparisonMode]);
 
   return <canvas ref={ref} className="black-hole-canvas" aria-label="黑洞任务悬浮窗" />;
 }
