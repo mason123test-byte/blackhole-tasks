@@ -25,7 +25,7 @@ uniform float u_visual_compare;
 
 #define PI 3.14159265359
 #define B_CRIT 5.1961524
-#define N_STEPS 144
+#define N_STEPS 112
 
 const float KERR_A = 0.60;
 const float KERR_A2 = KERR_A * KERR_A;
@@ -106,6 +106,64 @@ void kerrDerivatives(
     - 2.0 * pr * pr * (r - 1.0) / sigma
   );
   dptheta = -safeSin * cosTheta * (L * L / (sin2 * sin2) - KERR_A2) / sigma;
+}
+
+void rk4KerrStep(
+  inout float r,
+  inout float theta,
+  inout float phi,
+  inout float pr,
+  inout float ptheta,
+  float L,
+  float kappa,
+  float h
+) {
+  float k1r;
+  float k1theta;
+  float k1phi;
+  float k1pr;
+  float k1ptheta;
+  kerrDerivatives(r, theta, pr, ptheta, L, kappa, k1r, k1theta, k1phi, k1pr, k1ptheta);
+
+  float r2 = r + 0.5 * h * k1r;
+  float theta2 = clamp(theta + 0.5 * h * k1theta, 1e-4, PI - 1e-4);
+  float pr2 = pr + 0.5 * h * k1pr;
+  float ptheta2 = ptheta + 0.5 * h * k1ptheta;
+  float k2r;
+  float k2theta;
+  float k2phi;
+  float k2pr;
+  float k2ptheta;
+  kerrDerivatives(r2, theta2, pr2, ptheta2, L, kappa, k2r, k2theta, k2phi, k2pr, k2ptheta);
+
+  float r3 = r + 0.5 * h * k2r;
+  float theta3 = clamp(theta + 0.5 * h * k2theta, 1e-4, PI - 1e-4);
+  float pr3 = pr + 0.5 * h * k2pr;
+  float ptheta3 = ptheta + 0.5 * h * k2ptheta;
+  float k3r;
+  float k3theta;
+  float k3phi;
+  float k3pr;
+  float k3ptheta;
+  kerrDerivatives(r3, theta3, pr3, ptheta3, L, kappa, k3r, k3theta, k3phi, k3pr, k3ptheta);
+
+  float r4 = r + h * k3r;
+  float theta4 = clamp(theta + h * k3theta, 1e-4, PI - 1e-4);
+  float pr4 = pr + h * k3pr;
+  float ptheta4 = ptheta + h * k3ptheta;
+  float k4r;
+  float k4theta;
+  float k4phi;
+  float k4pr;
+  float k4ptheta;
+  kerrDerivatives(r4, theta4, pr4, ptheta4, L, kappa, k4r, k4theta, k4phi, k4pr, k4ptheta);
+
+  float sixth = h / 6.0;
+  r += sixth * (k1r + 2.0 * k2r + 2.0 * k3r + k4r);
+  theta = clamp(theta + sixth * (k1theta + 2.0 * k2theta + 2.0 * k3theta + k4theta), 1e-4, PI - 1e-4);
+  phi += sixth * (k1phi + 2.0 * k2phi + 2.0 * k3phi + k4phi);
+  pr += sixth * (k1pr + 2.0 * k2pr + 2.0 * k3pr + k4pr);
+  ptheta += sixth * (k1ptheta + 2.0 * k2ptheta + 2.0 * k3ptheta + k4ptheta);
 }
 
 void initKerrRay(
@@ -228,32 +286,14 @@ void rayTracedReference() {
     }
 
     float nearHole = 1.0 - smoothstep(3.2, 14.0, r);
-    float angularRefinement = clamp(abs(dphi0) * 0.45 + abs(dtheta0) * 1.5, 0.0, 3.0);
-    float h = mix(1.20, 0.055, nearHole);
+    float angularRefinement = clamp(abs(dphi0) * 0.40 + abs(dtheta0) * 1.35, 0.0, 2.5);
+    float h = mix(1.35, 0.065, nearHole);
     h /= 1.0 + angularRefinement;
-    h = clamp(h, 0.028, 1.20);
-
-    float midR = r + 0.5 * h * dr0;
-    float midTheta = clamp(theta + 0.5 * h * dtheta0, 1e-4, PI - 1e-4);
-    float midPhi = phi + 0.5 * h * dphi0;
-    float midPr = pr + 0.5 * h * dpr0;
-    float midPtheta = ptheta + 0.5 * h * dptheta0;
-
-    float dr1;
-    float dtheta1;
-    float dphi1;
-    float dpr1;
-    float dptheta1;
-    kerrDerivatives(midR, midTheta, midPr, midPtheta, L, kappa, dr1, dtheta1, dphi1, dpr1, dptheta1);
+    h = clamp(h, 0.032, 1.35);
 
     previousR = r;
     previousPhi = phi;
-
-    r += h * dr1;
-    theta = clamp(theta + h * dtheta1, 1e-4, PI - 1e-4);
-    phi += h * dphi1;
-    pr += h * dpr1;
-    ptheta += h * dptheta1;
+    rk4KerrStep(r, theta, phi, pr, ptheta, L, kappa, h);
 
     float side = theta - 0.5 * PI;
     if (!diskHit && side * previousSide < 0.0) {
@@ -312,7 +352,7 @@ void main() {
 
 export const REFERENCE_BLACK_HOLE_INFO = {
   model: "interstellar-gargantua-kerr-geodesic",
-  integrationSteps: 144,
+  integrationSteps: 112,
   tracePadding: 3,
   starGain: 0,
   sceneInput: "svg-gpu-texture",
