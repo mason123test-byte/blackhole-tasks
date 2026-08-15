@@ -16,7 +16,7 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
   it("uses a real Kerr null-geodesic state instead of heuristic frame dragging", () => {
     expect(REFERENCE_BLACK_HOLE_INFO).toMatchObject({
       model: "interstellar-gargantua-kerr-geodesic",
-      integrationSteps: 112,
+      integrationSteps: 144,
       tracePadding: 3,
       starGain: 0,
       sceneInput: "svg-gpu-texture",
@@ -24,7 +24,7 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
       styleReference: "https://arxiv.org/abs/1502.03808",
       physicsReference: "https://github.com/hungyipu/Odyssey",
     });
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("#define N_STEPS 112");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("#define N_STEPS 144");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float KERR_A = 0.60;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float KERR_A2 = KERR_A * KERR_A;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("void kerrDerivatives(");
@@ -32,9 +32,11 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("frameDragScale");
   });
 
-  it("initializes rays from a finite observer image plane in Boyer-Lindquist coordinates", () => {
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float OBSERVER_R = 28.0;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float OBSERVER_THETA = 1.50;");
+  it("matches the published DNGR figure-15 camera geometry", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float OBSERVER_R = 74.1;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float OBSERVER_THETA = 1.511;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INNER = 9.26;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_OUTER = 18.70;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float imageX = sqrt(OBSERVER_R * OBSERVER_R + KERR_A2) * sin(OBSERVER_THETA) - beta * cos(OBSERVER_THETA);");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float imageY = alpha;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float imageZ = OBSERVER_R * cos(OBSERVER_THETA) + beta * sin(OBSERVER_THETA);");
@@ -49,9 +51,13 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("dptheta = -safeSin * cosTheta * (L * L / (sin2 * sin2) - KERR_A2) / sigma;");
   });
 
+  it("spends the integration budget near the critical region instead of the distant observer", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float nearHole = 1.0 - smoothstep(3.2, 14.0, r);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float h = mix(1.20, 0.055, nearHole);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("h = clamp(h, 0.028, 1.20);");
+  });
+
   it("uses one opaque thin equatorial disk and lets Kerr geometry create the multiple images", () => {
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INNER = 3.6;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_OUTER = 16.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float side = theta - 0.5 * PI;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("if (!diskHit && side * previousSide < 0.0)");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("diskHit = true;");
