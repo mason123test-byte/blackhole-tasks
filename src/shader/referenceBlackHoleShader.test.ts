@@ -82,13 +82,15 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("float midR =");
   });
 
-  it("uses one opaque thin equatorial disk and lets Kerr geometry create the multiple images", () => {
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float side = theta - 0.5 * PI;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("if (!diskHit && side * previousSide < 0.0)");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("diskHit = true;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("break;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("diskCrossingIndex");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("crossingGain");
+  it("keeps tracing through a translucent thin disk so Kerr geometry can contribute multiple image orders", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const int MAX_DISK_CROSSINGS = 4;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("int diskCrossingCount = 0;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("if (side * previousSide < 0.0 && diskCrossingCount < MAX_DISK_CROSSINGS)");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("accumulatedDisk += transmittance * diskColor * diskAlpha;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("transmittance *= 1.0 - diskAlpha;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("diskCrossingCount += 1;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("bool diskHit");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("diskHit = true;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("GARGANTUA_ANNULUS_CENTER");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("GARGANTUA_ANNULUS_WIDTH");
   });
