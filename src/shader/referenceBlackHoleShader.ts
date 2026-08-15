@@ -36,6 +36,7 @@ const float OBSERVER_THETA = 1.511;
 
 const float DISK_INNER = 9.26;
 const float DISK_OUTER = 18.70;
+const int MAX_DISK_CROSSINGS = 4;
 const float STAR_GAIN = 0.0;
 const float DILATION_MIN = 0.20;
 const float GARGANTUA_DOPPLER_MIX = 0.0;
@@ -239,6 +240,34 @@ void initDngrCameraRay(
   kappa = ptheta * ptheta + KERR_A2 * sin2 + L * L / sin2;
 }
 
+void sampleDiskSurface(
+  float hitRadius,
+  float hitPhi,
+  float patternTime,
+  out vec3 diskColor,
+  out float diskAlpha
+) {
+  float innerEdge = smoothstep(DISK_INNER, DISK_INNER * 1.12, hitRadius);
+  float outerEdge = 1.0 - smoothstep(DISK_OUTER * 0.76, DISK_OUTER, hitRadius);
+  float radialEmission = innerEdge * outerEdge * pow(DISK_INNER / hitRadius, 0.72);
+
+  float turns = hitPhi / (2.0 * PI);
+  float kepler = pow(DISK_INNER / hitRadius, 1.5);
+  float swirl = hitRadius * 0.85 - patternTime * kepler * 3.6;
+  float rawStreak = diskStreakSample(hitRadius, turns, swirl);
+  float streak = 0.52 + 1.10 * rawStreak * rawStreak;
+
+  float grazing = 0.82 + 0.18 * smoothstep(0.0, 1.0, abs(sin(hitPhi)));
+  float brightness = radialEmission * streak * grazing;
+  vec3 thermalColor = blackbody(GARGANTUA_DISK_TEMP);
+  float dopplerMix = GARGANTUA_DOPPLER_MIX;
+  brightness *= mix(1.0, 1.0, dopplerMix);
+
+  vec3 linearDisk = thermalColor * brightness * 2.15;
+  diskColor = vec3(1.0) - exp(-linearDisk);
+  diskAlpha = clamp(0.32 + brightness * 0.95, 0.0, 0.96);
+}
+
 void rayTracedReference() {
   float aspect = u_resolution.x / max(u_resolution.y, 1.0);
   vec2 referenceUv = vec2(v_uv.x, 1.0 - v_uv.y);
@@ -282,9 +311,11 @@ void rayTracedReference() {
   float previousSide = theta - 0.5 * PI;
 
   bool captured = false;
-  bool diskHit = false;
-  float hitRadius = 0.0;
-  float hitPhi = 0.0;
+  int diskCrossingCount = 0;
+  vec3 accumulatedDisk = vec3(0.0);
+  float transmittance = 1.0;
+  float dilation = mix(1.0, DILATION_MIN, u_expanded);
+  float patternTime = u_time * dilation;
 
   for (int i = 0; i < N_STEPS; i++) {
     if (r <= KERR_HORIZON + 0.015) {
@@ -314,44 +345,30 @@ void rayTracedReference() {
     rk4KerrStep(r, theta, phi, pr, ptheta, L, kappa, h);
 
     float side = theta - 0.5 * PI;
-    if (!diskHit && side * previousSide < 0.0) {
+    if (side * previousSide < 0.0 && diskCrossingCount < MAX_DISK_CROSSINGS) {
       float crossing = previousSide / (previousSide - side);
       float diskRadius = mix(previousR, r, crossing);
       if (diskRadius > DISK_INNER && diskRadius < DISK_OUTER) {
-        hitRadius = diskRadius;
-        hitPhi = mix(previousPhi, phi, crossing);
-        diskHit = true;
-        break;
+        float diskPhi = mix(previousPhi, phi, crossing);
+        vec3 diskColor;
+        float diskAlpha;
+        sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha);
+        accumulatedDisk += transmittance * diskColor * diskAlpha;
+        transmittance *= 1.0 - diskAlpha;
+        diskCrossingCount += 1;
+        if (transmittance < 0.02) {
+          break;
+        }
       }
     }
     previousSide = side;
   }
 
-  if (diskHit) {
-    float innerEdge = smoothstep(DISK_INNER, DISK_INNER * 1.12, hitRadius);
-    float outerEdge = 1.0 - smoothstep(DISK_OUTER * 0.76, DISK_OUTER, hitRadius);
-    float radialEmission = innerEdge * outerEdge * pow(DISK_INNER / hitRadius, 0.72);
-
-    float dilation = mix(1.0, DILATION_MIN, u_expanded);
-    float patternTime = u_time * dilation;
-    float turns = hitPhi / (2.0 * PI);
-    float kepler = pow(DISK_INNER / hitRadius, 1.5);
-    float swirl = hitRadius * 0.85 - patternTime * kepler * 3.6;
-    float rawStreak = diskStreakSample(hitRadius, turns, swirl);
-    float streak = 0.52 + 1.10 * rawStreak * rawStreak;
-
-    float grazing = 0.82 + 0.18 * smoothstep(0.0, 1.0, abs(sin(hitPhi)));
-    float brightness = radialEmission * streak * grazing;
-    vec3 diskColor = blackbody(GARGANTUA_DISK_TEMP);
-    float dopplerMix = GARGANTUA_DOPPLER_MIX;
-    brightness *= mix(1.0, 1.0, dopplerMix);
-
-    vec3 linearDisk = diskColor * brightness * 2.15;
-    vec3 mappedDisk = vec3(1.0) - exp(-linearDisk);
-    float diskAlpha = clamp(0.32 + brightness * 0.95, 0.0, 0.96);
-
-    vec3 combined = mix(sceneSample.rgb, mappedDisk, diskAlpha);
-    float coverage = sceneSample.a + diskAlpha * (1.0 - sceneSample.a);
+  if (diskCrossingCount > 0) {
+    vec3 background = captured ? vec3(0.0) : sceneSample.rgb;
+    float backgroundAlpha = captured ? 1.0 : sceneSample.a;
+    vec3 combined = accumulatedDisk + transmittance * background;
+    float coverage = (1.0 - transmittance) + transmittance * backgroundAlpha;
     outColor = vec4(combined, coverage);
     return;
   }
