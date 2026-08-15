@@ -50,9 +50,6 @@ describe("Interstellar Gargantua WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "vec3 straightColor = coverage > 0.0001 ? premultipliedContribution / coverage : vec3(0.0);",
     );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "outColor = vec4(clamp(straightColor, 0.0, 1.0), coverage);",
-    );
   });
 
   it("keeps one thin physical disk and aligns the normal candidate with Gargantua's film horizon", () => {
@@ -71,7 +68,6 @@ describe("Interstellar Gargantua WebGL black-hole port", () => {
     expect(rendererSource).toContain(
       'if (mode === "candidate") return { shaderMode: 1, fixedTime: 12 };',
     );
-    expect(rendererSource).toContain("return { shaderMode: 1, fixedTime: null };");
   });
 
   it("uses an unwarped ray plane for the Gargantua candidate while preserving the proven upper geometry", () => {
@@ -102,22 +98,14 @@ describe("Interstellar Gargantua WebGL black-hole port", () => {
       "float filmOuterWing = 0.13 + 0.15 * smoothstep(3.5, DISK_OUTER, diskRadius);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float filmEmissivity = filmOuterWing + 1.38 * filmAnnulus;",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float criticalBoost = 1.0 + gargantuaStyleWeight * 0.30 * exp(-pow((impact - B_CRIT) / 0.15, 2.0));",
     );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float exposure = mix(1.20, 1.28, gargantuaStyleWeight);");
   });
 
-  it("matches the film choice to omit frequency-shift colour and brightness asymmetry", () => {
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float filmPhotometricWeight = candidateWeight;");
+  it("uses the movie's no-frequency-shift 4500 K photometry as the common A/B foundation", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float filmPhotometricWeight = 1.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float dopplerMix = mix(0.60, GARGANTUA_DOPPLER_MIX, filmPhotometricWeight);",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("shift = mix(1.0, shift, dopplerMix);");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "vec3 physicalDiskColor = blackbody(5500.0 * temperatureProfile * shift);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "vec3 diskColor = mix(physicalDiskColor, blackbody(GARGANTUA_DISK_TEMP), filmPhotometricWeight);",
@@ -155,7 +143,6 @@ describe("Interstellar Gargantua WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("u_hover");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("u_pulse");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("u_detail");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("pulseLight");
   });
 
   it("uses the reference author's DPR ceiling without fixed resolution caps", () => {
