@@ -34,6 +34,7 @@ const float KERR_HORIZON = 1.80;
 const float KERR_MIN_STEP = 0.006;
 const float KERR_MAX_STEP = 1.55;
 const float KERR_ERROR_TOL = 0.00035;
+const int KERR_MAX_RETRIES = 5;
 const float OBSERVER_R = 74.1;
 const float OBSERVER_THETA = 1.511;
 
@@ -435,37 +436,53 @@ void rayTracedReference() {
 
     vec4 state = vec4(r, theta, phi, pr);
     vec4 derivative = vec4(dr0, dtheta0, dphi0, dpr0);
-    vec4 trialState;
-    float trialPtheta;
-    vec4 stateError;
-    float pthetaError;
-    rkckKerrTrial(state, ptheta, L, kappa, h, trialState, trialPtheta, stateError, pthetaError);
+    vec4 acceptedState = state;
+    float acceptedPtheta = ptheta;
+    float acceptedErrorRatio = 1.0;
+    bool acceptedStep = false;
 
-    float errorRatio = kerrErrorRatio(
-      state,
-      ptheta,
-      derivative,
-      dptheta0,
-      h,
-      stateError,
-      pthetaError
-    );
-    if (errorRatio > 1.0 && h > KERR_MIN_STEP * 1.01) {
+    for (int retry = 0; retry < KERR_MAX_RETRIES; retry++) {
+      vec4 trialState;
+      float trialPtheta;
+      vec4 stateError;
+      float pthetaError;
+      rkckKerrTrial(state, ptheta, L, kappa, h, trialState, trialPtheta, stateError, pthetaError);
+
+      float errorRatio = kerrErrorRatio(
+        state,
+        ptheta,
+        derivative,
+        dptheta0,
+        h,
+        stateError,
+        pthetaError
+      );
+      if (errorRatio <= 1.0 || h <= KERR_MIN_STEP * 1.01) {
+        acceptedState = trialState;
+        acceptedPtheta = trialPtheta;
+        acceptedErrorRatio = errorRatio;
+        acceptedStep = true;
+        break;
+      }
+
       h = max(KERR_MIN_STEP, h * clamp(0.90 * pow(errorRatio, -0.25), 0.20, 0.80));
-      continue;
+    }
+
+    if (!acceptedStep) {
+      break;
     }
 
     previousR = r;
     previousPhi = phi;
-    r = trialState.x;
-    theta = trialState.y;
-    phi = trialState.z;
-    pr = trialState.w;
-    ptheta = trialPtheta;
+    r = acceptedState.x;
+    theta = acceptedState.y;
+    phi = acceptedState.z;
+    pr = acceptedState.w;
+    ptheta = acceptedPtheta;
     normalizePolarState(theta, phi, ptheta);
 
     h = clamp(
-      h * clamp(0.90 * pow(max(errorRatio, 1e-6), -0.20), 0.55, 1.80),
+      h * clamp(0.90 * pow(max(acceptedErrorRatio, 1e-6), -0.20), 0.55, 1.80),
       KERR_MIN_STEP,
       KERR_MAX_STEP
     );
