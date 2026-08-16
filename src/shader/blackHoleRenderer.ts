@@ -201,8 +201,8 @@ function startBlackHoleSession(
     if (!outputTexture || !outputFramebuffer) throw new Error("无法创建黑洞输出帧缓冲");
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, outputTexture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
@@ -306,20 +306,18 @@ function startBlackHoleSession(
         );
         const lowCostMode = Boolean(options.lowPowerMode || options.quality === "low");
         const rayScale = getRaySupersampleScale(window.devicePixelRatio, lowCostMode);
-        const width = baseSize.width;
-        const height = baseSize.height;
-        const rayWidth = Math.max(1, Math.round(width * rayScale));
-        const rayHeight = Math.max(1, Math.round(height * rayScale));
+        const width = Math.max(1, Math.round(baseSize.width * rayScale));
+        const height = Math.max(1, Math.round(baseSize.height * rayScale));
         let resizedFrame = false;
         if (canvas.width !== width || canvas.height !== height) {
           canvas.width = width;
           canvas.height = height;
           resizedFrame = true;
         }
-        if (outputWidth !== rayWidth || outputHeight !== rayHeight) {
+        if (outputWidth !== width || outputHeight !== height) {
           gl.activeTexture(gl.TEXTURE1);
           gl.bindTexture(gl.TEXTURE_2D, outputTexture);
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, rayWidth, rayHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
           gl.bindFramebuffer(gl.FRAMEBUFFER, outputFramebuffer);
           gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, outputTexture, 0);
           const resizedFramebufferStatus = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
@@ -333,8 +331,8 @@ function startBlackHoleSession(
             schedule();
             return;
           }
-          outputWidth = rayWidth;
-          outputHeight = rayHeight;
+          outputWidth = width;
+          outputHeight = height;
           resizedFrame = true;
         }
         if (resizedFrame) {
@@ -345,12 +343,12 @@ function startBlackHoleSession(
       }
 
       gl.bindFramebuffer(gl.FRAMEBUFFER, outputFramebuffer);
-      gl.viewport(0, 0, outputWidth, outputHeight);
+      gl.viewport(0, 0, canvas.width, canvas.height);
       gl.useProgram(program);
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
       gl.enableVertexAttribArray(position);
       gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
-      gl.uniform2f(uniforms.resolution, outputWidth, outputHeight);
+      gl.uniform2f(uniforms.resolution, canvas.width, canvas.height);
       gl.uniform1f(uniforms.time, visualComparison.fixedTime ?? (now - startedAt) / 1000);
       refreshSceneTexture();
       gl.uniform1f(uniforms.expanded, getExpanded());
@@ -364,8 +362,8 @@ function startBlackHoleSession(
       if (!rendererReady && readbackAttempts < 120) {
         readbackAttempts += 1;
         gl.finish();
-        const pixels = new Uint8Array(outputWidth * outputHeight * 4);
-        gl.readPixels(0, 0, outputWidth, outputHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        const pixels = new Uint8Array(canvas.width * canvas.height * 4);
+        gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
         let energy = 0;
         let alphaEnergy = 0;
         let maxChannel = 0;
