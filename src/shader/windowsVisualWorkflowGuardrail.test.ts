@@ -18,11 +18,10 @@ describe("Windows Gargantua visual workflow guardrail", () => {
     expect(smokeSource).not.toContain("Lower-arc candidate changed the upper arc too much");
   });
 
-  it("waits for a validated expanded WebGL frame instead of sleeping or toggling an already-expanded visual window", () => {
-    expect(smokeSource).toContain("function Wait-ExpandedRenderReady");
-    expect(smokeSource).toContain("$expandedWindow = Wait-ExpandedRenderReady $visualProcess.Id 800 600 30000");
-    expect(smokeSource).toContain('"VISUAL_COMPARISON_READY mode=$Mode title=$($expandedWindow.Title)"');
-    expect(smokeSource).not.toContain("Failed to expand $Mode visual comparison");
-    expect(smokeSource).not.toContain("Start-Sleep -Milliseconds 1600");
+  it("captures only after the renderer reports a validated WebGL frame", () => {
+    const readyIndex = smokeSource.indexOf("$orbWindow = Wait-OrbRenderReady $visualProcess.Id");
+    const captureIndex = smokeSource.indexOf("Save-ScreenRegion $OutputPath $expandedWindow.ClientBounds");
+    expect(readyIndex).toBeGreaterThan(-1);
+    expect(captureIndex).toBeGreaterThan(readyIndex);
   });
 });
