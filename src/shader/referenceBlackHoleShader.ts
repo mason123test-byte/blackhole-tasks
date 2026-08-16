@@ -18,6 +18,7 @@ in vec2 v_uv;
 out vec4 outColor;
 
 uniform vec2 u_resolution;
+uniform vec2 u_ray_jitter;
 uniform float u_time;
 uniform float u_expanded;
 uniform sampler2D u_scene_texture;
@@ -358,6 +359,8 @@ void sampleDiskSurface(
 void rayTracedReference() {
   float aspect = u_resolution.x / max(u_resolution.y, 1.0);
   vec2 referenceUv = vec2(v_uv.x, 1.0 - v_uv.y);
+  vec2 sceneUv = referenceUv;
+  referenceUv += u_ray_jitter / u_resolution;
   vec2 screen = (referenceUv - 0.5) * vec2(aspect, 1.0);
 
   float candidateWeight = u_visual_compare < 0.5
@@ -382,7 +385,7 @@ void rayTracedReference() {
   vec2 cameraPlane = mix(baselineCameraPlane, candidateCameraPlane, candidateWeight);
 
   vec4 sceneSample = u_scene_ready > 0.5
-    ? texture(u_scene_texture, clamp(referenceUv, vec2(0.0), vec2(1.0)))
+    ? texture(u_scene_texture, clamp(sceneUv, vec2(0.0), vec2(1.0)))
     : vec4(0.0);
 
   float cameraImpact = OBSERVER_R * length(cameraPlane);
