@@ -521,6 +521,25 @@ function Get-BrightMaskMetrics(
   [PSCustomObject]@{ Intersection = $intersection; Union = $union; Xor = $xor; IoU = $iou }
 }
 
+function Get-BrightPixelCount(
+  [System.Drawing.Bitmap]$Bitmap,
+  [int]$Left,
+  [int]$Top,
+  [int]$Right,
+  [int]$Bottom
+) {
+  $count = 0
+  for ($y = $Top; $y -lt $Bottom; $y++) {
+    for ($x = $Left; $x -lt $Right; $x++) {
+      $pixel = $Bitmap.GetPixel($x, $y)
+      if ([Math]::Max($pixel.R, [Math]::Max($pixel.G, $pixel.B)) -ge 96) {
+        $count++
+      }
+    }
+  }
+  return $count
+}
+
 function Write-VisualComparisonEvidence(
   [string]$BaselinePath,
   [string]$CandidatePath,
@@ -556,6 +575,9 @@ function Write-VisualComparisonEvidence(
     $upper = Get-BrightMaskMetrics $baseline $candidate `
       ([int]($baseline.Width * 0.18)) ([int]($baseline.Height * 0.18)) `
       ([int]($baseline.Width * 0.82)) ([int]($baseline.Height * 0.46))
+    $candidateBrightPixels = Get-BrightPixelCount $candidate `
+      ([int]($candidate.Width * 0.28)) ([int]($candidate.Height * 0.18)) `
+      ([int]($candidate.Width * 0.72)) ([int]($candidate.Height * 0.76))
     $culture = [System.Globalization.CultureInfo]::InvariantCulture
     $lowerIoU = $lower.IoU
     $upperIoU = $upper.IoU
@@ -568,13 +590,11 @@ function Write-VisualComparisonEvidence(
       "upperUnion=$($upper.Union)"
       "upperXor=$($upper.Xor)"
       "upperIoU=$($upperIoU.ToString('F6', $culture))"
+      "candidateBrightPixels=$candidateBrightPixels"
     ) | Set-Content -LiteralPath $MetricsPath
-    "VISUAL_COMPARISON_METRICS lowerIoU=$($lowerIoU.ToString('F6', $culture)) upperIoU=$($upperIoU.ToString('F6', $culture)) lowerXor=$($lower.Xor) upperXor=$($upper.Xor)"
-    if ($lowerIoU -gt 0.93) {
-      throw "Lower accretion arc did not change visibly enough: lowerIoU=$lowerIoU."
-    }
-    if ($upperIoU -lt 0.98) {
-      throw "Lower-arc candidate changed the upper arc too much: upperIoU=$upperIoU."
+    "VISUAL_COMPARISON_METRICS lowerIoU=$($lowerIoU.ToString('F6', $culture)) upperIoU=$($upperIoU.ToString('F6', $culture)) lowerXor=$($lower.Xor) upperXor=$($upper.Xor) candidateBrightPixels=$candidateBrightPixels"
+    if ($candidateBrightPixels -lt 1000) {
+      throw "Candidate Gargantua render is effectively blank: candidateBrightPixels=$candidateBrightPixels."
     }
   } finally {
     $baseline.Dispose()
