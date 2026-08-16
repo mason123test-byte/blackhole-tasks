@@ -333,7 +333,7 @@ void sampleDiskSurface(
   out vec3 diskColor,
   out float diskAlpha
 ) {
-  float innerEdge = smoothstep(DISK_INNER, DISK_INNER * 1.12, hitRadius);
+  float innerEdge = smoothstep(DISK_INNER, DISK_INNER * 1.025, hitRadius);
   float outerEdge = 1.0 - smoothstep(DISK_OUTER * 0.76, DISK_OUTER, hitRadius);
   float radialEmission = innerEdge * outerEdge * pow(DISK_INNER / hitRadius, 0.72);
 
