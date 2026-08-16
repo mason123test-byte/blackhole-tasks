@@ -16,7 +16,7 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
   it("uses a real Kerr null-geodesic state instead of heuristic frame dragging", () => {
     expect(REFERENCE_BLACK_HOLE_INFO).toMatchObject({
       model: "interstellar-gargantua-kerr-geodesic",
-      integrationSteps: 176,
+      integrationSteps: 240,
       tracePadding: 3,
       starGain: 0,
       sceneInput: "svg-gpu-texture",
@@ -26,7 +26,7 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
       cameraReference: "DNGR Appendix A.1 fixed-event FIDO local sky",
       cameraVerticalFovDeg: 31,
     });
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("#define N_STEPS 176");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("#define N_STEPS 240");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float KERR_A = 0.60;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float KERR_A2 = KERR_A * KERR_A;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float CAMERA_VERTICAL_FOV = 0.54105207;");
