@@ -46,6 +46,7 @@ const float STAR_GAIN = 0.0;
 const float DILATION_MIN = 0.20;
 const float GARGANTUA_DOPPLER_MIX = 0.0;
 const float GARGANTUA_DISK_TEMP = 4500.0;
+const float DISK_SOURCE_DIAGNOSTIC = 1.0;
 
 float hash21(vec2 p) {
   p = fract(p * vec2(234.34, 435.345));
@@ -341,9 +342,9 @@ void sampleDiskSurface(
   float kepler = pow(DISK_INNER / hitRadius, 1.5);
   float swirl = hitRadius * 0.85 - patternTime * kepler * 3.6;
   float rawStreak = diskStreakSample(hitRadius, turns, swirl);
-  float streak = 0.52 + 1.10 * rawStreak * rawStreak;
+  float streak = mix(0.52 + 1.10 * rawStreak * rawStreak, 1.0, DISK_SOURCE_DIAGNOSTIC);
 
-  float grazing = 0.82 + 0.18 * smoothstep(0.0, 1.0, abs(sin(hitPhi)));
+  float grazing = mix(0.82 + 0.18 * smoothstep(0.0, 1.0, abs(sin(hitPhi))), 1.0, DISK_SOURCE_DIAGNOSTIC);
   float brightness = radialEmission * streak * grazing;
   vec3 thermalColor = blackbody(GARGANTUA_DISK_TEMP);
   float dopplerMix = GARGANTUA_DOPPLER_MIX;
