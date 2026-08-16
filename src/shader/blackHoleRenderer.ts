@@ -24,7 +24,6 @@ void main() {
   outColor = texture(u_frame_texture, v_uv);
 }`;
 
-
 function reportOrbFrame(renderer: "webgl2", energy: number, width: number, height: number, diagnostic = "") {
   const diagnosticSuffix = diagnostic ? `|diag=${diagnostic}` : "";
   document.title = `黑洞任务|renderer=${renderer}|frame=ready|energy=${energy}|size=${width}x${height}${diagnosticSuffix}`;
@@ -95,6 +94,7 @@ function startBlackHoleSession(
 ) {
   const profile = getRenderProfile(options.quality ?? "balanced", options.lowPowerMode);
   const visualComparison = getVisualComparisonSettings(options.visualComparisonMode ?? "normal");
+  const freezeAfterValidatedFrame = visualComparison.fixedTime !== null;
   const gl = canvas.getContext("webgl2", {
     alpha: true,
     antialias: false,
@@ -284,6 +284,7 @@ function startBlackHoleSession(
     resizeObserver?.observe(canvas);
 
     const schedule = () => {
+      if (freezeAfterValidatedFrame && rendererReady) return;
       if (!disposed && !failed && !document.hidden && animationFrame === 0) {
         animationFrame = requestAnimationFrame(render);
       }
@@ -308,9 +309,11 @@ function startBlackHoleSession(
           window.devicePixelRatio,
           profile.pixelRatioCap,
         );
+        let resizedFrame = false;
         if (canvas.width !== width || canvas.height !== height) {
           canvas.width = width;
           canvas.height = height;
+          resizedFrame = true;
         }
         if (outputWidth !== width || outputHeight !== height) {
           gl.activeTexture(gl.TEXTURE1);
@@ -331,6 +334,11 @@ function startBlackHoleSession(
           }
           outputWidth = width;
           outputHeight = height;
+          resizedFrame = true;
+        }
+        if (resizedFrame) {
+          rendererReady = false;
+          readbackAttempts = 0;
         }
         needsResize = false;
       }
@@ -350,10 +358,11 @@ function startBlackHoleSession(
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
+      let validatedEnergy: number | null = null;
+      let validatedDiagnostic = "";
       // The orb WebView is created hidden. Some WebView2/CI combinations keep
       // requestAnimationFrame suspended until focus changes, so prove that a
-      // real geodesic frame exists and expose the result through the native
-      // window title used by the Windows smoke probe.
+      // real geodesic frame exists before publishing frame=ready.
       if (!rendererReady && readbackAttempts < 120) {
         readbackAttempts += 1;
         gl.finish();
@@ -373,11 +382,12 @@ function startBlackHoleSession(
         }
         const glError = gl.getError();
         const framebufferStatus = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
-        const diagnostic = `a${alphaEnergy}-m${maxChannel}-am${maxAlpha}-e${glError}-f${framebufferStatus}`;
-        canvas.dataset.energy = String(energy);
-        canvas.dataset.diagnostic = diagnostic;
-        reportOrbFrame("webgl2", energy, canvas.width, canvas.height, diagnostic);
-        rendererReady = energy > 100;
+        const expandedSceneReady = getExpanded() < 0.5 || sceneReady;
+        const validatedEnergy = expandedSceneReady ? energy : 0;
+        validatedDiagnostic = `a${alphaEnergy}-m${maxChannel}-am${maxAlpha}-sr${expandedSceneReady ? 1 : 0}-e${glError}-f${framebufferStatus}`;
+        canvas.dataset.energy = String(validatedEnergy);
+        canvas.dataset.diagnostic = validatedDiagnostic;
+        rendererReady = validatedEnergy > 100;
       }
 
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -392,13 +402,20 @@ function startBlackHoleSession(
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       gl.activeTexture(gl.TEXTURE0);
 
+      if (validatedEnergy !== null) {
+        gl.finish();
+        reportOrbFrame("webgl2", validatedEnergy, canvas.width, canvas.height, validatedDiagnostic);
+      }
+
       measuredFrames += 1;
       if (now - measuredAt >= 1000) {
         canvas.dataset.fps = String(Math.round(measuredFrames * 1000 / (now - measuredAt)));
         measuredFrames = 0;
         measuredAt = now;
       }
-      schedule();
+      if (!freezeAfterValidatedFrame || !rendererReady) {
+        schedule();
+      }
     };
     const onVisibility = () => {
       if (document.hidden) {
