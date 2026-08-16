@@ -47,6 +47,7 @@ const float DILATION_MIN = 0.20;
 const float GARGANTUA_DOPPLER_MIX = 0.0;
 const float GARGANTUA_DISK_TEMP = 4500.0;
 const float DISK_SOURCE_DIAGNOSTIC = 1.0;
+const float DISK_ORDER_DIAGNOSTIC = 1.0;
 
 float hash21(vec2 p) {
   p = fract(p * vec2(234.34, 435.345));
@@ -406,6 +407,7 @@ void rayTracedReference() {
 
   bool captured = false;
   int diskCrossingCount = 0;
+  int equatorialCrossingCount = 0;
   vec3 accumulatedDisk = vec3(0.0);
   float transmittance = 1.0;
   float dilation = mix(1.0, DILATION_MIN, u_expanded);
@@ -494,6 +496,7 @@ void rayTracedReference() {
 
     float side = theta - 0.5 * PI;
     if (side * previousSide < 0.0 && diskCrossingCount < MAX_DISK_CROSSINGS) {
+      equatorialCrossingCount += 1;
       float crossing = previousSide / (previousSide - side);
       float diskRadius = mix(previousR, r, crossing);
       if (diskRadius > DISK_INNER && diskRadius < DISK_OUTER) {
@@ -501,6 +504,16 @@ void rayTracedReference() {
         vec3 diskColor;
         float diskAlpha;
         sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha);
+        if (DISK_ORDER_DIAGNOSTIC > 0.5) {
+          if (equatorialCrossingCount == 1) {
+            diskColor = vec3(1.00, 0.12, 0.04);
+          } else if (equatorialCrossingCount == 2) {
+            diskColor = vec3(0.08, 1.00, 0.18);
+          } else {
+            diskColor = vec3(0.10, 0.25, 1.00);
+          }
+          diskAlpha = max(diskAlpha, 0.84);
+        }
         accumulatedDisk += transmittance * diskColor * diskAlpha;
         transmittance *= 1.0 - diskAlpha;
         diskCrossingCount += 1;
