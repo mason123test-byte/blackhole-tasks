@@ -17,4 +17,12 @@ describe("Windows Gargantua visual workflow guardrail", () => {
     expect(smokeSource).not.toContain("Lower accretion arc did not change visibly enough");
     expect(smokeSource).not.toContain("Lower-arc candidate changed the upper arc too much");
   });
+
+  it("waits for a validated expanded WebGL frame instead of sleeping or toggling an already-expanded visual window", () => {
+    expect(smokeSource).toContain("function Wait-ExpandedRenderReady");
+    expect(smokeSource).toContain("$expandedWindow = Wait-ExpandedRenderReady $visualProcess.Id 800 600 30000");
+    expect(smokeSource).toContain('"VISUAL_COMPARISON_READY mode=$Mode title=$($expandedWindow.Title)"');
+    expect(smokeSource).not.toContain("Failed to expand $Mode visual comparison");
+    expect(smokeSource).not.toContain("Start-Sleep -Milliseconds 1600");
+  });
 });
