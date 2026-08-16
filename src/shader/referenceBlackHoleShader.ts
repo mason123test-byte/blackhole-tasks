@@ -375,7 +375,8 @@ void sampleDiskSurface(
 
   float grazing = mix(0.82 + 0.18 * smoothstep(0.0, 1.0, abs(sin(hitPhi))), 1.0, DISK_SOURCE_DIAGNOSTIC);
   float brightness = radialEmission * streak * grazing;
-  vec3 thermalColor = blackbody(GARGANTUA_DISK_TEMP);
+  float localTemperature = mix(3200.0, GARGANTUA_DISK_TEMP, smoothstep(0.18, 0.82, rawStreak));
+  vec3 thermalColor = blackbody(localTemperature);
   float dopplerMix = GARGANTUA_DOPPLER_MIX;
   brightness *= mix(1.0, 1.0, dopplerMix);
 
