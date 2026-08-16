@@ -354,17 +354,39 @@ void sampleDiskSurface(
   diskAlpha = clamp(0.32 + brightness * 0.95, 0.0, 0.96);
 }
 
-void traceKerrSample(
-  vec2 cameraPlane,
-  vec4 sceneSample,
-  float patternTime,
-  out vec4 sampleColor,
-  out float criticalHint
-) {
+void rayTracedReference() {
+  float aspect = u_resolution.x / max(u_resolution.y, 1.0);
+  vec2 referenceUv = vec2(v_uv.x, 1.0 - v_uv.y);
+  vec2 screen = (referenceUv - 0.5) * vec2(aspect, 1.0);
+
+  float candidateWeight = u_visual_compare < 0.5
+    ? 0.0
+    : (u_visual_compare > 1.5 ? step(0.0, screen.x) : 1.0);
+
+  // The baseline keeps the old implicit impact-parameter framing for A/B only.
+  float shadowRadius = mix(0.112, 0.105, u_expanded);
+  float worldScale = B_CRIT / shadowRadius;
+  float baselineAlpha = screen.x * worldScale;
+  float baselineBeta = -screen.y * worldScale;
+  float baselineLowerWarp = (1.0 - candidateWeight)
+    * smoothstep(0.0, shadowRadius * 0.65, screen.y)
+    * (1.0 - smoothstep(shadowRadius * 3.6, shadowRadius * 5.2, length(screen)));
+  baselineBeta *= mix(1.0, 1.20, baselineLowerWarp);
+  vec2 baselineCameraPlane = vec2(baselineAlpha, baselineBeta) / OBSERVER_R;
+
+  // Production candidate: explicit pinhole projection. 31 degrees leaves the
+  // Kerr-lensed disk enough frame margin to match Figure 15(a) composition.
+  float cameraHalfTan = tan(0.5 * CAMERA_VERTICAL_FOV);
+  vec2 candidateCameraPlane = vec2(screen.x * 2.0, -screen.y * 2.0) * cameraHalfTan;
+  vec2 cameraPlane = mix(baselineCameraPlane, candidateCameraPlane, candidateWeight);
+
+  vec4 sceneSample = u_scene_ready > 0.5
+    ? texture(u_scene_texture, clamp(referenceUv, vec2(0.0), vec2(1.0)))
+    : vec4(0.0);
+
   float cameraImpact = OBSERVER_R * length(cameraPlane);
   if (cameraImpact > DISK_OUTER + 10.0) {
-    sampleColor = sceneSample;
-    criticalHint = 0.0;
+    outColor = sceneSample;
     return;
   }
 
@@ -380,13 +402,13 @@ void traceKerrSample(
   float previousR = r;
   float previousPhi = phi;
   float previousSide = theta - 0.5 * PI;
-  float minRayRadius = r;
-  float maxRayWinding = 0.0;
 
   bool captured = false;
   int diskCrossingCount = 0;
   vec3 accumulatedDisk = vec3(0.0);
   float transmittance = 1.0;
+  float dilation = mix(1.0, DILATION_MIN, u_expanded);
+  float patternTime = u_time * dilation;
   float h = 0.90;
 
   for (int i = 0; i < N_STEPS; i++) {
@@ -462,8 +484,6 @@ void traceKerrSample(
     pr = acceptedState.w;
     ptheta = acceptedPtheta;
     normalizePolarState(theta, phi, ptheta);
-    minRayRadius = min(minRayRadius, r);
-    maxRayWinding = max(maxRayWinding, abs(phi));
 
     h = clamp(
       h * clamp(0.90 * pow(max(acceptedErrorRatio, 1e-6), -0.20), 0.55, 1.80),
@@ -491,87 +511,21 @@ void traceKerrSample(
     previousSide = side;
   }
 
-  criticalHint = step(minRayRadius, 5.8);
-  criticalHint *= step(0.55, maxRayWinding);
-
   if (diskCrossingCount > 0) {
     vec3 background = captured ? vec3(0.0) : sceneSample.rgb;
     float backgroundAlpha = captured ? 1.0 : sceneSample.a;
     vec3 combined = accumulatedDisk + transmittance * background;
     float coverage = (1.0 - transmittance) + transmittance * backgroundAlpha;
-    sampleColor = vec4(combined, coverage);
+    outColor = vec4(combined, coverage);
     return;
   }
 
   if (captured) {
-    sampleColor = vec4(0.0, 0.0, 0.0, 1.0);
+    outColor = vec4(0.0, 0.0, 0.0, 1.0);
     return;
   }
 
-  sampleColor = sceneSample;
-}
-
-void rayTracedReference() {
-  float aspect = u_resolution.x / max(u_resolution.y, 1.0);
-  vec2 referenceUv = vec2(v_uv.x, 1.0 - v_uv.y);
-  vec2 screen = (referenceUv - 0.5) * vec2(aspect, 1.0);
-
-  float candidateWeight = u_visual_compare < 0.5
-    ? 0.0
-    : (u_visual_compare > 1.5 ? step(0.0, screen.x) : 1.0);
-
-  // The baseline keeps the old implicit impact-parameter framing for A/B only.
-  float shadowRadius = mix(0.112, 0.105, u_expanded);
-  float worldScale = B_CRIT / shadowRadius;
-  float baselineAlpha = screen.x * worldScale;
-  float baselineBeta = -screen.y * worldScale;
-  float baselineLowerWarp = (1.0 - candidateWeight)
-    * smoothstep(0.0, shadowRadius * 0.65, screen.y)
-    * (1.0 - smoothstep(shadowRadius * 3.6, shadowRadius * 5.2, length(screen)));
-  baselineBeta *= mix(1.0, 1.20, baselineLowerWarp);
-  vec2 baselineCameraPlane = vec2(baselineAlpha, baselineBeta) / OBSERVER_R;
-
-  // Production candidate: explicit pinhole projection. 31 degrees leaves the
-  // Kerr-lensed disk enough frame margin to match Figure 15(a) composition.
-  float cameraHalfTan = tan(0.5 * CAMERA_VERTICAL_FOV);
-  vec2 candidateCameraPlane = vec2(screen.x * 2.0, -screen.y * 2.0) * cameraHalfTan;
-  vec2 cameraPlane = mix(baselineCameraPlane, candidateCameraPlane, candidateWeight);
-
-  vec4 sceneSample = u_scene_ready > 0.5
-    ? texture(u_scene_texture, clamp(referenceUv, vec2(0.0), vec2(1.0)))
-    : vec4(0.0);
-
-  float dilation = mix(1.0, DILATION_MIN, u_expanded);
-  float patternTime = u_time * dilation;
-  vec4 centerColor;
-  float criticalHint;
-  traceKerrSample(cameraPlane, sceneSample, patternTime, centerColor, criticalHint);
-
-  if (candidateWeight > 0.5 && criticalHint > 0.5) {
-    float rayBundlePixel = 2.0 * cameraHalfTan / u_resolution.y;
-    vec2 bundleNormal = length(cameraPlane) > 1e-8 ? normalize(cameraPlane) : vec2(0.0, 1.0);
-    vec4 bundlePlus;
-    vec4 bundleMinus;
-    float ignoredHint;
-    traceKerrSample(
-      cameraPlane + bundleNormal * rayBundlePixel * 0.45,
-      sceneSample,
-      patternTime,
-      bundlePlus,
-      ignoredHint
-    );
-    traceKerrSample(
-      cameraPlane - bundleNormal * rayBundlePixel * 0.45,
-      sceneSample,
-      patternTime,
-      bundleMinus,
-      ignoredHint
-    );
-    outColor = (centerColor + bundlePlus + bundleMinus) / 3.0;
-    return;
-  }
-
-  outColor = centerColor;
+  outColor = sceneSample;
 }
 
 void main() {
