@@ -13,6 +13,10 @@ const blackHoleCanvasSource = readFileSync(
   resolve(process.cwd(), "src/components/orb/BlackHoleCanvas.tsx"),
   "utf8",
 );
+const rendererSource = readFileSync(
+  resolve(process.cwd(), "src/shader/blackHoleRenderer.ts"),
+  "utf8",
+);
 
 describe("black-hole render profiles", () => {
   it("uses the reference author's WebGL pixel-ratio ceiling", () => {
@@ -58,14 +62,18 @@ describe("black-hole render profiles", () => {
     expect(blackHoleCanvasSource).toContain('[expanded, lowPowerMode, onError, quality, visualComparisonMode]');
   });
 
-  it("stops diagnostic rendering after the first validated expanded frame", () => {
-    expect(blackHoleCanvasSource).toContain('const visualFramePattern = /renderer=webgl2\\|frame=ready\\|energy=(\\d+)\\|size=(\\d+)x(\\d+)/;');
-    expect(blackHoleCanvasSource).toContain('if (visualComparisonMode === "normal") return stopRenderer;');
-    expect(blackHoleCanvasSource).toContain('const freezeTimer = window.setInterval(() => {');
-    expect(blackHoleCanvasSource).toContain('Number(match[1]) > 100');
-    expect(blackHoleCanvasSource).toContain('Number(match[2]) >= 800');
-    expect(blackHoleCanvasSource).toContain('Number(match[3]) >= 600');
-    expect(blackHoleCanvasSource).toContain('stopRenderer();');
+  it("keeps the validated diagnostic frame alive instead of destroying GL resources before Windows composition", () => {
+    expect(rendererSource).toContain("const freezeAfterValidatedFrame = visualComparison.fixedTime !== null;");
+    expect(rendererSource).toContain("let resizedFrame = false;");
+    expect(rendererSource).toContain("rendererReady = false;");
+    expect(rendererSource).toContain("readbackAttempts = 0;");
+    expect(rendererSource).toContain("const expandedSceneReady = getExpanded() < 0.5 || sceneReady;");
+    expect(rendererSource).toContain("const validatedEnergy = expandedSceneReady ? energy : 0;");
+    expect(rendererSource).toContain("gl.finish();\n        reportOrbFrame(\"webgl2\", validatedEnergy");
+    expect(rendererSource).toContain("if (!freezeAfterValidatedFrame || !rendererReady) {");
+    expect(blackHoleCanvasSource).not.toContain("freezeTimer");
+    expect(blackHoleCanvasSource).not.toContain("stopVisualRenderer");
+    expect(blackHoleCanvasSource).toContain("return stopRenderer;");
   });
 
   it("keeps framebuffer reconstruction out of the production compositor", () => {
