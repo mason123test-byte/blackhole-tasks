@@ -432,9 +432,12 @@ void rayTracedReference() {
     float axisDistance = min(theta, PI - theta);
     float axisStepLimit = 0.20 * axisDistance / max(abs(dtheta0), 1e-4);
     h = min(h, max(KERR_MIN_STEP, axisStepLimit));
-    float equatorDistance = abs(theta - 0.5 * PI);
-    float equatorStepLimit = 0.30 * max(equatorDistance, 0.010) / max(abs(dtheta0), 1e-4);
-    h = min(h, max(KERR_MIN_STEP, equatorStepLimit));
+    float equatorSide = theta - 0.5 * PI;
+    float equatorDistance = abs(equatorSide);
+    if (equatorSide * dtheta0 < 0.0) {
+      float equatorStepLimit = 1.20 * max(equatorDistance, 0.010) / max(abs(dtheta0), 1e-4);
+      h = min(h, max(KERR_MIN_STEP, equatorStepLimit));
+    }
     float angularStepLimit = 0.24 / max(abs(dtheta0) + abs(dphi0), 1e-4);
     h = min(h, max(KERR_MIN_STEP, angularStepLimit));
     float horizonDistance = max(r - KERR_HORIZON, 0.02);
