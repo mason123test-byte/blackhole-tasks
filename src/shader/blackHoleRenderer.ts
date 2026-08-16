@@ -101,9 +101,6 @@ function startBlackHoleSession(
     depth: false,
     stencil: false,
     premultipliedAlpha: false,
-    // WebView2 can create this transparent surface while its native window is
-    // still hidden. Preserve the submitted frame until the first visible
-    // compositor/readback handshake has proved that real pixels exist.
     preserveDrawingBuffer: true,
     powerPreference: options.lowPowerMode ? "low-power" : "default",
   });
@@ -184,8 +181,6 @@ function startBlackHoleSession(
     gl.uniform1f(compositorUniforms.visualCompare, visualComparison.shaderMode);
     gl.useProgram(program);
 
-    // Ghostty provides iChannel0. Here WebView2 decodes an SVG task-field
-    // snapshot and uploads it directly to this texture; Canvas2D is never used.
     const sceneTexture = gl.createTexture();
     if (!sceneTexture) throw new Error("无法创建黑洞场景纹理");
     gl.activeTexture(gl.TEXTURE0);
@@ -196,11 +191,6 @@ function startBlackHoleSession(
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
 
-    // Render into an explicit texture-backed framebuffer first. WebView2's
-    // transparent DirectComposition default framebuffer can return zeroes from
-    // readPixels even when the submitted frame is visible. The explicit target
-    // gives both the native smoke probe and the compositor the same shader
-    // output: validate it here, then composite it to the window surface below.
     const outputTexture = gl.createTexture();
     const outputFramebuffer = gl.createFramebuffer();
     if (!outputTexture || !outputFramebuffer) throw new Error("无法创建黑洞输出帧缓冲");
@@ -360,9 +350,6 @@ function startBlackHoleSession(
 
       let validatedEnergy: number | null = null;
       let validatedDiagnostic = "";
-      // The orb WebView is created hidden. Some WebView2/CI combinations keep
-      // requestAnimationFrame suspended until focus changes, so prove that a
-      // real geodesic frame exists before publishing frame=ready.
       if (!rendererReady && readbackAttempts < 120) {
         readbackAttempts += 1;
         gl.finish();
@@ -383,7 +370,7 @@ function startBlackHoleSession(
         const glError = gl.getError();
         const framebufferStatus = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
         const expandedSceneReady = getExpanded() < 0.5 || sceneReady;
-        const validatedEnergy = expandedSceneReady ? energy : 0;
+        validatedEnergy = expandedSceneReady ? energy : 0;
         validatedDiagnostic = `a${alphaEnergy}-m${maxChannel}-am${maxAlpha}-sr${expandedSceneReady ? 1 : 0}-e${glError}-f${framebufferStatus}`;
         canvas.dataset.energy = String(validatedEnergy);
         canvas.dataset.diagnostic = validatedDiagnostic;
