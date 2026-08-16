@@ -77,7 +77,7 @@ export function getRenderSize(
 
 export function getRaySupersampleScale(devicePixelRatio: number, lowCostMode = false) {
   if (lowCostMode || (devicePixelRatio || 1) > 1.25) return 1;
-  return 1.25;
+  return 1.5;
 }
 
 interface RendererOptions {
