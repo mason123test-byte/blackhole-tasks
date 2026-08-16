@@ -116,6 +116,35 @@ void kerrDerivatives(
   dptheta = -safeSin * cosTheta * (L * L / (sin2 * sin2) - KERR_A2) / sigma;
 }
 
+void projectKerrMomenta(
+  float r,
+  float theta,
+  float L,
+  float kappa,
+  inout float pr,
+  inout float ptheta
+) {
+  float safeSin = max(abs(sin(theta)), 1e-4);
+  float sin2 = safeSin * safeSin;
+  float prSign = pr < 0.0 ? -1.0 : 1.0;
+  float pthetaSign = ptheta < 0.0 ? -1.0 : 1.0;
+
+  float thetaPotential = max(
+    kappa - KERR_A2 * sin2 - L * L / sin2,
+    0.0
+  );
+  ptheta = pthetaSign * sqrt(thetaPotential);
+
+  float r2 = r * r;
+  float delta = max(r2 - 2.0 * r + KERR_A2, 1e-5);
+  float radialPotential =
+    (r2 + KERR_A2) * (r2 + KERR_A2)
+    - 4.0 * KERR_A * r * L
+    + KERR_A2 * L * L
+    - delta * kappa;
+  pr = prSign * sqrt(max(radialPotential, 0.0)) / delta;
+}
+
 void normalizePolarStage(inout float theta, inout float ptheta) {
   if (theta < 0.0) {
     theta = -theta;
@@ -485,6 +514,7 @@ void rayTracedReference() {
     pr = acceptedState.w;
     ptheta = acceptedPtheta;
     normalizePolarState(theta, phi, ptheta);
+    projectKerrMomenta(r, theta, L, kappa, pr, ptheta);
 
     h = clamp(
       h * clamp(0.90 * pow(max(acceptedErrorRatio, 1e-6), -0.20), 0.55, 1.80),
