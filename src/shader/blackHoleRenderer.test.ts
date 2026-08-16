@@ -70,7 +70,12 @@ describe("black-hole render profiles", () => {
     expect(rendererSource).toContain("const expandedSceneReady = getExpanded() < 0.5 || sceneReady;");
     expect(rendererSource).toContain("validatedEnergy = expandedSceneReady ? energy : 0;");
     expect(rendererSource).not.toContain("const validatedEnergy = expandedSceneReady ? energy : 0;");
-    expect(rendererSource).toContain("gl.finish();\n        reportOrbFrame(\"webgl2\", validatedEnergy");
+    const compositorDrawIndex = rendererSource.lastIndexOf("gl.drawArrays(gl.TRIANGLES, 0, 6);");
+    const composedFinishIndex = rendererSource.lastIndexOf("gl.finish();");
+    const readyReportIndex = rendererSource.indexOf('reportOrbFrame("webgl2", validatedEnergy');
+    expect(compositorDrawIndex).toBeGreaterThan(-1);
+    expect(composedFinishIndex).toBeGreaterThan(compositorDrawIndex);
+    expect(readyReportIndex).toBeGreaterThan(composedFinishIndex);
     expect(rendererSource).toContain("if (!freezeAfterValidatedFrame || !rendererReady) {");
     expect(blackHoleCanvasSource).not.toContain("freezeTimer");
     expect(blackHoleCanvasSource).not.toContain("stopVisualRenderer");
