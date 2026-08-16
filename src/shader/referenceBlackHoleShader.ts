@@ -46,7 +46,7 @@ const float STAR_GAIN = 0.0;
 const float DILATION_MIN = 0.20;
 const float GARGANTUA_DOPPLER_MIX = 0.0;
 const float GARGANTUA_DISK_TEMP = 4500.0;
-const float DISK_SOURCE_DIAGNOSTIC = 1.0;
+const float DISK_SOURCE_DIAGNOSTIC = 0.0;
 
 float hash21(vec2 p) {
   p = fract(p * vec2(234.34, 435.345));
