@@ -19,6 +19,7 @@ describe("Kerr temporal pixel-beam filtering", () => {
     expect(rendererSource).toContain("[0.25, 0.25]");
     expect(rendererSource).toContain("let accumulatedRaySamples = 0;");
     expect(rendererSource).toContain("accumulatedRaySamples >= rayJitterSequence.length");
-    expect(rendererSource).toContain("gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);");
+    expect(rendererSource).toContain("gl.blendFunc(gl.CONSTANT_ALPHA, gl.ONE_MINUS_CONSTANT_ALPHA);");
+    expect(rendererSource).toContain("gl.blendColor(0, 0, 0, sampleWeight);");
   });
 });
