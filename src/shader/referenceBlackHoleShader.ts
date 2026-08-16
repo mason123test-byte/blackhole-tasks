@@ -408,6 +408,8 @@ void rayTracedReference() {
   bool captured = false;
   int diskCrossingCount = 0;
   int equatorialCrossingCount = 0;
+  float rejectedInnerDelta = 1e9;
+  int rejectedInnerOrder = 0;
   vec3 accumulatedDisk = vec3(0.0);
   float transmittance = 1.0;
   float dilation = mix(1.0, DILATION_MIN, u_expanded);
@@ -499,6 +501,13 @@ void rayTracedReference() {
       equatorialCrossingCount += 1;
       float crossing = previousSide / (previousSide - side);
       float diskRadius = mix(previousR, r, crossing);
+      if (diskRadius > DISK_INNER - 1.0 && diskRadius <= DISK_INNER) {
+        float innerDelta = DISK_INNER - diskRadius;
+        if (innerDelta < rejectedInnerDelta) {
+          rejectedInnerDelta = innerDelta;
+          rejectedInnerOrder = equatorialCrossingCount;
+        }
+      }
       if (diskRadius > DISK_INNER && diskRadius < DISK_OUTER) {
         float diskPhi = mix(previousPhi, phi, crossing);
         vec3 diskColor;
@@ -531,6 +540,17 @@ void rayTracedReference() {
     vec3 combined = accumulatedDisk + transmittance * background;
     float coverage = (1.0 - transmittance) + transmittance * backgroundAlpha;
     outColor = vec4(combined, coverage);
+    return;
+  }
+
+  if (DISK_ORDER_DIAGNOSTIC > 0.5 && rejectedInnerOrder > 0) {
+    if (rejectedInnerOrder == 1) {
+      outColor = vec4(1.00, 1.00, 0.00, 1.0);
+    } else if (rejectedInnerOrder == 2) {
+      outColor = vec4(1.00, 0.00, 1.00, 1.0);
+    } else {
+      outColor = vec4(0.00, 1.00, 1.00, 1.0);
+    }
     return;
   }
 
