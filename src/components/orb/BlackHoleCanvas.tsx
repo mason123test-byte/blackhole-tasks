@@ -17,8 +17,6 @@ interface BlackHoleCanvasProps {
   onError?(message: string): void;
 }
 
-const visualFramePattern = /renderer=webgl2\|frame=ready\|energy=(\d+)\|size=(\d+)x(\d+)/;
-
 export function BlackHoleCanvas({
   expanded,
   quality,
@@ -67,31 +65,7 @@ export function BlackHoleCanvas({
       () => sceneRef.current,
       { quality, lowPowerMode, visualComparisonMode, onError },
     );
-    if (visualComparisonMode === "normal") return stopRenderer;
-
-    let stopped = false;
-    const stopVisualRenderer = () => {
-      if (stopped) return;
-      stopped = true;
-      stopRenderer();
-    };
-    const freezeTimer = window.setInterval(() => {
-      const match = document.title.match(visualFramePattern);
-      if (
-        match
-        && Number(match[1]) > 100
-        && Number(match[2]) >= 800
-        && Number(match[3]) >= 600
-      ) {
-        window.clearInterval(freezeTimer);
-        stopVisualRenderer();
-      }
-    }, 50);
-
-    return () => {
-      window.clearInterval(freezeTimer);
-      stopVisualRenderer();
-    };
+    return stopRenderer;
   }, [expanded, lowPowerMode, onError, quality, visualComparisonMode]);
 
   return <canvas ref={ref} className="black-hole-canvas" aria-label="黑洞任务悬浮窗" />;
