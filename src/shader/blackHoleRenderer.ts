@@ -75,6 +75,11 @@ export function getRenderSize(
   };
 }
 
+export function getRaySupersampleScale(devicePixelRatio: number, lowCostMode = false) {
+  if (lowCostMode || (devicePixelRatio || 1) > 1.25) return 1;
+  return 1.25;
+}
+
 interface RendererOptions {
   quality?: RenderQuality;
   lowPowerMode?: boolean;
@@ -293,12 +298,16 @@ function startBlackHoleSession(
         : nextFrameAt + frameInterval;
 
       if (needsResize) {
-        const { width, height } = getRenderSize(
+        const baseSize = getRenderSize(
           canvas.clientWidth,
           canvas.clientHeight,
           window.devicePixelRatio,
           profile.pixelRatioCap,
         );
+        const lowCostMode = Boolean(options.lowPowerMode || options.quality === "low");
+        const rayScale = getRaySupersampleScale(window.devicePixelRatio, lowCostMode);
+        const width = Math.max(1, Math.round(baseSize.width * rayScale));
+        const height = Math.max(1, Math.round(baseSize.height * rayScale));
         let resizedFrame = false;
         if (canvas.width !== width || canvas.height !== height) {
           canvas.width = width;
