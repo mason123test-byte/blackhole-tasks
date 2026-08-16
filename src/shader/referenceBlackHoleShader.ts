@@ -26,7 +26,7 @@ uniform float u_visual_compare;
 
 #define PI 3.14159265359
 #define B_CRIT 5.1961524
-#define N_STEPS 240
+#define N_STEPS 176
 
 const float KERR_A = 0.60;
 const float KERR_A2 = KERR_A * KERR_A;
@@ -534,7 +534,7 @@ void main() {
 
 export const REFERENCE_BLACK_HOLE_INFO = {
   model: "interstellar-gargantua-kerr-geodesic",
-  integrationSteps: 240,
+  integrationSteps: 176,
   tracePadding: 3,
   starGain: 0,
   sceneInput: "svg-gpu-texture",

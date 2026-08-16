@@ -38,7 +38,7 @@ describe("black-hole render profiles", () => {
   it("uses the published-geometry Kerr Gargantua WebGL renderer with error-controlled stepping", () => {
     expect(BLACK_HOLE_RENDERER_INFO).toMatchObject({
       model: "interstellar-gargantua-kerr-geodesic",
-      integrationSteps: 240,
+      integrationSteps: 176,
       tracePadding: 3,
       starGain: 0,
       sceneInput: "svg-gpu-texture",
