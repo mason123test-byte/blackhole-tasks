@@ -80,6 +80,13 @@ export function getRaySupersampleScale(devicePixelRatio: number, lowCostMode = f
   return 1.25;
 }
 
+const rayJitterSequence = [
+  [-0.25, -0.25],
+  [0.25, -0.25],
+  [-0.25, 0.25],
+  [0.25, 0.25],
+] as const;
+
 interface RendererOptions {
   quality?: RenderQuality;
   lowPowerMode?: boolean;
@@ -168,6 +175,7 @@ function startBlackHoleSession(
 
     const uniforms = {
       resolution: gl.getUniformLocation(program, "u_resolution"),
+      rayJitter: gl.getUniformLocation(program, "u_ray_jitter"),
       time: gl.getUniformLocation(program, "u_time"),
       expanded: gl.getUniformLocation(program, "u_expanded"),
       sceneTexture: gl.getUniformLocation(program, "u_scene_texture"),
@@ -229,6 +237,7 @@ function startBlackHoleSession(
     let needsResize = true;
     let readbackAttempts = 0;
     let rendererReady = false;
+    let accumulatedRaySamples = 0;
     let contextLost = false;
     let failed = false;
     let sceneSignature = "";
@@ -245,6 +254,8 @@ function startBlackHoleSession(
       const signature = buildSceneTextureSignature(snapshot);
       if (signature === sceneSignature) return;
       sceneSignature = signature;
+      accumulatedRaySamples = 0;
+      rendererReady = false;
       const revision = ++sceneRevision;
       if (!snapshot.expanded) {
         sceneReady = false;
@@ -338,9 +349,17 @@ function startBlackHoleSession(
         if (resizedFrame) {
           rendererReady = false;
           readbackAttempts = 0;
+          accumulatedRaySamples = 0;
         }
         needsResize = false;
       }
+
+      const useTemporalBeamFilter = freezeAfterValidatedFrame;
+      const jitterIndex = useTemporalBeamFilter
+        ? Math.min(accumulatedRaySamples, rayJitterSequence.length - 1)
+        : 0;
+      const jitter = useTemporalBeamFilter ? rayJitterSequence[jitterIndex] : [0, 0] as const;
+      const expandedSceneReady = getExpanded() < 0.5 || sceneReady;
 
       gl.bindFramebuffer(gl.FRAMEBUFFER, outputFramebuffer);
       gl.viewport(0, 0, canvas.width, canvas.height);
@@ -349,13 +368,29 @@ function startBlackHoleSession(
       gl.enableVertexAttribArray(position);
       gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
       gl.uniform2f(uniforms.resolution, canvas.width, canvas.height);
+      gl.uniform2f(uniforms.rayJitter, jitter[0], jitter[1]);
       gl.uniform1f(uniforms.time, visualComparison.fixedTime ?? (now - startedAt) / 1000);
       refreshSceneTexture();
       gl.uniform1f(uniforms.expanded, getExpanded());
       gl.uniform1f(uniforms.sceneReady, sceneReady ? 1 : 0);
-      gl.clearColor(0, 0, 0, 0);
-      gl.clear(gl.COLOR_BUFFER_BIT);
+
+      const canAccumulate = useTemporalBeamFilter && expandedSceneReady;
+      if (!canAccumulate || accumulatedRaySamples === 0) {
+        gl.disable(gl.BLEND);
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+      }
+      if (canAccumulate) {
+        const sampleWeight = 1 / (accumulatedRaySamples + 1);
+        gl.enable(gl.BLEND);
+        gl.blendColor(0, 0, 0, sampleWeight);
+        gl.blendFunc(gl.CONSTANT_ALPHA, gl.ONE_MINUS_CONSTANT_ALPHA);
+      }
       gl.drawArrays(gl.TRIANGLES, 0, 6);
+      gl.disable(gl.BLEND);
+      if (canAccumulate && accumulatedRaySamples < rayJitterSequence.length) {
+        accumulatedRaySamples += 1;
+      }
 
       let validatedEnergy: number | null = null;
       let validatedDiagnostic = "";
@@ -378,12 +413,13 @@ function startBlackHoleSession(
         }
         const glError = gl.getError();
         const framebufferStatus = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
-        const expandedSceneReady = getExpanded() < 0.5 || sceneReady;
-        validatedEnergy = expandedSceneReady ? energy : 0;
-        validatedDiagnostic = `a${alphaEnergy}-m${maxChannel}-am${maxAlpha}-sr${expandedSceneReady ? 1 : 0}-e${glError}-f${framebufferStatus}`;
+        const validatedSceneReady = getExpanded() < 0.5 || sceneReady;
+        validatedEnergy = validatedSceneReady ? energy : 0;
+        validatedDiagnostic = `a${alphaEnergy}-m${maxChannel}-am${maxAlpha}-sr${validatedSceneReady ? 1 : 0}-e${glError}-f${framebufferStatus}`;
         canvas.dataset.energy = String(validatedEnergy);
         canvas.dataset.diagnostic = validatedDiagnostic;
-        rendererReady = validatedEnergy > 100;
+        const beamReady = !useTemporalBeamFilter || accumulatedRaySamples >= rayJitterSequence.length;
+        rendererReady = validatedEnergy > 100 && beamReady;
       }
 
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
