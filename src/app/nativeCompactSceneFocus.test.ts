@@ -15,15 +15,17 @@ describe("compact scene focus retention", () => {
     expect(tauriSource).not.toContain("set_scene_expanded_inner(&app, expanded, expanded)");
   });
 
-  it("waits for React paint only before expansion, never before collapse", () => {
+  it("commits React state synchronously and waits for paint only before expansion", () => {
     expect(backendSource).toContain("const waitForPaint = () =>");
     expect(backendSource).toContain("requestAnimationFrame(() => requestAnimationFrame(() => resolve()))");
     expect(backendSource).toContain(
       'if (command === "set_scene_expanded" && args.expanded === true) await waitForPaint();',
     );
     expect(backendSource).not.toContain('if (command === "set_scene_expanded") await waitForPaint();');
-    expect(orbAppSource).toContain("if (next) {");
-    expect(orbAppSource).toContain(
+    expect(orbAppSource).toContain('import { flushSync } from "react-dom";');
+    expect(orbAppSource).toContain("flushSync(() => {");
+    expect(orbAppSource).toContain('await backend.window("set_scene_expanded", { expanded: next });');
+    expect(orbAppSource).not.toContain(
       "await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));",
     );
   });
