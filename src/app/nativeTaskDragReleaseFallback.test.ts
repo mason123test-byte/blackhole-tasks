@@ -32,4 +32,15 @@ describe("native task drag release fallback", () => {
     expect(orbAppSource).toContain("onPointerUp={(event) => {");
     expect(orbAppSource).toContain("if (taskDragRef.current) endTaskDrag(event);");
   });
+
+  it("falls back to MouseEvents when injected Win32 input does not produce a complete PointerEvent stream", () => {
+    expect(orbAppSource).toContain("onMouseDown={(event) => onMouseDown(event, task)}");
+    expect(orbAppSource).toContain("const startTaskMouseDrag = (event: React.MouseEvent<HTMLElement>, task: Task) => {");
+    expect(orbAppSource).toContain("const moveTaskMouseDrag = (event: React.MouseEvent<HTMLElement>) => {");
+    expect(orbAppSource).toContain("const endTaskMouseDrag = (event: React.MouseEvent<HTMLElement>) => {");
+    expect(orbAppSource).toContain("onMouseMove={(event) => {");
+    expect(orbAppSource).toContain("if (taskDragRef.current) moveTaskMouseDrag(event);");
+    expect(orbAppSource).toContain("onMouseUp={(event) => {");
+    expect(orbAppSource).toContain("if (taskDragRef.current) endTaskMouseDrag(event);");
+  });
 });
