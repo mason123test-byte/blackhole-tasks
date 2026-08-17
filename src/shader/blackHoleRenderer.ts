@@ -24,8 +24,12 @@ out vec4 outColor;
 vec4 flareTap(vec2 uv) {
   vec4 sampleColor = texture(u_frame_texture, uv);
   float peak = max(sampleColor.r, max(sampleColor.g, sampleColor.b));
-  float warm = smoothstep(-0.03, 0.18, sampleColor.r - sampleColor.b);
-  float mask = sampleColor.a * smoothstep(0.42, 0.82, peak) * mix(0.05, 1.0, warm);
+  float whiteFloor = min(sampleColor.r, min(sampleColor.g, sampleColor.b));
+  float warm = smoothstep(0.015, 0.14, sampleColor.r - sampleColor.b);
+  float mask = sampleColor.a
+    * smoothstep(0.56, 0.80, whiteFloor)
+    * smoothstep(0.72, 0.92, peak)
+    * warm;
   return vec4(sampleColor.rgb * mask, mask);
 }
 
@@ -45,12 +49,13 @@ vec4 flareRing(vec2 offset) {
 void main() {
   vec4 base = texture(u_frame_texture, v_uv);
   vec2 texel = 1.0 / max(u_resolution, vec2(1.0));
-  vec4 nearGlow = flareRing(texel * 6.5);
-  vec4 farGlow = flareRing(texel * 24.0);
+  vec4 nearGlow = flareRing(texel * 5.0);
+  vec4 midGlow = flareRing(texel * 15.0);
+  vec4 farGlow = flareRing(texel * 40.0);
 
-  vec3 glow = nearGlow.rgb * 0.22 + farGlow.rgb * 0.10;
-  float glowAlpha = nearGlow.a * 0.16 + farGlow.a * 0.08;
-  outColor = vec4(clamp(base.rgb + glow, 0.0, 1.0), max(base.a, min(glowAlpha, 0.38)));
+  vec3 glow = nearGlow.rgb * 0.50 + midGlow.rgb * 0.26 + farGlow.rgb * 0.12;
+  float glowAlpha = nearGlow.a * 0.28 + midGlow.a * 0.15 + farGlow.a * 0.08;
+  outColor = vec4(clamp(base.rgb + glow, 0.0, 1.0), max(base.a, min(glowAlpha, 0.52)));
 }`;
 
 function reportOrbFrame(renderer: "webgl2", energy: number, width: number, height: number, diagnostic = "") {
