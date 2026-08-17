@@ -726,6 +726,12 @@ try {
   [System.Windows.Forms.SendKeys]::SendWait($smokeTaskTitle)
   [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
   Wait-SmokeTaskState $smokeTaskTitle $true "q1" "todo" | Out-Null
+  # The Rust snapshot can observe the inserted row before React's awaited
+  # createTask call has unmounted InlineAdd. Escape is harmless once the form
+  # is gone, and guarantees the native drag starts on the task card instead
+  # of the still-focused input field.
+  [System.Windows.Forms.SendKeys]::SendWait("{ESC}")
+  Start-Sleep -Milliseconds 500
   Start-Sleep -Milliseconds 200
   Save-DesktopScreenshot (Join-Path $OutputDirectory "03-task-created-q1.png")
 
