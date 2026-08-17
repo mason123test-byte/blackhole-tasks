@@ -133,6 +133,7 @@ public static class BlackHoleWindowProbe
         if (!SetCursorPos(x, y)) return false;
         Thread.Sleep(80);
         mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
+        Thread.Sleep(50);
         mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
         return true;
     }
