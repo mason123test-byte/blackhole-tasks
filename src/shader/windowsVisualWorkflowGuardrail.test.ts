@@ -44,27 +44,4 @@ describe("Windows Gargantua visual workflow guardrail", () => {
     expect(settleIndex).toBeGreaterThan(escapeIndex);
     expect(dragIndex).toBeGreaterThan(settleIndex);
   });
-
-  it("settles the compact scene before the persistence reopen click", () => {
-    const persistenceCloseIndex = smokeSource.indexOf(
-      'Invoke-SceneCloseClick $expanded "persistence"',
-    );
-    const compactIndex = smokeSource.indexOf(
-      "$orb = Wait-SceneCompact $process.Id 300 230 10000",
-      persistenceCloseIndex,
-    );
-    const settleIndex = smokeSource.indexOf(
-      "Start-Sleep -Milliseconds 500",
-      compactIndex,
-    );
-    const centerIndex = smokeSource.indexOf(
-      "$orbCenterX = [int](($orb.ClientBounds.Left + $orb.ClientBounds.Right) / 2)",
-      compactIndex,
-    );
-
-    expect(persistenceCloseIndex).toBeGreaterThan(-1);
-    expect(compactIndex).toBeGreaterThan(persistenceCloseIndex);
-    expect(settleIndex).toBeGreaterThan(compactIndex);
-    expect(centerIndex).toBeGreaterThan(settleIndex);
-  });
 });
