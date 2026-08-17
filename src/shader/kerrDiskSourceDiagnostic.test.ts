@@ -7,7 +7,10 @@ describe("Kerr disk source structure", () => {
       "const float DISK_SOURCE_DIAGNOSTIC = 0.0;",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float streak = mix(0.52 + 1.10 * rawStreak * rawStreak, 1.0, DISK_SOURCE_DIAGNOSTIC);",
+      "float rawStreak = diskStreakSample(hitRadius, turns, swirl);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float streak = mix(0.74 + 0.30 * rawStreak, 1.0, DISK_SOURCE_DIAGNOSTIC);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float grazing = mix(0.82 + 0.18 * smoothstep(0.0, 1.0, abs(sin(hitPhi))), 1.0, DISK_SOURCE_DIAGNOSTIC);",
