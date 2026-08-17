@@ -13,10 +13,16 @@ describe("Kerr disk source structure", () => {
       "float grazing = mix(0.82 + 0.18 * smoothstep(0.0, 1.0, abs(sin(hitPhi))), 1.0, DISK_SOURCE_DIAGNOSTIC);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float localTemperature = mix(3200.0, GARGANTUA_DISK_TEMP, smoothstep(0.18, 0.82, rawStreak));",
+      "float radialProgress = clamp((hitRadius - DISK_INNER) / (DISK_OUTER - DISK_INNER), 0.0, 1.0);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "vec3 thermalColor = blackbody(localTemperature);",
+      "float innerHeat = 1.0 - smoothstep(0.05, 0.78, radialProgress);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float streakHeat = smoothstep(0.22, 0.90, rawStreak);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float localTemperature = mix(3100.0, 5200.0, clamp(0.72 * innerHeat + 0.28 * streakHeat, 0.0, 1.0));",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float radialEmission = innerEdge * outerEdge * pow(DISK_INNER / hitRadius, 0.72);",
