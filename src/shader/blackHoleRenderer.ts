@@ -43,14 +43,16 @@ vec4 flareSample(
 
 void main() {
   vec4 base = textureLod(u_frame_texture, v_uv, 0.0);
+  float basePeak = max(base.r, max(base.g, base.b));
+  float emissionSupport = base.a * smoothstep(0.015, 0.18, basePeak);
   float availableLod = floor(log2(max(min(u_resolution.x, u_resolution.y), 1.0)));
   vec4 nearGlow = flareSample(min(2.0, availableLod), 0.18, 0.45, 0.30, 0.70, 0.003, 0.08);
   vec4 midGlow = flareSample(min(4.0, availableLod), 0.08, 0.28, 0.14, 0.48, 0.002, 0.06);
   vec4 farGlow = flareSample(min(6.0, availableLod), 0.025, 0.12, 0.06, 0.24, 0.001, 0.04);
 
-  vec3 glow = nearGlow.rgb * 0.42 + midGlow.rgb * 0.24 + farGlow.rgb * 0.14;
-  float glowAlpha = nearGlow.a * 0.22 + midGlow.a * 0.12 + farGlow.a * 0.06;
-  outColor = vec4(clamp(base.rgb + glow, 0.0, 1.0), max(base.a, min(glowAlpha, 0.48)));
+  vec3 glow = (nearGlow.rgb * 0.22 + midGlow.rgb * 0.10 + farGlow.rgb * 0.04) * emissionSupport;
+  float glowAlpha = (nearGlow.a * 0.12 + midGlow.a * 0.05 + farGlow.a * 0.02) * emissionSupport;
+  outColor = vec4(clamp(base.rgb + glow, 0.0, 1.0), max(base.a, min(glowAlpha, 0.28)));
 }`;
 
 function reportOrbFrame(renderer: "webgl2", energy: number, width: number, height: number, diagnostic = "") {

@@ -82,14 +82,18 @@ describe("black-hole render profiles", () => {
     expect(blackHoleCanvasSource).toContain("return stopRenderer;");
   });
 
-  it("uses a mipmapped three-scale film flare without reconstructing black-hole geometry", () => {
+  it("keeps mip flare inside pixels that already contain physical Kerr emission", () => {
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("textureLod(u_frame_texture, v_uv, lod)");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("textureLod(u_frame_texture, v_uv, 0.0)");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("min(2.0, availableLod)");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("min(4.0, availableLod)");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("min(6.0, availableLod)");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("float basePeak = max(base.r, max(base.g, base.b));");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "vec3 glow = nearGlow.rgb * 0.42 + midGlow.rgb * 0.24 + farGlow.rgb * 0.14;",
+      "float emissionSupport = base.a * smoothstep(0.015, 0.18, basePeak);",
+    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
+      "vec3 glow = (nearGlow.rgb * 0.22 + midGlow.rgb * 0.10 + farGlow.rgb * 0.04) * emissionSupport;",
+    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
+      "float glowAlpha = (nearGlow.a * 0.12 + midGlow.a * 0.05 + farGlow.a * 0.02) * emissionSupport;",
     );
     expect(rendererSource).toContain("gl.LINEAR_MIPMAP_LINEAR");
     expect(rendererSource).toContain("gl.generateMipmap(gl.TEXTURE_2D);");
