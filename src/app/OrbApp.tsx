@@ -277,7 +277,12 @@ export function OrbApp() {
     };
     taskDragRef.current = session;
     setTaskDrag(session);
-    event.currentTarget.setPointerCapture(event.pointerId);
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Some WebView2 / injected-input paths can fail pointer capture. The
+      // root surface continues the same drag session in that case.
+    }
   };
 
   const moveTaskDrag = (event: React.PointerEvent<HTMLElement>) => {
@@ -349,9 +354,18 @@ export function OrbApp() {
       className={`gravity-app ${expanded ? "is-expanded" : "is-collapsed"}`}
       aria-label="黑洞四象限任务空间"
       onPointerDown={startMove}
-      onPointerMove={(event) => void moveWindow(event)}
-      onPointerUp={() => { down.current = null; }}
-      onPointerCancel={() => { down.current = null; }}
+      onPointerMove={(event) => {
+        if (taskDragRef.current) moveTaskDrag(event);
+        else void moveWindow(event);
+      }}
+      onPointerUp={(event) => {
+        if (taskDragRef.current) endTaskDrag(event);
+        down.current = null;
+      }}
+      onPointerCancel={(event) => {
+        if (taskDragRef.current) endTaskDrag(event);
+        down.current = null;
+      }}
     >
       <BlackHoleCanvas
         expanded={expanded}
