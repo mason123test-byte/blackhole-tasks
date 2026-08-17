@@ -375,10 +375,13 @@ void sampleDiskSurface(
   float radialProgress = clamp((hitRadius - DISK_INNER) / (DISK_OUTER - DISK_INNER), 0.0, 1.0);
   float innerHeat = 1.0 - smoothstep(0.05, 0.78, radialProgress);
   float streakHeat = smoothstep(0.22, 0.90, rawStreak);
+  float macroNoise = vnoiseWrapY(vec2(hitRadius * 0.34, turns * 5.0 + swirl * 0.42), 5.0);
+  float macroStructure = mix(0.78, 1.16, smoothstep(0.18, 0.86, macroNoise));
 
   float grazing = mix(0.82 + 0.18 * smoothstep(0.0, 1.0, abs(sin(hitPhi))), 1.0, DISK_SOURCE_DIAGNOSTIC);
   float brightness = radialEmission * streak * grazing;
   brightness *= mix(1.28, 0.78, smoothstep(0.05, 0.95, radialProgress));
+  brightness *= macroStructure;
   float localTemperature = mix(3100.0, 5200.0, clamp(0.72 * innerHeat + 0.28 * streakHeat, 0.0, 1.0));
   vec3 thermalColor = blackbody(localTemperature);
   float dopplerMix = GARGANTUA_DOPPLER_MIX;
