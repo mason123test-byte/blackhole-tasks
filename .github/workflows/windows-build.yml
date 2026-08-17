@@ -72,6 +72,13 @@ jobs:
             -ExePath "src-tauri/target/release/blackhole-tasks.exe" `
             -OutputDirectory "output/windows-smoke"
 
+      - name: Capture expanded Windows visual evidence
+        shell: pwsh
+        run: |
+          ./scripts/windows-expanded-visual-evidence.ps1 `
+            -ExePath "src-tauri/target/release/blackhole-tasks.exe" `
+            -OutputPath "output/windows-smoke/02-single-scene-expanded.png"
+
       - name: Upload Windows installers
         if: always()
         uses: actions/upload-artifact@v5
