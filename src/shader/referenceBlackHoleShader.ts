@@ -371,7 +371,7 @@ void sampleDiskSurface(
   float kepler = pow(DISK_INNER / hitRadius, 1.5);
   float swirl = hitRadius * 0.85 - patternTime * kepler * 3.6;
   float rawStreak = diskStreakSample(hitRadius, turns, swirl);
-  float streak = mix(0.52 + 1.10 * rawStreak * rawStreak, 1.0, DISK_SOURCE_DIAGNOSTIC);
+  float streak = mix(0.74 + 0.30 * rawStreak, 1.0, DISK_SOURCE_DIAGNOSTIC);
   float radialProgress = clamp((hitRadius - DISK_INNER) / (DISK_OUTER - DISK_INNER), 0.0, 1.0);
   float innerHeat = 1.0 - smoothstep(0.05, 0.78, radialProgress);
   float streakHeat = smoothstep(0.22, 0.90, rawStreak);
