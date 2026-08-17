@@ -13,4 +13,10 @@ describe("native pointer input settling", () => {
       /if \(!SetCursorPos\(startX, startY\)\) return false;\s+Thread\.Sleep\(100\);\s+mouse_event\(0x0002/,
     );
   });
+
+  it("holds a native click long enough for WebView2 to observe both edges", () => {
+    expect(smokeSource).toMatch(
+      /mouse_event\(0x0002, 0, 0, 0, UIntPtr\.Zero\);\s+Thread\.Sleep\((?:40|50|60|80)\);\s+mouse_event\(0x0004, 0, 0, 0, UIntPtr\.Zero\);/,
+    );
+  });
 });
