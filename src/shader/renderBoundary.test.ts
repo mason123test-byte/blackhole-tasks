@@ -15,7 +15,7 @@ const readSource = (relativePath: string) =>
   readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), "utf8");
 
 const smokeSource = readFileSync(
-  resolve(process.cwd(), "scripts/windows-interaction-smoke.ps1"),
+  resolve(process.cwd(), "scripts/windows-interaction-smoke-full.ps1"),
   "utf8",
 );
 

@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const smokeSource = readFileSync(resolve(process.cwd(), "scripts/windows-interaction-smoke.ps1"), "utf8");
+const smokeSource = readFileSync(
+  resolve(process.cwd(), "scripts/windows-interaction-smoke-full.ps1"),
+  "utf8",
+);
 
 describe("native compact renderer readiness", () => {
   it("does not click a newly collapsed scene until its compact WebGL2 frame is ready", () => {

@@ -29,10 +29,10 @@ describe("native expanded renderer readiness", () => {
     expect(captureIndex).toBeGreaterThan(readinessIndex);
   });
 
-  it("runs the evidence recapture after the full interaction smoke and before artifact upload", () => {
+  it("runs the evidence recapture after the full interaction smoke and before full artifact upload", () => {
     const smokeIndex = workflowSource.indexOf("Interaction-test native Windows app");
     const evidenceIndex = workflowSource.indexOf("Capture expanded Windows visual evidence");
-    const uploadIndex = workflowSource.indexOf("Upload Windows interaction screenshots");
+    const uploadIndex = workflowSource.indexOf("Upload Windows full smoke artifact");
 
     expect(smokeIndex).toBeGreaterThanOrEqual(0);
     expect(evidenceIndex).toBeGreaterThan(smokeIndex);

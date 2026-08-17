@@ -28,7 +28,7 @@ describe("strict Inferno fallback boundary", () => {
 
   it("contains no retired compatibility modules or retry clicks", () => {
     const rust = read("../../src-tauri/src/lib.rs");
-    const smoke = read("../../scripts/windows-interaction-smoke.ps1");
+    const smoke = read("../../scripts/windows-interaction-smoke-full.ps1");
     expect(rust).not.toContain("#[cfg(any())]");
     expect(rust).not.toContain("orb:render-pulse");
     expect(smoke).not.toContain("RETRY_");
