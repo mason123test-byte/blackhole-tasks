@@ -6,7 +6,7 @@ const tauriSource = readFileSync(resolve(process.cwd(), "src-tauri/src/lib.rs"),
 
 describe("compact scene focus retention", () => {
   it("keeps the orb focused after UI-driven collapse so the first reopen click is actionable", () => {
-    expect(tauriSource).toContain("if (focus) {");
+    expect(tauriSource).toContain("if focus {");
     expect(tauriSource).toContain("window.set_focus().map_err(map_window)?;");
     expect(tauriSource).toContain("set_scene_expanded_inner(&app, expanded, true)");
     expect(tauriSource).not.toContain("if expanded && focus {");
