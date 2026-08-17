@@ -40,8 +40,8 @@ function InlineAdd({ quadrant, onDone }: { quadrant: Quadrant; onDone(): void })
     if (!title.trim() || saving) return;
     setSaving(true);
     try {
-      await createTask({ title: title.trim(), quadrant });
       onDone();
+      await createTask({ title: title.trim(), quadrant });
     } finally {
       setSaving(false);
     }
