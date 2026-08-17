@@ -118,6 +118,7 @@ function GravityTaskCard({
   onPointerDown,
   onPointerMove,
   onPointerEnd,
+  onMouseDown,
 }: {
   task: Task;
   dragging: boolean;
@@ -125,6 +126,7 @@ function GravityTaskCard({
   onPointerDown(event: React.PointerEvent<HTMLElement>, task: Task): void;
   onPointerMove(event: React.PointerEvent<HTMLElement>): void;
   onPointerEnd(event: React.PointerEvent<HTMLElement>): void;
+  onMouseDown(event: React.MouseEvent<HTMLElement>, task: Task): void;
 }) {
   const completeTask = useTaskStore((state) => state.completeTask);
   return (
@@ -137,6 +139,7 @@ function GravityTaskCard({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerEnd}
       onPointerCancel={onPointerEnd}
+      onMouseDown={(event) => onMouseDown(event, task)}
       onClick={(event) => { if (!(event.target as HTMLElement).closest("button")) onEdit(); }}
       onKeyDown={(event) => { if (event.key === "Enter") onEdit(); }}
     >
@@ -167,6 +170,7 @@ function QuadrantZone({
   onTaskPointerDown,
   onTaskPointerMove,
   onTaskPointerEnd,
+  onTaskMouseDown,
 }: {
   quadrant: Quadrant;
   tasks: Task[];
@@ -180,6 +184,7 @@ function QuadrantZone({
   onTaskPointerDown(event: React.PointerEvent<HTMLElement>, task: Task): void;
   onTaskPointerMove(event: React.PointerEvent<HTMLElement>): void;
   onTaskPointerEnd(event: React.PointerEvent<HTMLElement>): void;
+  onTaskMouseDown(event: React.MouseEvent<HTMLElement>, task: Task): void;
 }) {
   return (
     <section
@@ -203,6 +208,7 @@ function QuadrantZone({
               onPointerDown={onTaskPointerDown}
               onPointerMove={onTaskPointerMove}
               onPointerEnd={onTaskPointerEnd}
+              onMouseDown={onTaskMouseDown}
             />) }
       </div>
     </section>
@@ -285,9 +291,44 @@ export function OrbApp() {
     }
   };
 
+  const startTaskMouseDrag = (event: React.MouseEvent<HTMLElement>, task: Task) => {
+    if (taskDragRef.current || event.button !== 0 || (event.target as HTMLElement).closest("button,input,textarea")) return;
+    const session: TaskDragSession = {
+      task,
+      pointerId: -1,
+      startX: event.clientX,
+      startY: event.clientY,
+      x: event.clientX,
+      y: event.clientY,
+      active: false,
+      target: null,
+    };
+    taskDragRef.current = session;
+    setTaskDrag(session);
+  };
+
   const moveTaskDrag = (event: React.PointerEvent<HTMLElement>) => {
     const session = taskDragRef.current;
     if (!session || session.pointerId !== event.pointerId) return;
+    const distance = Math.hypot(event.clientX - session.startX, event.clientY - session.startY);
+    if (!session.active && distance < 6) return;
+    event.preventDefault();
+    const zone = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-quadrant]");
+    const value = zone?.dataset.quadrant;
+    const next: TaskDragSession = {
+      ...session,
+      x: event.clientX,
+      y: event.clientY,
+      active: true,
+      target: isQuadrant(value) ? value : null,
+    };
+    taskDragRef.current = next;
+    setTaskDrag(next);
+  };
+
+  const moveTaskMouseDrag = (event: React.MouseEvent<HTMLElement>) => {
+    const session = taskDragRef.current;
+    if (!session || (event.buttons & 1) === 0) return;
     const distance = Math.hypot(event.clientX - session.startX, event.clientY - session.startY);
     if (!session.active && distance < 6) return;
     event.preventDefault();
@@ -314,6 +355,24 @@ export function OrbApp() {
     const active = session.active || releaseDistance >= 6;
     const target = session.target ?? releaseTarget;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    taskDragRef.current = null;
+    setTaskDrag(null);
+    if (!active) return;
+    suppressEditUntil.current = performance.now() + 300;
+    if (target && target !== session.task.quadrant) {
+      void updateTask(session.task.id, { quadrant: target });
+    }
+  };
+
+  const endTaskMouseDrag = (event: React.MouseEvent<HTMLElement>) => {
+    const session = taskDragRef.current;
+    if (!session) return;
+    const releaseDistance = Math.hypot(event.clientX - session.startX, event.clientY - session.startY);
+    const releaseZone = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-quadrant]");
+    const releaseValue = releaseZone?.dataset.quadrant;
+    const releaseTarget = isQuadrant(releaseValue) ? releaseValue : null;
+    const active = session.active || releaseDistance >= 6;
+    const target = session.target ?? releaseTarget;
     taskDragRef.current = null;
     setTaskDrag(null);
     if (!active) return;
@@ -366,6 +425,12 @@ export function OrbApp() {
         if (taskDragRef.current) endTaskDrag(event);
         down.current = null;
       }}
+      onMouseMove={(event) => {
+        if (taskDragRef.current) moveTaskMouseDrag(event);
+      }}
+      onMouseUp={(event) => {
+        if (taskDragRef.current) endTaskMouseDrag(event);
+      }}
     >
       <BlackHoleCanvas
         expanded={expanded}
@@ -412,6 +477,7 @@ export function OrbApp() {
                 onTaskPointerDown={startTaskDrag}
                 onTaskPointerMove={moveTaskDrag}
                 onTaskPointerEnd={endTaskDrag}
+                onTaskMouseDown={startTaskMouseDrag}
               />
             ))}
           </div>
