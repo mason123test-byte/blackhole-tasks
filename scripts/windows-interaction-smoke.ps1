@@ -131,6 +131,7 @@ public static class BlackHoleWindowProbe
     public static bool ClickAt(int x, int y)
     {
         if (!SetCursorPos(x, y)) return false;
+        Thread.Sleep(80);
         mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
         mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
         return true;
@@ -139,6 +140,7 @@ public static class BlackHoleWindowProbe
     public static bool DragFromTo(int startX, int startY, int endX, int endY)
     {
         if (!SetCursorPos(startX, startY)) return false;
+        Thread.Sleep(100);
         mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
         Thread.Sleep(80);
         const int steps = 18;
