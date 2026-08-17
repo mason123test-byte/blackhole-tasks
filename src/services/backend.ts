@@ -108,7 +108,7 @@ export const backend = {
   },
   async window(command: string, args: Record<string, unknown> = {}) {
     if (!isTauri()) return;
-    if (command === "set_scene_expanded") await waitForPaint();
+    if (command === "set_scene_expanded" && args.expanded === true) await waitForPaint();
     await invokeWhenReady(command, args);
   },
   async exportData(): Promise<string> {
