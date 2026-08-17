@@ -253,16 +253,28 @@ function Wait-SceneSize([int]$ProcessId, [int]$MinimumWidth, [int]$MinimumHeight
 
 function Wait-SceneCompact([int]$ProcessId, [int]$MaximumWidth = 300, [int]$MaximumHeight = 230, [int]$TimeoutMilliseconds = 30000) {
   $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMilliseconds)
+  $lastTitle = ""
   do {
     $match = @(Get-AppWindows $ProcessId | Where-Object { $_.Title -eq "黑洞任务" -or $_.Title.StartsWith("黑洞任务|") })
     if ($match.Count -eq 1) {
       $width = $match[0].ClientBounds.Right - $match[0].ClientBounds.Left
       $height = $match[0].ClientBounds.Bottom - $match[0].ClientBounds.Top
-      if ($width -le $MaximumWidth -and $height -le $MaximumHeight) { return $match[0] }
+      $lastTitle = $match[0].Title
+      if ($lastTitle -match '^黑洞任务\|renderer=webgl2\|frame=ready\|energy=(\d+)\|size=(\d+)x(\d+)(?:\|diag=.*)?$') {
+        $renderWidth = [int]$Matches[2]
+        $renderHeight = [int]$Matches[3]
+        if ($width -le $MaximumWidth -and $height -le $MaximumHeight -and
+            $renderWidth -le ($MaximumWidth * 1.5) -and $renderHeight -le ($MaximumHeight * 1.5)) {
+          return $match[0]
+        }
+      }
+      if ($lastTitle -match '^黑洞任务\|renderer=canvas2d\|') {
+        throw "Compact scene fell back to Canvas2D instead of the reference WebGL2 renderer: $lastTitle"
+      }
     }
     Start-Sleep -Milliseconds 50
   } while ([DateTime]::UtcNow -lt $deadline)
-  throw "Single scene did not return below ${MaximumWidth}x${MaximumHeight} within ${TimeoutMilliseconds}ms."
+  throw "Single scene did not return below ${MaximumWidth}x${MaximumHeight} with renderer=webgl2|frame=ready within ${TimeoutMilliseconds}ms; lastTitle='$lastTitle'."
 }
 
 function Ensure-WindowOnVirtualScreen([int]$ProcessId, $Window) {
