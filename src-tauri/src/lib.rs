@@ -207,7 +207,7 @@ fn set_scene_expanded_inner(app: &tauri::AppHandle, expanded: bool, focus: bool)
     window
         .set_position(PhysicalPosition::new(target_x, target_y))
         .map_err(map_window)?;
-    if expanded && focus {
+    if focus {
         window.set_focus().map_err(map_window)?;
     }
     let _ = app.emit("scene:expanded-changed", expanded);
@@ -224,7 +224,7 @@ fn set_scene_expanded_inner(app: &tauri::AppHandle, expanded: bool, focus: bool)
 
 #[tauri::command]
 fn set_scene_expanded(expanded: bool, app: tauri::AppHandle) -> AppResult<()> {
-    set_scene_expanded_inner(&app, expanded, expanded)
+    set_scene_expanded_inner(&app, expanded, true)
 }
 
 fn toggle_scene_inner(app: &tauri::AppHandle) -> AppResult<()> {
