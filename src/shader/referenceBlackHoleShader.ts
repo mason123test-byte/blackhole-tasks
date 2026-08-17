@@ -253,7 +253,7 @@ void rkckKerrTrial(
   );
   float p6 = ptheta + h * (
     0.0294958044 * q1
-    + 0.3417968750 * q2
+    + 0.3417968750 * q3
     + 0.0415943287 * q3
     + 0.4003454138 * q4
     + 0.0617675781 * q5
@@ -372,10 +372,14 @@ void sampleDiskSurface(
   float swirl = hitRadius * 0.85 - patternTime * kepler * 3.6;
   float rawStreak = diskStreakSample(hitRadius, turns, swirl);
   float streak = mix(0.52 + 1.10 * rawStreak * rawStreak, 1.0, DISK_SOURCE_DIAGNOSTIC);
+  float radialProgress = clamp((hitRadius - DISK_INNER) / (DISK_OUTER - DISK_INNER), 0.0, 1.0);
+  float innerHeat = 1.0 - smoothstep(0.05, 0.78, radialProgress);
+  float streakHeat = smoothstep(0.22, 0.90, rawStreak);
 
   float grazing = mix(0.82 + 0.18 * smoothstep(0.0, 1.0, abs(sin(hitPhi))), 1.0, DISK_SOURCE_DIAGNOSTIC);
   float brightness = radialEmission * streak * grazing;
-  float localTemperature = mix(3200.0, GARGANTUA_DISK_TEMP, smoothstep(0.18, 0.82, rawStreak));
+  brightness *= mix(1.28, 0.78, smoothstep(0.05, 0.95, radialProgress));
+  float localTemperature = mix(3100.0, 5200.0, clamp(0.72 * innerHeat + 0.28 * streakHeat, 0.0, 1.0));
   vec3 thermalColor = blackbody(localTemperature);
   float dopplerMix = GARGANTUA_DOPPLER_MIX;
   brightness *= mix(1.0, 1.0, dopplerMix);
