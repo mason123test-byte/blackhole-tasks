@@ -22,6 +22,8 @@ const startupStateMissing = (error: unknown) =>
   String(error).includes("state not managed") || String(error).includes(".manage() before using this command");
 
 const wait = (milliseconds: number) => new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
+const waitForPaint = () =>
+  new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 
 /**
  * Static Tauri WebViews can finish loading a few milliseconds before setup has
@@ -104,7 +106,11 @@ export const backend = {
     if (isTauri()) return invokeWhenReady("update_settings", { patch });
     const data = read(); data.settings = { ...data.settings, ...patch }; write(data); return data.settings;
   },
-  async window(command: string, args: Record<string, unknown> = {}) { if (isTauri()) await invokeWhenReady(command, args); },
+  async window(command: string, args: Record<string, unknown> = {}) {
+    if (!isTauri()) return;
+    if (command === "set_scene_expanded") await waitForPaint();
+    await invokeWhenReady(command, args);
+  },
   async exportData(): Promise<string> {
     if (isTauri()) return invokeWhenReady("export_data");
     return JSON.stringify({ format: "blackhole-tasks", formatVersion: 1, exportedAt: new Date().toISOString(), appVersion: "0.1.0", ...read() }, null, 2);
