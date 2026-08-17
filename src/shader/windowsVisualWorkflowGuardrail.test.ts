@@ -24,4 +24,24 @@ describe("Windows Gargantua visual workflow guardrail", () => {
     expect(readyIndex).toBeGreaterThan(-1);
     expect(captureIndex).toBeGreaterThan(readyIndex);
   });
+
+  it("settles the inline add UI before issuing the native task drag", () => {
+    const createdIndex = smokeSource.indexOf(
+      'Wait-SmokeTaskState $smokeTaskTitle $true "q1" "todo" | Out-Null',
+    );
+    const escapeIndex = smokeSource.indexOf(
+      '[System.Windows.Forms.SendKeys]::SendWait("{ESC}")',
+      createdIndex,
+    );
+    const settleIndex = smokeSource.indexOf("Start-Sleep -Milliseconds 500", escapeIndex);
+    const dragIndex = smokeSource.indexOf(
+      "[BlackHoleWindowProbe]::DragFromTo($dragStartX, $taskY, $dragTargetX, $dragTargetY)",
+      createdIndex,
+    );
+
+    expect(createdIndex).toBeGreaterThan(-1);
+    expect(escapeIndex).toBeGreaterThan(createdIndex);
+    expect(settleIndex).toBeGreaterThan(escapeIndex);
+    expect(dragIndex).toBeGreaterThan(settleIndex);
+  });
 });
