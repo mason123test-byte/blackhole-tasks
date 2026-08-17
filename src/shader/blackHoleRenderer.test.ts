@@ -82,29 +82,35 @@ describe("black-hole render profiles", () => {
     expect(blackHoleCanvasSource).toContain("return stopRenderer;");
   });
 
-  it("adds symmetric film veiling flare without reconstructing black-hole geometry", () => {
+  it("adds broad symmetric film veiling flare without reconstructing black-hole geometry", () => {
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("uniform vec2 u_resolution;");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec4 base = texture(u_frame_texture, v_uv);");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
       "float warm = smoothstep(-0.03, 0.18, sampleColor.r - sampleColor.b);",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "float mask = sampleColor.a * smoothstep(0.55, 0.88, peak) * mix(0.08, 1.0, warm);",
+      "float mask = sampleColor.a * smoothstep(0.42, 0.82, peak) * mix(0.05, 1.0, warm);",
+    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec4 flareRing(vec2 offset)");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
+      "flareTap(v_uv + vec2(offset.x, 0.0))",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "flareTap(v_uv + vec2(nearOffset.x, 0.0))",
+      "flareTap(v_uv - vec2(offset.x, 0.0))",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "flareTap(v_uv - vec2(nearOffset.x, 0.0))",
+      "flareTap(v_uv + vec2(0.0, offset.y))",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "flareTap(v_uv + vec2(0.0, nearOffset.y))",
+      "flareTap(v_uv - vec2(0.0, offset.y))",
+    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec4 nearGlow = flareRing(texel * 6.5);");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec4 farGlow = flareRing(texel * 24.0);");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
+      "vec3 glow = nearGlow.rgb * 0.22 + farGlow.rgb * 0.10;",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "flareTap(v_uv - vec2(0.0, nearOffset.y))",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "outColor = vec4(clamp(base.rgb + glow, 0.0, 1.0), max(base.a, min(glowAlpha, 0.32)));",
+      "outColor = vec4(clamp(base.rgb + glow, 0.0, 1.0), max(base.a, min(glowAlpha, 0.38)));",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("mirroredUv");
     expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("1.0 - v_uv.y");

@@ -25,37 +25,32 @@ vec4 flareTap(vec2 uv) {
   vec4 sampleColor = texture(u_frame_texture, uv);
   float peak = max(sampleColor.r, max(sampleColor.g, sampleColor.b));
   float warm = smoothstep(-0.03, 0.18, sampleColor.r - sampleColor.b);
-  float mask = sampleColor.a * smoothstep(0.55, 0.88, peak) * mix(0.08, 1.0, warm);
+  float mask = sampleColor.a * smoothstep(0.42, 0.82, peak) * mix(0.05, 1.0, warm);
   return vec4(sampleColor.rgb * mask, mask);
+}
+
+vec4 flareRing(vec2 offset) {
+  return (
+    flareTap(v_uv + vec2(offset.x, 0.0))
+    + flareTap(v_uv - vec2(offset.x, 0.0))
+    + flareTap(v_uv + vec2(0.0, offset.y))
+    + flareTap(v_uv - vec2(0.0, offset.y))
+    + flareTap(v_uv + offset)
+    + flareTap(v_uv - offset)
+    + flareTap(v_uv + vec2(offset.x, -offset.y))
+    + flareTap(v_uv + vec2(-offset.x, offset.y))
+  ) * 0.125;
 }
 
 void main() {
   vec4 base = texture(u_frame_texture, v_uv);
   vec2 texel = 1.0 / max(u_resolution, vec2(1.0));
-  vec2 nearOffset = texel * 3.5;
-  vec2 farOffset = texel * 12.0;
+  vec4 nearGlow = flareRing(texel * 6.5);
+  vec4 farGlow = flareRing(texel * 24.0);
 
-  vec4 nearGlow = (
-    flareTap(v_uv + vec2(nearOffset.x, 0.0))
-    + flareTap(v_uv - vec2(nearOffset.x, 0.0))
-    + flareTap(v_uv + vec2(0.0, nearOffset.y))
-    + flareTap(v_uv - vec2(0.0, nearOffset.y))
-    + flareTap(v_uv + nearOffset)
-    + flareTap(v_uv - nearOffset)
-    + flareTap(v_uv + vec2(nearOffset.x, -nearOffset.y))
-    + flareTap(v_uv + vec2(-nearOffset.x, nearOffset.y))
-  ) * 0.125;
-
-  vec4 farGlow = (
-    flareTap(v_uv + vec2(farOffset.x, 0.0))
-    + flareTap(v_uv - vec2(farOffset.x, 0.0))
-    + flareTap(v_uv + vec2(0.0, farOffset.y))
-    + flareTap(v_uv - vec2(0.0, farOffset.y))
-  ) * 0.25;
-
-  vec3 glow = nearGlow.rgb * 0.14 + farGlow.rgb * 0.055;
-  float glowAlpha = nearGlow.a * 0.12 + farGlow.a * 0.045;
-  outColor = vec4(clamp(base.rgb + glow, 0.0, 1.0), max(base.a, min(glowAlpha, 0.32)));
+  vec3 glow = nearGlow.rgb * 0.22 + farGlow.rgb * 0.10;
+  float glowAlpha = nearGlow.a * 0.16 + farGlow.a * 0.08;
+  outColor = vec4(clamp(base.rgb + glow, 0.0, 1.0), max(base.a, min(glowAlpha, 0.38)));
 }`;
 
 function reportOrbFrame(renderer: "webgl2", energy: number, width: number, height: number, diagnostic = "") {
