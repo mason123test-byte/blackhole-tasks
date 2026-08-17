@@ -21,4 +21,15 @@ describe("native task drag release fallback", () => {
     expect(orbAppSource).toContain("if (target && target !== session.task.quadrant) {");
     expect(orbAppSource).toContain("void updateTask(session.task.id, { quadrant: target });");
   });
+
+  it("keeps dragging through the root surface when WebView2 pointer capture is unavailable", () => {
+    expect(orbAppSource).toContain("try {");
+    expect(orbAppSource).toContain("event.currentTarget.setPointerCapture(event.pointerId);");
+    expect(orbAppSource).toContain("} catch {");
+    expect(orbAppSource).toContain("onPointerMove={(event) => {");
+    expect(orbAppSource).toContain("if (taskDragRef.current) moveTaskDrag(event);");
+    expect(orbAppSource).toContain("else void moveWindow(event);");
+    expect(orbAppSource).toContain("onPointerUp={(event) => {");
+    expect(orbAppSource).toContain("if (taskDragRef.current) endTaskDrag(event);");
+  });
 });
