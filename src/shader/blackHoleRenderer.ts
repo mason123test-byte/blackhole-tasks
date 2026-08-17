@@ -21,41 +21,36 @@ uniform sampler2D u_frame_texture;
 uniform vec2 u_resolution;
 out vec4 outColor;
 
-vec4 flareTap(vec2 uv) {
-  vec4 sampleColor = texture(u_frame_texture, uv);
+vec4 flareSample(
+  float lod,
+  float whiteLow,
+  float whiteHigh,
+  float peakLow,
+  float peakHigh,
+  float warmLow,
+  float warmHigh
+) {
+  vec4 sampleColor = textureLod(u_frame_texture, v_uv, lod);
   float peak = max(sampleColor.r, max(sampleColor.g, sampleColor.b));
   float whiteFloor = min(sampleColor.r, min(sampleColor.g, sampleColor.b));
-  float warm = smoothstep(0.015, 0.14, sampleColor.r - sampleColor.b);
+  float warm = sampleColor.r - sampleColor.b;
   float mask = sampleColor.a
-    * smoothstep(0.56, 0.80, whiteFloor)
-    * smoothstep(0.72, 0.92, peak)
-    * warm;
+    * smoothstep(whiteLow, whiteHigh, whiteFloor)
+    * smoothstep(peakLow, peakHigh, peak)
+    * smoothstep(warmLow, warmHigh, warm);
   return vec4(sampleColor.rgb * mask, mask);
 }
 
-vec4 flareRing(vec2 offset) {
-  return (
-    flareTap(v_uv + vec2(offset.x, 0.0))
-    + flareTap(v_uv - vec2(offset.x, 0.0))
-    + flareTap(v_uv + vec2(0.0, offset.y))
-    + flareTap(v_uv - vec2(0.0, offset.y))
-    + flareTap(v_uv + offset)
-    + flareTap(v_uv - offset)
-    + flareTap(v_uv + vec2(offset.x, -offset.y))
-    + flareTap(v_uv + vec2(-offset.x, offset.y))
-  ) * 0.125;
-}
-
 void main() {
-  vec4 base = texture(u_frame_texture, v_uv);
-  vec2 texel = 1.0 / max(u_resolution, vec2(1.0));
-  vec4 nearGlow = flareRing(texel * 5.0);
-  vec4 midGlow = flareRing(texel * 15.0);
-  vec4 farGlow = flareRing(texel * 40.0);
+  vec4 base = textureLod(u_frame_texture, v_uv, 0.0);
+  float availableLod = floor(log2(max(min(u_resolution.x, u_resolution.y), 1.0)));
+  vec4 nearGlow = flareSample(min(2.0, availableLod), 0.18, 0.45, 0.30, 0.70, 0.003, 0.08);
+  vec4 midGlow = flareSample(min(4.0, availableLod), 0.08, 0.28, 0.14, 0.48, 0.002, 0.06);
+  vec4 farGlow = flareSample(min(6.0, availableLod), 0.025, 0.12, 0.06, 0.24, 0.001, 0.04);
 
-  vec3 glow = nearGlow.rgb * 0.50 + midGlow.rgb * 0.26 + farGlow.rgb * 0.12;
-  float glowAlpha = nearGlow.a * 0.28 + midGlow.a * 0.15 + farGlow.a * 0.08;
-  outColor = vec4(clamp(base.rgb + glow, 0.0, 1.0), max(base.a, min(glowAlpha, 0.52)));
+  vec3 glow = nearGlow.rgb * 0.42 + midGlow.rgb * 0.24 + farGlow.rgb * 0.14;
+  float glowAlpha = nearGlow.a * 0.22 + midGlow.a * 0.12 + farGlow.a * 0.06;
+  outColor = vec4(clamp(base.rgb + glow, 0.0, 1.0), max(base.a, min(glowAlpha, 0.48)));
 }`;
 
 function reportOrbFrame(renderer: "webgl2", energy: number, width: number, height: number, diagnostic = "") {
@@ -235,8 +230,8 @@ function startBlackHoleSession(
     if (!outputTexture || !outputFramebuffer) throw new Error("无法创建黑洞输出帧缓冲");
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, outputTexture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
@@ -429,6 +424,7 @@ function startBlackHoleSession(
       gl.uniform2f(compositorUniforms.resolution, canvas.width, canvas.height);
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, outputTexture);
+      gl.generateMipmap(gl.TEXTURE_2D);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       gl.activeTexture(gl.TEXTURE0);
 

@@ -82,31 +82,18 @@ describe("black-hole render profiles", () => {
     expect(blackHoleCanvasSource).toContain("return stopRenderer;");
   });
 
-  it("adds a broad three-scale film flare sourced only by warm near-white disk light", () => {
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("uniform vec2 u_resolution;");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec4 base = texture(u_frame_texture, v_uv);");
+  it("uses a mipmapped three-scale film flare without reconstructing black-hole geometry", () => {
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("textureLod(u_frame_texture, v_uv, lod)");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("textureLod(u_frame_texture, v_uv, 0.0)");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("min(2.0, availableLod)");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("min(4.0, availableLod)");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("min(6.0, availableLod)");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "float whiteFloor = min(sampleColor.r, min(sampleColor.g, sampleColor.b));",
+      "vec3 glow = nearGlow.rgb * 0.42 + midGlow.rgb * 0.24 + farGlow.rgb * 0.14;",
     );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "float warm = smoothstep(0.015, 0.14, sampleColor.r - sampleColor.b);",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "* smoothstep(0.56, 0.80, whiteFloor)",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "* smoothstep(0.72, 0.92, peak)",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec4 flareRing(vec2 offset)");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec4 nearGlow = flareRing(texel * 5.0);");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec4 midGlow = flareRing(texel * 15.0);");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec4 farGlow = flareRing(texel * 40.0);");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "vec3 glow = nearGlow.rgb * 0.50 + midGlow.rgb * 0.26 + farGlow.rgb * 0.12;",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "outColor = vec4(clamp(base.rgb + glow, 0.0, 1.0), max(base.a, min(glowAlpha, 0.52)));",
-    );
+    expect(rendererSource).toContain("gl.LINEAR_MIPMAP_LINEAR");
+    expect(rendererSource).toContain("gl.generateMipmap(gl.TEXTURE_2D);");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("flareRing(");
     expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("mirroredUv");
     expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("1.0 - v_uv.y");
     expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("annulusMask");
