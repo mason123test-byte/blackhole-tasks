@@ -365,7 +365,7 @@ void sampleDiskSurface(
 ) {
   float innerEdge = smoothstep(DISK_INNER, DISK_INNER * 1.025, hitRadius);
   float outerEdge = 1.0 - smoothstep(DISK_OUTER * 0.76, DISK_OUTER, hitRadius);
-  float radialEmission = innerEdge * outerEdge * pow(DISK_INNER / hitRadius, 2.35);
+  float radialEmission = innerEdge * outerEdge * pow(DISK_INNER / hitRadius, 0.72);
 
   float turns = hitPhi / (2.0 * PI);
   float kepler = pow(DISK_INNER / hitRadius, 1.5);
