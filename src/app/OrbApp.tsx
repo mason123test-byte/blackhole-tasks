@@ -302,13 +302,19 @@ export function OrbApp() {
   const endTaskDrag = (event: React.PointerEvent<HTMLElement>) => {
     const session = taskDragRef.current;
     if (!session || session.pointerId !== event.pointerId) return;
+    const releaseDistance = Math.hypot(event.clientX - session.startX, event.clientY - session.startY);
+    const releaseZone = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-quadrant]");
+    const releaseValue = releaseZone?.dataset.quadrant;
+    const releaseTarget = isQuadrant(releaseValue) ? releaseValue : null;
+    const active = session.active || releaseDistance >= 6;
+    const target = session.target ?? releaseTarget;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     taskDragRef.current = null;
     setTaskDrag(null);
-    if (!session.active) return;
+    if (!active) return;
     suppressEditUntil.current = performance.now() + 300;
-    if (session.target && session.target !== session.task.quadrant) {
-      void updateTask(session.task.id, { quadrant: session.target });
+    if (target && target !== session.task.quadrant) {
+      void updateTask(session.task.id, { quadrant: target });
     }
   };
 
