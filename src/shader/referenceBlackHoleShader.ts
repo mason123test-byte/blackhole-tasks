@@ -35,8 +35,8 @@ const float KERR_MIN_STEP = 0.006;
 const float KERR_MAX_STEP = 1.55;
 const float KERR_ERROR_TOL = 0.00035;
 const int KERR_MAX_RETRIES = 5;
-const float OBSERVER_R = 60.0;
-const float OBSERVER_THETA = 1.535;
+const float OBSERVER_R = 74.1;
+const float OBSERVER_THETA = 1.470;
 const float CAMERA_VERTICAL_FOV = 0.54105207;
 
 const float DISK_INNER = 9.26;
