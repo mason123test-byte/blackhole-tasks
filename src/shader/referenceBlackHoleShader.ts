@@ -46,7 +46,7 @@ const float STAR_GAIN = 0.0;
 const float DILATION_MIN = 0.20;
 const float GARGANTUA_DOPPLER_MIX = 0.0;
 const float GARGANTUA_DISK_TEMP = 4500.0;
-const float FILM_DISK_EXPOSURE = 1.35;
+const float FILM_DISK_EXPOSURE = 1.50;
 const float DISK_SOURCE_DIAGNOSTIC = 0.0;
 
 float hash21(vec2 p) {
@@ -207,7 +207,7 @@ void initDngrCameraRay(float cameraRight, float cameraUp, out float r, out float
 void sampleDiskSurface(float hitRadius, float hitPhi, float patternTime, out vec3 diskColor, out float diskAlpha) {
   float innerEdge = smoothstep(DISK_INNER, DISK_INNER * 1.020, hitRadius);
   float outerEdge = 1.0 - smoothstep(DISK_OUTER * 0.74, DISK_OUTER * 0.995, hitRadius);
-  float radialEmission = innerEdge * outerEdge * pow(DISK_INNER / hitRadius, 0.82);
+  float radialEmission = innerEdge * outerEdge * pow(DISK_INNER / hitRadius, 0.45);
   float turns = hitPhi / (2.0 * PI); float kepler = pow(DISK_INNER / hitRadius, 1.5); float swirl = hitRadius * 0.85 - patternTime * kepler * 3.6;
   float rawStreak = diskStreakSample(hitRadius, turns, swirl);
   float streak = mix(0.72 + 0.34 * rawStreak, 1.0, DISK_SOURCE_DIAGNOSTIC);
@@ -231,14 +231,14 @@ void sampleDiskSurface(float hitRadius, float hitPhi, float patternTime, out vec
 
 float crossingColorGain(int crossingIndex) {
   if (crossingIndex <= 0) return 1.0;
-  if (crossingIndex == 1) return 0.46;
+  if (crossingIndex == 1) return 0.75;
   if (crossingIndex == 2) return 0.20;
   return 0.08;
 }
 
 float crossingAlphaGain(int crossingIndex) {
   if (crossingIndex <= 0) return 1.0;
-  if (crossingIndex == 1) return 0.50;
+  if (crossingIndex == 1) return 0.68;
   if (crossingIndex == 2) return 0.25;
   return 0.12;
 }
