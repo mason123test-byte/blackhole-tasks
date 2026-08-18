@@ -46,7 +46,7 @@ const float STAR_GAIN = 0.0;
 const float DILATION_MIN = 0.20;
 const float GARGANTUA_DOPPLER_MIX = 0.0;
 const float GARGANTUA_DISK_TEMP = 4500.0;
-const float FILM_DISK_EXPOSURE = 1.40;
+const float FILM_DISK_EXPOSURE = 1.55;
 const float DISK_SOURCE_DIAGNOSTIC = 0.0;
 
 float hash21(vec2 p) {
@@ -216,9 +216,9 @@ void sampleDiskSurface(float hitRadius, float hitPhi, float patternTime, out vec
   float grazing = mix(0.80 + 0.20 * smoothstep(0.0, 1.0, abs(sin(hitPhi))), 1.0, DISK_SOURCE_DIAGNOSTIC);
   float fineLane = 0.5 + 0.5 * sin(hitRadius * 9.6 + hitPhi * 1.35 + rawStreak * 3.2);
   float broadLane = 0.5 + 0.5 * sin(hitRadius * 4.1 - hitPhi * 0.65 + swirl * 0.55);
-  float laneStructure = 0.50 + 0.34 * pow(fineLane, 2.3) + 0.28 * pow(broadLane, 1.6);
+  float laneStructure = 0.78 + 0.22 * pow(fineLane, 2.3) + 0.16 * pow(broadLane, 1.6);
   float filamentNoise = vnoiseWrapY(vec2(hitRadius * 3.4, turns * 31.0 + swirl * 4.8), 31.0);
-  float filaments = 0.68 + 0.48 * smoothstep(0.38, 0.88, filamentNoise);
+  float filaments = 0.92 + 0.18 * smoothstep(0.38, 0.88, filamentNoise);
   float physicalLayers = mix(laneStructure * filaments, 1.0, DISK_SOURCE_DIAGNOSTIC);
   float brightness = radialEmission * streak * grazing;
   brightness *= physicalLayers;
