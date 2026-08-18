@@ -46,6 +46,7 @@ const float STAR_GAIN = 0.0;
 const float DILATION_MIN = 0.20;
 const float GARGANTUA_DOPPLER_MIX = 0.0;
 const float GARGANTUA_DISK_TEMP = 4500.0;
+const float FILM_DISK_EXPOSURE = 1.55;
 const float DISK_SOURCE_DIAGNOSTIC = 0.0;
 
 float hash21(vec2 p) {
@@ -364,21 +365,22 @@ void sampleDiskSurface(
   out float diskAlpha
 ) {
   float innerEdge = smoothstep(DISK_INNER, DISK_INNER * 1.020, hitRadius);
-  float outerEdge = 1.0 - smoothstep(DISK_OUTER * 0.70, DISK_OUTER * 0.93, hitRadius);
-  float radialEmission = innerEdge * outerEdge * pow(DISK_INNER / hitRadius, 0.90);
+  float outerEdge = 1.0 - smoothstep(DISK_OUTER * 0.74, DISK_OUTER * 0.98, hitRadius);
+  float radialEmission = innerEdge * outerEdge * pow(DISK_INNER / hitRadius, 0.82);
 
   float turns = hitPhi / (2.0 * PI);
   float kepler = pow(DISK_INNER / hitRadius, 1.5);
   float swirl = hitRadius * 0.85 - patternTime * kepler * 3.6;
   float rawStreak = diskStreakSample(hitRadius, turns, swirl);
-  float streak = mix(0.68 + 0.34 * rawStreak, 1.0, DISK_SOURCE_DIAGNOSTIC);
+  float streak = mix(0.72 + 0.34 * rawStreak, 1.0, DISK_SOURCE_DIAGNOSTIC);
   float radialProgress = clamp((hitRadius - DISK_INNER) / (DISK_OUTER - DISK_INNER), 0.0, 1.0);
   float innerHeat = 1.0 - smoothstep(0.04, 0.72, radialProgress);
   float streakHeat = smoothstep(0.28, 0.92, rawStreak);
 
-  float grazing = mix(0.78 + 0.22 * smoothstep(0.0, 1.0, abs(sin(hitPhi))), 1.0, DISK_SOURCE_DIAGNOSTIC);
+  float grazing = mix(0.80 + 0.20 * smoothstep(0.0, 1.0, abs(sin(hitPhi))), 1.0, DISK_SOURCE_DIAGNOSTIC);
   float brightness = radialEmission * streak * grazing;
   brightness *= mix(1.15, 0.58, smoothstep(0.04, 0.90, radialProgress));
+  brightness *= FILM_DISK_EXPOSURE;
   float localTemperature = mix(3000.0, 5050.0, clamp(0.74 * innerHeat + 0.26 * streakHeat, 0.0, 1.0));
   vec3 thermalColor = blackbody(localTemperature);
   float dopplerMix = GARGANTUA_DOPPLER_MIX;
