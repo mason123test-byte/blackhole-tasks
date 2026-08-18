@@ -214,7 +214,14 @@ void sampleDiskSurface(float hitRadius, float hitPhi, float patternTime, out vec
   float radialProgress = clamp((hitRadius - DISK_INNER) / (DISK_OUTER - DISK_INNER), 0.0, 1.0);
   float innerHeat = 1.0 - smoothstep(0.04, 0.72, radialProgress); float streakHeat = smoothstep(0.28, 0.92, rawStreak);
   float grazing = mix(0.80 + 0.20 * smoothstep(0.0, 1.0, abs(sin(hitPhi))), 1.0, DISK_SOURCE_DIAGNOSTIC);
+  float fineLane = 0.5 + 0.5 * sin(hitRadius * 9.6 + hitPhi * 1.35 + rawStreak * 3.2);
+  float broadLane = 0.5 + 0.5 * sin(hitRadius * 4.1 - hitPhi * 0.65 + swirl * 0.55);
+  float laneStructure = 0.50 + 0.34 * pow(fineLane, 2.3) + 0.28 * pow(broadLane, 1.6);
+  float filamentNoise = vnoiseWrapY(vec2(hitRadius * 3.4, turns * 31.0 + swirl * 4.8), 31.0);
+  float filaments = 0.68 + 0.48 * smoothstep(0.38, 0.88, filamentNoise);
+  float physicalLayers = mix(laneStructure * filaments, 1.0, DISK_SOURCE_DIAGNOSTIC);
   float brightness = radialEmission * streak * grazing;
+  brightness *= physicalLayers;
   brightness *= mix(1.15, 0.58, smoothstep(0.04, 0.90, radialProgress)); brightness *= FILM_DISK_EXPOSURE;
   float localTemperature = mix(3000.0, 5050.0, clamp(0.74 * innerHeat + 0.26 * streakHeat, 0.0, 1.0));
   vec3 thermalColor = blackbody(localTemperature); brightness *= mix(1.0, 1.0, GARGANTUA_DOPPLER_MIX);
