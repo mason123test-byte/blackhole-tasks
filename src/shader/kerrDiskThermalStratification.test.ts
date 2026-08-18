@@ -26,7 +26,7 @@ describe("Gargantua disk thermal stratification", () => {
   });
 
   it("retains broad emitting disk layers instead of photometrically erasing the film-like lensed bands", () => {
-    expect(diskFalloff(17.30)).toBeGreaterThan(0.59);
+    expect(diskFalloff(18.70)).toBeGreaterThan(0.56);
     expect(diskFalloff(11.75)).toBeGreaterThan(0.82);
     expect(diskFalloff(9.93)).toBeGreaterThan(0.94);
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
