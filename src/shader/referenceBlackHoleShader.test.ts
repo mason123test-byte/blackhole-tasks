@@ -37,7 +37,7 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
 
   it("matches the tuned Gargantua camera and thin-disk geometry", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float OBSERVER_R = 74.1;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float OBSERVER_THETA = 1.455;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float OBSERVER_THETA = 1.415;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INNER = 4.20;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_OUTER = 28.00;");
   });
@@ -116,9 +116,9 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const int MAX_DISK_CROSSINGS = 4;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("int diskCrossingCount = 0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float crossingColorGain(int crossingIndex)");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("if (crossingIndex == 1) return 0.66;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("if (crossingIndex == 1) return 0.80;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float crossingAlphaGain(int crossingIndex)");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("if (crossingIndex == 1) return 0.60;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("if (crossingIndex == 1) return 0.72;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float colorGain = crossingColorGain(diskCrossingCount);");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float alphaGain = crossingAlphaGain(diskCrossingCount);");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float effectiveAlpha = clamp(diskAlpha * alphaGain, 0.0, 0.90);");
@@ -151,8 +151,8 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "brightness *= mix(1.10, 0.62, smoothstep(0.04, 0.90, radialProgress));",
     );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec3 linearDisk = thermalColor * brightness * 1.38;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("diskAlpha = clamp(0.08 + brightness * 0.66, 0.0, 0.80);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec3 linearDisk = thermalColor * brightness * 1.52;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("diskAlpha = clamp(0.10 + brightness * 0.74, 0.0, 0.84);");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec3 thermalColor = blackbody(localTemperature);");
   });
 
