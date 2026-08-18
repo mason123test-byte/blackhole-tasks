@@ -24,12 +24,12 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
       styleReference: "https://arxiv.org/abs/1502.03808",
       physicsReference: "https://github.com/hungyipu/Odyssey",
       cameraReference: "DNGR Appendix A.1 fixed-event FIDO local sky",
-      cameraVerticalFovDeg: 31,
+      cameraVerticalFovDeg: 38,
     });
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("#define N_STEPS 176");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float KERR_A = 0.60;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float KERR_A2 = KERR_A * KERR_A;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float CAMERA_VERTICAL_FOV = 0.54105207;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float CAMERA_VERTICAL_FOV = 0.66322512;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("void kerrDerivatives(");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("FRAME_DRAG_GAIN");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("frameDragScale");
@@ -37,9 +37,9 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
 
   it("matches the tuned Gargantua camera and thin-disk geometry", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float OBSERVER_R = 74.1;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float OBSERVER_THETA = 1.470;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INNER = 9.26;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_OUTER = 18.70;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float OBSERVER_THETA = 1.400;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INNER = 8.60;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_OUTER = 22.40;");
   });
 
   it("launches every production ray from the same DNGR camera event and varies only local-sky direction", () => {
