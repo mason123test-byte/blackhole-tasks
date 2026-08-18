@@ -36,17 +36,17 @@ const float KERR_MAX_STEP = 1.55;
 const float KERR_ERROR_TOL = 0.00035;
 const int KERR_MAX_RETRIES = 5;
 const float OBSERVER_R = 74.1;
-const float OBSERVER_THETA = 1.440;
+const float OBSERVER_THETA = 1.490;
 const float CAMERA_VERTICAL_FOV = 0.62831853;
 
-const float DISK_INNER = 5.60;
+const float DISK_INNER = 4.20;
 const float DISK_OUTER = 22.40;
 const int MAX_DISK_CROSSINGS = 4;
 const float STAR_GAIN = 0.0;
 const float DILATION_MIN = 0.20;
 const float GARGANTUA_DOPPLER_MIX = 0.0;
 const float GARGANTUA_DISK_TEMP = 4500.0;
-const float FILM_DISK_EXPOSURE = 1.50;
+const float FILM_DISK_EXPOSURE = 1.28;
 const float DISK_SOURCE_DIAGNOSTIC = 0.0;
 
 float hash21(vec2 p) {
@@ -207,38 +207,41 @@ void initDngrCameraRay(float cameraRight, float cameraUp, out float r, out float
 void sampleDiskSurface(float hitRadius, float hitPhi, float patternTime, out vec3 diskColor, out float diskAlpha) {
   float innerEdge = smoothstep(DISK_INNER, DISK_INNER * 1.020, hitRadius);
   float outerEdge = 1.0 - smoothstep(DISK_OUTER * 0.74, DISK_OUTER * 0.995, hitRadius);
-  float radialEmission = innerEdge * outerEdge * pow(DISK_INNER / hitRadius, 0.45);
+  float radialEmission = innerEdge * outerEdge * pow(DISK_INNER / hitRadius, 0.38);
   float turns = hitPhi / (2.0 * PI); float kepler = pow(DISK_INNER / hitRadius, 1.5); float swirl = hitRadius * 0.85 - patternTime * kepler * 3.6;
   float rawStreak = diskStreakSample(hitRadius, turns, swirl);
   float streak = mix(0.72 + 0.34 * rawStreak, 1.0, DISK_SOURCE_DIAGNOSTIC);
   float radialProgress = clamp((hitRadius - DISK_INNER) / (DISK_OUTER - DISK_INNER), 0.0, 1.0);
   float innerHeat = 1.0 - smoothstep(0.04, 0.72, radialProgress); float streakHeat = smoothstep(0.28, 0.92, rawStreak);
   float grazing = mix(0.80 + 0.20 * smoothstep(0.0, 1.0, abs(sin(hitPhi))), 1.0, DISK_SOURCE_DIAGNOSTIC);
-  float fineLane = 0.5 + 0.5 * sin(hitRadius * 9.6 + hitPhi * 1.35 + rawStreak * 3.2);
-  float broadLane = 0.5 + 0.5 * sin(hitRadius * 4.1 - hitPhi * 0.65 + swirl * 0.55);
-  float laneStructure = 0.78 + 0.22 * pow(fineLane, 2.3) + 0.16 * pow(broadLane, 1.6);
-  float filamentNoise = vnoiseWrapY(vec2(hitRadius * 3.4, turns * 31.0 + swirl * 4.8), 31.0);
-  float filaments = 0.92 + 0.18 * smoothstep(0.38, 0.88, filamentNoise);
+  float fineNoise = vnoiseWrapY(vec2(hitRadius * 2.35 + rawStreak * 2.0, turns * 37.0 + swirl * 3.6), 37.0);
+  float broadNoise = vnoiseWrapY(vec2(hitRadius * 0.72 + fineNoise * 2.4, turns * 11.0 - swirl * 1.25 + 9.0), 11.0);
+  float radialWarp = (fineNoise - 0.5) * 5.5 + (broadNoise - 0.5) * 3.0;
+  float ribbon = 0.5 + 0.5 * sin(hitRadius * 5.2 + radialWarp + hitPhi * 0.42);
+  float secondaryRibbon = 0.5 + 0.5 * sin(hitRadius * 2.35 - hitPhi * 0.27 + broadNoise * 4.0);
+  float laneStructure = 0.60 + 0.33 * pow(ribbon, 1.8) + 0.18 * pow(secondaryRibbon, 1.5) + 0.12 * fineNoise;
+  float filamentNoise = vnoiseWrapY(vec2(hitRadius * 3.1 + broadNoise * 2.0, turns * 29.0 + swirl * 4.2), 29.0);
+  float filaments = 0.86 + 0.28 * smoothstep(0.42, 0.86, filamentNoise);
   float physicalLayers = mix(laneStructure * filaments, 1.0, DISK_SOURCE_DIAGNOSTIC);
   float brightness = radialEmission * streak * grazing;
   brightness *= physicalLayers;
-  brightness *= mix(1.15, 0.58, smoothstep(0.04, 0.90, radialProgress)); brightness *= FILM_DISK_EXPOSURE;
-  float localTemperature = mix(3000.0, 5050.0, clamp(0.74 * innerHeat + 0.26 * streakHeat, 0.0, 1.0));
+  brightness *= mix(1.10, 0.62, smoothstep(0.04, 0.90, radialProgress)); brightness *= FILM_DISK_EXPOSURE;
+  float localTemperature = mix(2900.0, 4800.0, clamp(0.74 * innerHeat + 0.26 * streakHeat, 0.0, 1.0));
   vec3 thermalColor = blackbody(localTemperature); brightness *= mix(1.0, 1.0, GARGANTUA_DOPPLER_MIX);
-  vec3 linearDisk = thermalColor * brightness * 1.58;
-  diskColor = vec3(1.0) - exp(-linearDisk); diskAlpha = clamp(0.12 + brightness * 0.78, 0.0, 0.86);
+  vec3 linearDisk = thermalColor * brightness * 1.38;
+  diskColor = vec3(1.0) - exp(-linearDisk); diskAlpha = clamp(0.08 + brightness * 0.66, 0.0, 0.80);
 }
 
 float crossingColorGain(int crossingIndex) {
   if (crossingIndex <= 0) return 1.0;
-  if (crossingIndex == 1) return 0.75;
+  if (crossingIndex == 1) return 0.66;
   if (crossingIndex == 2) return 0.20;
   return 0.08;
 }
 
 float crossingAlphaGain(int crossingIndex) {
   if (crossingIndex <= 0) return 1.0;
-  if (crossingIndex == 1) return 0.68;
+  if (crossingIndex == 1) return 0.60;
   if (crossingIndex == 2) return 0.25;
   return 0.12;
 }
