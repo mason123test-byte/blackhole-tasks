@@ -167,7 +167,7 @@ void rkckKerrTrial(vec4 state, float ptheta, float L, float kappa, float h, out 
   vec4 s3 = state + h * (0.075 * k1 + 0.225 * k2); float p3 = ptheta + h * (0.075 * q1 + 0.225 * q2); normalizePackedStage(s3, p3);
   vec4 k3; float q3; kerrPackedDerivatives(s3, p3, L, kappa, k3, q3);
   vec4 s4 = state + h * (0.3 * k1 - 0.9 * k2 + 1.2 * k3); float p4 = ptheta + h * (0.3 * q1 - 0.9 * q2 + 1.2 * q3); normalizePackedStage(s4, p4);
-  vec4 k4; float q4; kerrPackedDerivatives(s4, p4, L, kappa, k4, q4, dpr, dptheta);
+  vec4 k4; float q4; kerrPackedDerivatives(s4, p4, L, kappa, k4, q4);
   vec4 s5 = state + h * (-0.2037037037 * k1 + 2.5 * k2 - 2.5925925926 * k3 + 1.2962962963 * k4);
   float p5 = ptheta + h * (-0.2037037037 * q1 + 2.5 * q2 - 2.5925925926 * q3 + 1.2962962963 * q4); normalizePackedStage(s5, p5);
   vec4 k5; float q5; kerrPackedDerivatives(s5, p5, L, kappa, k5, q5);
