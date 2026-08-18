@@ -100,7 +100,7 @@ jobs:
           if ($stableVersion -match '^rustc 1\.97\.1 ') {
             $env:RUSTUP_TOOLCHAIN = 'stable'
             "RUSTUP_TOOLCHAIN=stable" >> $env:GITHUB_ENV
-            "Using hosted stable toolchain because it matches pinned $expectedVersion: $stableVersion"
+            "Using hosted stable toolchain because it matches pinned ${expectedVersion}: $stableVersion"
           } else {
             $exact = '1.97.1-x86_64-pc-windows-msvc'
             if (-not (rustup toolchain list | Select-String -SimpleMatch $exact)) {
@@ -158,7 +158,7 @@ jobs:
           if ($stableVersion -match '^rustc 1\.97\.1 ') {
             $env:RUSTUP_TOOLCHAIN = 'stable'
             "RUSTUP_TOOLCHAIN=stable" >> $env:GITHUB_ENV
-            "Using hosted stable toolchain because it matches pinned $expectedVersion: $stableVersion"
+            "Using hosted stable toolchain because it matches pinned ${expectedVersion}: $stableVersion"
           } else {
             $exact = '1.97.1-x86_64-pc-windows-msvc'
             if (-not (rustup toolchain list | Select-String -SimpleMatch $exact)) {
@@ -233,7 +233,7 @@ jobs:
           if ($stableVersion -match '^rustc 1\.97\.1 ') {
             $env:RUSTUP_TOOLCHAIN = 'stable'
             "RUSTUP_TOOLCHAIN=stable" >> $env:GITHUB_ENV
-            "Using hosted stable toolchain because it matches pinned $expectedVersion: $stableVersion"
+            "Using hosted stable toolchain because it matches pinned ${expectedVersion}: $stableVersion"
           } else {
             $exact = '1.97.1-x86_64-pc-windows-msvc'
             if (-not (rustup toolchain list | Select-String -SimpleMatch $exact)) {
