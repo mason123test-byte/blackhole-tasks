@@ -91,6 +91,15 @@ describe("Windows Gargantua visual workflow guardrail", () => {
     expect(workflowSource).not.toContain("github.event.pull_request.base.sha");
   });
 
+  it("keeps shader-only iterations on the no-Rust fast path", () => {
+    const rustAffectingPath = /^(src-tauri\/|rust-toolchain(?:\.toml)?$|Cargo\.(toml|lock)$|\.github\/workflows\/windows-build\.yml$)/;
+    expect("src/shader/referenceBlackHoleShader.ts").not.toMatch(rustAffectingPath);
+    expect("src/shader/blackHoleRenderer.ts").not.toMatch(rustAffectingPath);
+    expect("src/shader/windowsVisualWorkflowGuardrail.test.ts").not.toMatch(rustAffectingPath);
+    expect("src-tauri/src/lib.rs").toMatch(rustAffectingPath);
+    expect(".github/workflows/windows-build.yml").toMatch(rustAffectingPath);
+  });
+
   it("pins Rust while reusing the hosted toolchain when the exact version already matches", () => {
     expect(rustToolchainSource).toContain('channel = "1.97.1"');
     expect(rustToolchainSource).toContain('components = ["rustfmt", "clippy"]');
