@@ -84,10 +84,19 @@ describe("Windows Gargantua visual workflow guardrail", () => {
     expect(workflowSource).toContain("cargo test");
   });
 
-  it("pins Rust so repeated jobs do not resync the floating stable channel", () => {
+  it("uses only the newest head commit for PR fast-path change detection", () => {
+    expect(workflowSource).toContain("$head = '${{ github.event.pull_request.head.sha }}'");
+    expect(workflowSource).toContain('$parent = (git rev-parse "$head^").Trim()');
+    expect(workflowSource).toContain("git diff --name-only $parent $head");
+    expect(workflowSource).not.toContain("github.event.pull_request.base.sha");
+  });
+
+  it("pins Rust while reusing the hosted toolchain when the exact version already matches", () => {
     expect(rustToolchainSource).toContain('channel = "1.97.1"');
     expect(rustToolchainSource).toContain('components = ["rustfmt", "clippy"]');
-    expect(workflowSource).toContain("rustup toolchain list");
+    expect(workflowSource).toContain("rustc +stable --version");
+    expect(workflowSource).toContain("Using hosted stable toolchain because it matches pinned");
+    expect(workflowSource).toContain("RUSTUP_TOOLCHAIN=stable");
     expect(workflowSource).toContain("rustup toolchain install 1.97.1");
     expect(workflowSource).not.toContain("rustup toolchain install stable");
   });

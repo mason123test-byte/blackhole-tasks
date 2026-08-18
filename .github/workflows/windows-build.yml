@@ -67,7 +67,12 @@ jobs:
         run: |
           $changed = @()
           if ('${{ github.event_name }}' -eq 'pull_request') {
-            $changed = @(git diff --name-only '${{ github.event.pull_request.base.sha }}' '${{ github.event.pull_request.head.sha }}')
+            # Compare only the latest head commit with its first parent. Comparing
+            # the entire PR against main would keep historical Rust files in the
+            # diff forever and defeat the fast path for later shader-only commits.
+            $head = '${{ github.event.pull_request.head.sha }}'
+            $parent = (git rev-parse "$head^").Trim()
+            $changed = @(git diff --name-only $parent $head)
           } elseif ('${{ github.event_name }}' -eq 'push' -and '${{ github.event.before }}' -and '${{ github.event.before }}' -ne '0000000000000000000000000000000000000000') {
             $changed = @(git diff --name-only '${{ github.event.before }}' '${{ github.sha }}')
           } else {
@@ -86,13 +91,23 @@ jobs:
           "changed-files=$($changed -join ',')"
           "rust_changed=$($rustChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
 
-      - name: Ensure pinned Rust toolchain
+      - name: Select pinned Rust toolchain
         if: ${{ steps.rust-changes.outputs.rust_changed == 'true' }}
         shell: pwsh
         run: |
-          $expected = '1.97.1-x86_64-pc-windows-msvc'
-          if (-not (rustup toolchain list | Select-String -SimpleMatch $expected)) {
-            rustup toolchain install 1.97.1 --profile minimal --component rustfmt
+          $expectedVersion = '1.97.1'
+          $stableVersion = (& rustc +stable --version 2>$null | Out-String).Trim()
+          if ($stableVersion -match '^rustc 1\.97\.1 ') {
+            $env:RUSTUP_TOOLCHAIN = 'stable'
+            "RUSTUP_TOOLCHAIN=stable" >> $env:GITHUB_ENV
+            "Using hosted stable toolchain because it matches pinned $expectedVersion: $stableVersion"
+          } else {
+            $exact = '1.97.1-x86_64-pc-windows-msvc'
+            if (-not (rustup toolchain list | Select-String -SimpleMatch $exact)) {
+              rustup toolchain install 1.97.1 --profile minimal --component rustfmt
+            }
+            $env:RUSTUP_TOOLCHAIN = '1.97.1'
+            "RUSTUP_TOOLCHAIN=1.97.1" >> $env:GITHUB_ENV
           }
           rustc --version
           cargo --version
@@ -135,12 +150,22 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Ensure pinned Rust toolchain
+      - name: Select pinned Rust toolchain
         shell: pwsh
         run: |
-          $expected = '1.97.1-x86_64-pc-windows-msvc'
-          if (-not (rustup toolchain list | Select-String -SimpleMatch $expected)) {
-            rustup toolchain install 1.97.1 --profile minimal
+          $expectedVersion = '1.97.1'
+          $stableVersion = (& rustc +stable --version 2>$null | Out-String).Trim()
+          if ($stableVersion -match '^rustc 1\.97\.1 ') {
+            $env:RUSTUP_TOOLCHAIN = 'stable'
+            "RUSTUP_TOOLCHAIN=stable" >> $env:GITHUB_ENV
+            "Using hosted stable toolchain because it matches pinned $expectedVersion: $stableVersion"
+          } else {
+            $exact = '1.97.1-x86_64-pc-windows-msvc'
+            if (-not (rustup toolchain list | Select-String -SimpleMatch $exact)) {
+              rustup toolchain install 1.97.1 --profile minimal
+            }
+            $env:RUSTUP_TOOLCHAIN = '1.97.1'
+            "RUSTUP_TOOLCHAIN=1.97.1" >> $env:GITHUB_ENV
           }
           rustc --version
           cargo --version
@@ -200,12 +225,22 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Ensure pinned Rust toolchain
+      - name: Select pinned Rust toolchain
         shell: pwsh
         run: |
-          $expected = '1.97.1-x86_64-pc-windows-msvc'
-          if (-not (rustup toolchain list | Select-String -SimpleMatch $expected)) {
-            rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy
+          $expectedVersion = '1.97.1'
+          $stableVersion = (& rustc +stable --version 2>$null | Out-String).Trim()
+          if ($stableVersion -match '^rustc 1\.97\.1 ') {
+            $env:RUSTUP_TOOLCHAIN = 'stable'
+            "RUSTUP_TOOLCHAIN=stable" >> $env:GITHUB_ENV
+            "Using hosted stable toolchain because it matches pinned $expectedVersion: $stableVersion"
+          } else {
+            $exact = '1.97.1-x86_64-pc-windows-msvc'
+            if (-not (rustup toolchain list | Select-String -SimpleMatch $exact)) {
+              rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy
+            }
+            $env:RUSTUP_TOOLCHAIN = '1.97.1'
+            "RUSTUP_TOOLCHAIN=1.97.1" >> $env:GITHUB_ENV
           }
           rustc --version
           cargo --version
