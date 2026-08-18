@@ -36,17 +36,17 @@ const float KERR_MAX_STEP = 1.55;
 const float KERR_ERROR_TOL = 0.00035;
 const int KERR_MAX_RETRIES = 5;
 const float OBSERVER_R = 74.1;
-const float OBSERVER_THETA = 1.490;
-const float CAMERA_VERTICAL_FOV = 0.62831853;
+const float OBSERVER_THETA = 1.455;
+const float CAMERA_VERTICAL_FOV = 0.55850536;
 
 const float DISK_INNER = 4.20;
-const float DISK_OUTER = 22.40;
+const float DISK_OUTER = 28.00;
 const int MAX_DISK_CROSSINGS = 4;
 const float STAR_GAIN = 0.0;
 const float DILATION_MIN = 0.20;
 const float GARGANTUA_DOPPLER_MIX = 0.0;
 const float GARGANTUA_DISK_TEMP = 4500.0;
-const float FILM_DISK_EXPOSURE = 1.28;
+const float FILM_DISK_EXPOSURE = 1.42;
 const float DISK_SOURCE_DIAGNOSTIC = 0.0;
 
 float hash21(vec2 p) {
@@ -338,6 +338,6 @@ export const REFERENCE_BLACK_HOLE_INFO = {
   styleReference: "https://arxiv.org/abs/1502.03808",
   physicsReference: "https://github.com/hungyipu/Odyssey",
   cameraReference: "DNGR Appendix A.1 fixed-event FIDO local sky",
-  cameraVerticalFovDeg: 36,
+  cameraVerticalFovDeg: 32,
   webglReference: "https://ebruneton.github.io/black_hole_shader/",
 } as const;
