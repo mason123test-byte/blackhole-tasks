@@ -10,25 +10,25 @@ describe("Kerr disk source structure", () => {
       "float rawStreak = diskStreakSample(hitRadius, turns, swirl);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float streak = mix(0.74 + 0.30 * rawStreak, 1.0, DISK_SOURCE_DIAGNOSTIC);",
+      "float streak = mix(0.72 + 0.34 * rawStreak, 1.0, DISK_SOURCE_DIAGNOSTIC);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float grazing = mix(0.82 + 0.18 * smoothstep(0.0, 1.0, abs(sin(hitPhi))), 1.0, DISK_SOURCE_DIAGNOSTIC);",
+      "float grazing = mix(0.80 + 0.20 * smoothstep(0.0, 1.0, abs(sin(hitPhi))), 1.0, DISK_SOURCE_DIAGNOSTIC);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float radialProgress = clamp((hitRadius - DISK_INNER) / (DISK_OUTER - DISK_INNER), 0.0, 1.0);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float innerHeat = 1.0 - smoothstep(0.05, 0.78, radialProgress);",
+      "float innerHeat = 1.0 - smoothstep(0.04, 0.72, radialProgress);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float streakHeat = smoothstep(0.22, 0.90, rawStreak);",
+      "float streakHeat = smoothstep(0.28, 0.92, rawStreak);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float localTemperature = mix(3100.0, 5200.0, clamp(0.72 * innerHeat + 0.28 * streakHeat, 0.0, 1.0));",
+      "float localTemperature = mix(3000.0, 5050.0, clamp(0.74 * innerHeat + 0.26 * streakHeat, 0.0, 1.0));",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float radialEmission = innerEdge * outerEdge * pow(DISK_INNER / hitRadius, 0.72);",
+      "float radialEmission = innerEdge * outerEdge * pow(DISK_INNER / hitRadius, 0.82);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "projectKerrMomenta(r, theta, L, kappa, pr, ptheta);",
