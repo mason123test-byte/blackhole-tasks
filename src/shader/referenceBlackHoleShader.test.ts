@@ -35,11 +35,11 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("frameDragScale");
   });
 
-  it("matches the published Gargantua camera and disk geometry", () => {
+  it("matches the tuned Gargantua camera and thin-disk geometry", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float OBSERVER_R = 74.1;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float OBSERVER_THETA = 1.511;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float OBSERVER_THETA = 1.535;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INNER = 9.26;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_OUTER = 18.70;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_OUTER = 17.30;");
   });
 
   it("launches every production ray from the same DNGR camera event and varies only local-sky direction", () => {
@@ -115,11 +115,14 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
   it("keeps tracing through a translucent thin disk while fading physical higher-order crossings", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const int MAX_DISK_CROSSINGS = 4;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("int diskCrossingCount = 0;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float crossingGain(int crossingIndex)");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("if (crossingIndex == 1) return 0.58;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float imageGain = crossingGain(diskCrossingCount);");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float effectiveAlpha = clamp(diskAlpha * imageGain, 0.0, 0.90);");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("accumulatedDisk += transmittance * diskColor * effectiveAlpha;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float crossingColorGain(int crossingIndex)");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("if (crossingIndex == 1) return 0.46;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float crossingAlphaGain(int crossingIndex)");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("if (crossingIndex == 1) return 0.50;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float colorGain = crossingColorGain(diskCrossingCount);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float alphaGain = crossingAlphaGain(diskCrossingCount);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float effectiveAlpha = clamp(diskAlpha * alphaGain, 0.0, 0.90);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("accumulatedDisk += transmittance * (diskColor * colorGain) * effectiveAlpha;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("transmittance *= 1.0 - effectiveAlpha;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("diskCrossingCount += 1;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("bool diskHit");
