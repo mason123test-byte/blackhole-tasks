@@ -6,6 +6,10 @@ const workflowSource = readFileSync(
   resolve(process.cwd(), ".github/workflows/windows-build.yml"),
   "utf8",
 );
+const rustToolchainSource = readFileSync(
+  resolve(process.cwd(), "rust-toolchain.toml"),
+  "utf8",
+);
 const smokeEntrySource = readFileSync(
   resolve(process.cwd(), "scripts/windows-interaction-smoke.ps1"),
   "utf8",
@@ -53,18 +57,51 @@ describe("Windows Gargantua visual workflow guardrail", () => {
     expect(lifecycleIndex).toBeGreaterThan(metricsIndex);
   });
 
-  it("splits default visual validation from workflow-dispatch full validation", () => {
-    expect(workflowSource).toContain("validation_mode:");
-    expect(workflowSource).toContain("- visual");
-    expect(workflowSource).toContain("- full");
-    expect(workflowSource).toContain("name: Fast checks");
+  it("splits fast checks while preserving real Windows visual and full validation", () => {
+    expect(workflowSource).toContain("name: Frontend fast checks");
+    expect(workflowSource).toContain("runs-on: ubuntu-latest");
+    expect(workflowSource).toContain("name: Rust fast checks");
     expect(workflowSource).toContain("name: Windows visual evidence");
     expect(workflowSource).toContain("name: Full Windows validation");
     expect(workflowSource).toContain("npm run tauri build -- --no-bundle");
     expect(workflowSource).toContain("-VisualOnly");
     expect(workflowSource).toContain("inputs.validation_mode == 'full'");
     expect(workflowSource).toContain("Build Tauri EXE and installers");
+    expect(workflowSource).toContain("Interaction-test native Windows app");
+  });
+
+  it("deduplicates push/PR runs and caches Rust without skipping full validation", () => {
+    expect(workflowSource).toContain(
+      "github.event.pull_request.head.ref || github.ref_name",
+    );
     expect(workflowSource).toContain("cancel-in-progress: true");
+    expect(workflowSource).toContain("uses: Swatinem/rust-cache@v2");
+    expect(workflowSource).toContain("cache-on-failure: true");
+    expect(workflowSource).toContain("Detect Rust-affecting changes");
+    expect(workflowSource).toContain("RUST_FAST_SKIPPED reason=no-rust-affecting-files");
+    expect(workflowSource).toContain("needs: [frontend-fast, rust-fast]");
+    expect(workflowSource).toContain("cargo clippy");
+    expect(workflowSource).toContain("cargo test");
+  });
+
+  it("pins Rust so repeated jobs do not resync the floating stable channel", () => {
+    expect(rustToolchainSource).toContain('channel = "1.97.1"');
+    expect(rustToolchainSource).toContain('components = ["rustfmt", "clippy"]');
+    expect(workflowSource).toContain("rustup toolchain list");
+    expect(workflowSource).toContain("rustup toolchain install 1.97.1");
+    expect(workflowSource).not.toContain("rustup toolchain install stable");
+  });
+
+  it("keeps transient visual artifacts screenshot-focused", () => {
+    const visualUploadStart = workflowSource.indexOf(
+      "- name: Upload Windows visual artifact",
+    );
+    const fullStart = workflowSource.indexOf("windows-full:");
+    expect(visualUploadStart).toBeGreaterThan(-1);
+    expect(fullStart).toBeGreaterThan(visualUploadStart);
+    const visualUpload = workflowSource.slice(visualUploadStart, fullStart);
+    expect(visualUpload).toContain("path: output/windows-visual/*");
+    expect(visualUpload).not.toContain("blackhole-tasks.exe");
   });
 
   it("settles the inline add UI before issuing the native task drag in full mode", () => {

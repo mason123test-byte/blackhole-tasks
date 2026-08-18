@@ -19,14 +19,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: windows-build-${{ github.ref }}
+  group: windows-build-${{ github.event.pull_request.head.ref || github.ref_name }}-${{ inputs.validation_mode || 'visual' }}
   cancel-in-progress: true
 
 jobs:
-  fast-checks:
-    name: Fast checks
-    runs-on: windows-latest
-    timeout-minutes: 30
+  frontend-fast:
+    name: Frontend fast checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Check out source
@@ -37,12 +37,6 @@ jobs:
         with:
           node-version: 24
           cache: npm
-
-      - name: Ensure Rust toolchain
-        shell: pwsh
-        run: |
-          rustup toolchain install stable --profile minimal --component rustfmt
-          rustup default stable
 
       - name: Install frontend dependencies
         run: npm ci
@@ -56,11 +50,74 @@ jobs:
       - name: Test frontend
         run: npm run test
 
+  rust-fast:
+    name: Rust fast checks
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source with comparison history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Detect Rust-affecting changes
+        id: rust-changes
+        shell: pwsh
+        run: |
+          $changed = @()
+          if ('${{ github.event_name }}' -eq 'pull_request') {
+            $changed = @(git diff --name-only '${{ github.event.pull_request.base.sha }}' '${{ github.event.pull_request.head.sha }}')
+          } elseif ('${{ github.event_name }}' -eq 'push' -and '${{ github.event.before }}' -and '${{ github.event.before }}' -ne '0000000000000000000000000000000000000000') {
+            $changed = @(git diff --name-only '${{ github.event.before }}' '${{ github.sha }}')
+          } else {
+            # Manual/full validation should never skip Rust validation.
+            $changed = @('src-tauri/manual-full-validation')
+          }
+
+          $rustChanged = $false
+          foreach ($path in $changed) {
+            if ($path -match '^(src-tauri/|rust-toolchain(?:\.toml)?$|Cargo\.(toml|lock)$|\.github/workflows/windows-build\.yml$)') {
+              $rustChanged = $true
+              break
+            }
+          }
+
+          "changed-files=$($changed -join ',')"
+          "rust_changed=$($rustChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+
+      - name: Ensure pinned Rust toolchain
+        if: ${{ steps.rust-changes.outputs.rust_changed == 'true' }}
+        shell: pwsh
+        run: |
+          $expected = '1.97.1-x86_64-pc-windows-msvc'
+          if (-not (rustup toolchain list | Select-String -SimpleMatch $expected)) {
+            rustup toolchain install 1.97.1 --profile minimal --component rustfmt
+          }
+          rustc --version
+          cargo --version
+
+      - name: Cache Rust build
+        if: ${{ steps.rust-changes.outputs.rust_changed == 'true' }}
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          cache-on-failure: true
+
       - name: Check Rust formatting
+        if: ${{ steps.rust-changes.outputs.rust_changed == 'true' }}
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
 
       - name: Check Rust
+        if: ${{ steps.rust-changes.outputs.rust_changed == 'true' }}
         run: cargo check --manifest-path src-tauri/Cargo.toml --all-targets
+
+      - name: Record skipped duplicate Rust compile
+        if: ${{ steps.rust-changes.outputs.rust_changed != 'true' }}
+        shell: pwsh
+        run: |
+          "RUST_FAST_SKIPPED reason=no-rust-affecting-files"
+          "Windows visual evidence still performs a real Tauri release build for this commit."
 
   windows-visual:
     name: Windows visual evidence
@@ -78,16 +135,21 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Ensure Rust toolchain
+      - name: Ensure pinned Rust toolchain
         shell: pwsh
         run: |
-          rustup toolchain install stable --profile minimal
-          rustup default stable
+          $expected = '1.97.1-x86_64-pc-windows-msvc'
+          if (-not (rustup toolchain list | Select-String -SimpleMatch $expected)) {
+            rustup toolchain install 1.97.1 --profile minimal
+          }
+          rustc --version
+          cargo --version
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          cache-on-failure: true
 
       - name: Install frontend dependencies
         run: npm ci
@@ -117,16 +179,14 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: blackhole-tasks-windows-visual-${{ github.run_number }}
-          path: |
-            output/windows-visual/*
-            src-tauri/target/release/blackhole-tasks.exe
+          path: output/windows-visual/*
           if-no-files-found: warn
           retention-days: 14
 
   windows-full:
     name: Full Windows validation
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_mode == 'full' }}
-    needs: fast-checks
+    needs: [frontend-fast, rust-fast]
     runs-on: windows-latest
     timeout-minutes: 60
 
@@ -140,19 +200,27 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Ensure Rust toolchain
+      - name: Ensure pinned Rust toolchain
         shell: pwsh
         run: |
-          rustup toolchain install stable --profile minimal --component rustfmt --component clippy
-          rustup default stable
+          $expected = '1.97.1-x86_64-pc-windows-msvc'
+          if (-not (rustup toolchain list | Select-String -SimpleMatch $expected)) {
+            rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy
+          }
+          rustc --version
+          cargo --version
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          cache-on-failure: true
 
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
 
       - name: Lint Rust
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
