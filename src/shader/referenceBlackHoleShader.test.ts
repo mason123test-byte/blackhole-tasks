@@ -36,8 +36,8 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
   });
 
   it("matches the tuned Gargantua camera and thin-disk geometry", () => {
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float OBSERVER_R = 60.0;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float OBSERVER_THETA = 1.535;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float OBSERVER_R = 74.1;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float OBSERVER_THETA = 1.470;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INNER = 9.26;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_OUTER = 18.70;");
   });
