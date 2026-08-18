@@ -36,11 +36,11 @@ const float KERR_MAX_STEP = 1.55;
 const float KERR_ERROR_TOL = 0.00035;
 const int KERR_MAX_RETRIES = 5;
 const float OBSERVER_R = 74.1;
-const float OBSERVER_THETA = 1.470;
-const float CAMERA_VERTICAL_FOV = 0.54105207;
+const float OBSERVER_THETA = 1.400;
+const float CAMERA_VERTICAL_FOV = 0.66322512;
 
-const float DISK_INNER = 9.26;
-const float DISK_OUTER = 18.70;
+const float DISK_INNER = 8.60;
+const float DISK_OUTER = 22.40;
 const int MAX_DISK_CROSSINGS = 4;
 const float STAR_GAIN = 0.0;
 const float DILATION_MIN = 0.20;
@@ -206,7 +206,7 @@ void initDngrCameraRay(float cameraRight, float cameraUp, out float r, out float
 
 void sampleDiskSurface(float hitRadius, float hitPhi, float patternTime, out vec3 diskColor, out float diskAlpha) {
   float innerEdge = smoothstep(DISK_INNER, DISK_INNER * 1.020, hitRadius);
-  float outerEdge = 1.0 - smoothstep(DISK_OUTER * 0.82, DISK_OUTER * 0.995, hitRadius);
+  float outerEdge = 1.0 - smoothstep(DISK_OUTER * 0.74, DISK_OUTER * 0.995, hitRadius);
   float radialEmission = innerEdge * outerEdge * pow(DISK_INNER / hitRadius, 0.82);
   float turns = hitPhi / (2.0 * PI); float kepler = pow(DISK_INNER / hitRadius, 1.5); float swirl = hitRadius * 0.85 - patternTime * kepler * 3.6;
   float rawStreak = diskStreakSample(hitRadius, turns, swirl);
@@ -335,6 +335,6 @@ export const REFERENCE_BLACK_HOLE_INFO = {
   styleReference: "https://arxiv.org/abs/1502.03808",
   physicsReference: "https://github.com/hungyipu/Odyssey",
   cameraReference: "DNGR Appendix A.1 fixed-event FIDO local sky",
-  cameraVerticalFovDeg: 31,
+  cameraVerticalFovDeg: 38,
   webglReference: "https://ebruneton.github.io/black_hole_shader/",
 } as const;
