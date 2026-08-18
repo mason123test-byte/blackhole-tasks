@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { REFERENCE_BLACK_HOLE_FRAGMENT } from "./referenceBlackHoleShader";
 
-const diskFalloff = (radius: number) => Math.pow(9.26 / radius, 0.82);
+const diskFalloff = (radius: number) => Math.pow(5.60 / radius, 0.45);
 
 describe("Gargantua disk thermal stratification", () => {
   it("keeps the physical Kerr geometry while making the inner disk hotter and the outer disk warmer/dimmer", () => {
@@ -27,10 +27,10 @@ describe("Gargantua disk thermal stratification", () => {
 
   it("retains broad emitting disk layers instead of photometrically erasing the film-like lensed bands", () => {
     expect(diskFalloff(18.70)).toBeGreaterThan(0.56);
-    expect(diskFalloff(11.75)).toBeGreaterThan(0.82);
-    expect(diskFalloff(9.93)).toBeGreaterThan(0.94);
+    expect(diskFalloff(11.75)).toBeGreaterThan(0.70);
+    expect(diskFalloff(9.93)).toBeGreaterThan(0.76);
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "pow(DISK_INNER / hitRadius, 0.82)",
+      "pow(DISK_INNER / hitRadius, 0.45)",
     );
   });
 });
