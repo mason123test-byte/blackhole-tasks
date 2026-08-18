@@ -36,7 +36,7 @@ const float KERR_MAX_STEP = 1.55;
 const float KERR_ERROR_TOL = 0.00035;
 const int KERR_MAX_RETRIES = 5;
 const float OBSERVER_R = 74.1;
-const float OBSERVER_THETA = 1.455;
+const float OBSERVER_THETA = 1.415;
 const float CAMERA_VERTICAL_FOV = 0.55850536;
 
 const float DISK_INNER = 4.20;
@@ -46,7 +46,7 @@ const float STAR_GAIN = 0.0;
 const float DILATION_MIN = 0.20;
 const float GARGANTUA_DOPPLER_MIX = 0.0;
 const float GARGANTUA_DISK_TEMP = 4500.0;
-const float FILM_DISK_EXPOSURE = 1.42;
+const float FILM_DISK_EXPOSURE = 1.55;
 const float DISK_SOURCE_DIAGNOSTIC = 0.0;
 
 float hash21(vec2 p) {
@@ -228,20 +228,20 @@ void sampleDiskSurface(float hitRadius, float hitPhi, float patternTime, out vec
   brightness *= mix(1.10, 0.62, smoothstep(0.04, 0.90, radialProgress)); brightness *= FILM_DISK_EXPOSURE;
   float localTemperature = mix(2900.0, 4800.0, clamp(0.74 * innerHeat + 0.26 * streakHeat, 0.0, 1.0));
   vec3 thermalColor = blackbody(localTemperature); brightness *= mix(1.0, 1.0, GARGANTUA_DOPPLER_MIX);
-  vec3 linearDisk = thermalColor * brightness * 1.38;
-  diskColor = vec3(1.0) - exp(-linearDisk); diskAlpha = clamp(0.08 + brightness * 0.66, 0.0, 0.80);
+  vec3 linearDisk = thermalColor * brightness * 1.52;
+  diskColor = vec3(1.0) - exp(-linearDisk); diskAlpha = clamp(0.10 + brightness * 0.74, 0.0, 0.84);
 }
 
 float crossingColorGain(int crossingIndex) {
   if (crossingIndex <= 0) return 1.0;
-  if (crossingIndex == 1) return 0.66;
+  if (crossingIndex == 1) return 0.80;
   if (crossingIndex == 2) return 0.20;
   return 0.08;
 }
 
 float crossingAlphaGain(int crossingIndex) {
   if (crossingIndex <= 0) return 1.0;
-  if (crossingIndex == 1) return 0.60;
+  if (crossingIndex == 1) return 0.72;
   if (crossingIndex == 2) return 0.25;
   return 0.12;
 }
