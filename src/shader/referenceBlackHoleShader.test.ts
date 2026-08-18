@@ -112,12 +112,15 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("h = min(h, max(KERR_MIN_STEP, axisStepLimit));");
   });
 
-  it("keeps tracing through a translucent thin disk so Kerr geometry can contribute multiple image orders", () => {
+  it("keeps tracing through a translucent thin disk while fading physical higher-order crossings", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const int MAX_DISK_CROSSINGS = 4;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("int diskCrossingCount = 0;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("if (side * previousSide < 0.0 && diskCrossingCount < MAX_DISK_CROSSINGS)");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("accumulatedDisk += transmittance * diskColor * diskAlpha;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("transmittance *= 1.0 - diskAlpha;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float crossingGain(int crossingIndex)");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("if (crossingIndex == 1) return 0.58;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float imageGain = crossingGain(diskCrossingCount);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float effectiveAlpha = clamp(diskAlpha * imageGain, 0.0, 0.90);");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("accumulatedDisk += transmittance * diskColor * effectiveAlpha;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("transmittance *= 1.0 - effectiveAlpha;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("diskCrossingCount += 1;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("bool diskHit");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("GARGANTUA_ANNULUS_CENTER");
@@ -129,20 +132,24 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("baselineBeta *= mix(1.0, 1.20, baselineLowerWarp);");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("lowerMajorAxisScale");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("lowerMinorAxisScale");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("screen.y <");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("1.0 - referenceUv.y");
   });
 
-  it("keeps the film presentation warm and suppresses strong Doppler asymmetry", () => {
+  it("keeps the film presentation warm while reducing direct-disk overexposure", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_DOPPLER_MIX = 0.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float GARGANTUA_DISK_TEMP = 4500.0;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float innerHeat = 1.0 - smoothstep(0.05, 0.78, radialProgress);",
+      "float innerHeat = 1.0 - smoothstep(0.04, 0.72, radialProgress);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float localTemperature = mix(3100.0, 5200.0, clamp(0.72 * innerHeat + 0.28 * streakHeat, 0.0, 1.0));",
+      "float localTemperature = mix(3000.0, 5050.0, clamp(0.74 * innerHeat + 0.26 * streakHeat, 0.0, 1.0));",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "brightness *= mix(1.28, 0.78, smoothstep(0.05, 0.95, radialProgress));",
+      "brightness *= mix(1.15, 0.58, smoothstep(0.04, 0.90, radialProgress));",
     );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec3 linearDisk = thermalColor * brightness * 1.58;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("diskAlpha = clamp(0.12 + brightness * 0.78, 0.0, 0.86);");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec3 thermalColor = blackbody(localTemperature);");
   });
 

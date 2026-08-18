@@ -363,30 +363,37 @@ void sampleDiskSurface(
   out vec3 diskColor,
   out float diskAlpha
 ) {
-  float innerEdge = smoothstep(DISK_INNER, DISK_INNER * 1.025, hitRadius);
-  float outerEdge = 1.0 - smoothstep(DISK_OUTER * 0.76, DISK_OUTER, hitRadius);
-  float radialEmission = innerEdge * outerEdge * pow(DISK_INNER / hitRadius, 0.72);
+  float innerEdge = smoothstep(DISK_INNER, DISK_INNER * 1.020, hitRadius);
+  float outerEdge = 1.0 - smoothstep(DISK_OUTER * 0.70, DISK_OUTER * 0.93, hitRadius);
+  float radialEmission = innerEdge * outerEdge * pow(DISK_INNER / hitRadius, 0.90);
 
   float turns = hitPhi / (2.0 * PI);
   float kepler = pow(DISK_INNER / hitRadius, 1.5);
   float swirl = hitRadius * 0.85 - patternTime * kepler * 3.6;
   float rawStreak = diskStreakSample(hitRadius, turns, swirl);
-  float streak = mix(0.74 + 0.30 * rawStreak, 1.0, DISK_SOURCE_DIAGNOSTIC);
+  float streak = mix(0.68 + 0.34 * rawStreak, 1.0, DISK_SOURCE_DIAGNOSTIC);
   float radialProgress = clamp((hitRadius - DISK_INNER) / (DISK_OUTER - DISK_INNER), 0.0, 1.0);
-  float innerHeat = 1.0 - smoothstep(0.05, 0.78, radialProgress);
-  float streakHeat = smoothstep(0.22, 0.90, rawStreak);
+  float innerHeat = 1.0 - smoothstep(0.04, 0.72, radialProgress);
+  float streakHeat = smoothstep(0.28, 0.92, rawStreak);
 
-  float grazing = mix(0.82 + 0.18 * smoothstep(0.0, 1.0, abs(sin(hitPhi))), 1.0, DISK_SOURCE_DIAGNOSTIC);
+  float grazing = mix(0.78 + 0.22 * smoothstep(0.0, 1.0, abs(sin(hitPhi))), 1.0, DISK_SOURCE_DIAGNOSTIC);
   float brightness = radialEmission * streak * grazing;
-  brightness *= mix(1.28, 0.78, smoothstep(0.05, 0.95, radialProgress));
-  float localTemperature = mix(3100.0, 5200.0, clamp(0.72 * innerHeat + 0.28 * streakHeat, 0.0, 1.0));
+  brightness *= mix(1.15, 0.58, smoothstep(0.04, 0.90, radialProgress));
+  float localTemperature = mix(3000.0, 5050.0, clamp(0.74 * innerHeat + 0.26 * streakHeat, 0.0, 1.0));
   vec3 thermalColor = blackbody(localTemperature);
   float dopplerMix = GARGANTUA_DOPPLER_MIX;
   brightness *= mix(1.0, 1.0, dopplerMix);
 
-  vec3 linearDisk = thermalColor * brightness * 2.15;
+  vec3 linearDisk = thermalColor * brightness * 1.58;
   diskColor = vec3(1.0) - exp(-linearDisk);
-  diskAlpha = clamp(0.32 + brightness * 0.95, 0.0, 0.96);
+  diskAlpha = clamp(0.12 + brightness * 0.78, 0.0, 0.86);
+}
+
+float crossingGain(int crossingIndex) {
+  if (crossingIndex <= 0) return 1.0;
+  if (crossingIndex == 1) return 0.58;
+  if (crossingIndex == 2) return 0.34;
+  return 0.20;
 }
 
 void rayTracedReference() {
@@ -536,8 +543,10 @@ void rayTracedReference() {
         vec3 diskColor;
         float diskAlpha;
         sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha);
-        accumulatedDisk += transmittance * diskColor * diskAlpha;
-        transmittance *= 1.0 - diskAlpha;
+        float imageGain = crossingGain(diskCrossingCount);
+        float effectiveAlpha = clamp(diskAlpha * imageGain, 0.0, 0.90);
+        accumulatedDisk += transmittance * diskColor * effectiveAlpha;
+        transmittance *= 1.0 - effectiveAlpha;
         diskCrossingCount += 1;
         if (transmittance < 0.02) {
           break;
