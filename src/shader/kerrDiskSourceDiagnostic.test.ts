@@ -28,7 +28,7 @@ describe("Kerr disk source structure", () => {
       "float localTemperature = mix(3000.0, 5050.0, clamp(0.74 * innerHeat + 0.26 * streakHeat, 0.0, 1.0));",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float radialEmission = innerEdge * outerEdge * pow(DISK_INNER / hitRadius, 0.82);",
+      "float radialEmission = innerEdge * outerEdge * pow(DISK_INNER / hitRadius, 0.45);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "projectKerrMomenta(r, theta, L, kappa, pr, ptheta);",
