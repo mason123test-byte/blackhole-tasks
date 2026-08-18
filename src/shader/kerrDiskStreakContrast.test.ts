@@ -4,7 +4,7 @@ import { REFERENCE_BLACK_HOLE_FRAGMENT } from "./referenceBlackHoleShader";
 describe("Gargantua disk streak contrast", () => {
   it("keeps texture but avoids high-contrast ribbon striping", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float streak = mix(0.74 + 0.30 * rawStreak, 1.0, DISK_SOURCE_DIAGNOSTIC);",
+      "float streak = mix(0.72 + 0.34 * rawStreak, 1.0, DISK_SOURCE_DIAGNOSTIC);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain(
       "0.52 + 1.10 * rawStreak * rawStreak",
