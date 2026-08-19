@@ -62,7 +62,7 @@ void main() {
   float availableLod = floor(log2(max(min(u_resolution.x, u_resolution.y), 1.0)));
   vec4 nearGlow = flareSample(min(2.0, availableLod), 0.16, 0.42, 0.27, 0.66);
   vec4 midGlow = flareSample(min(4.0, availableLod), 0.065, 0.23, 0.11, 0.40);
-  vec4 farGlow = flareSample(min(6.0, availableLod), 0.022, 0.10, 0.045, 0.20);
+  vec4 farGlow = flareSample(min(7.0, availableLod), 0.022, 0.10, 0.045, 0.20);
   float flareCoreReject = 1.0 - 0.82 * smoothstep(0.56, 0.82, basePeak);
   float veilingSupport = (1.0 - shadowProtect)
     * flareCoreReject

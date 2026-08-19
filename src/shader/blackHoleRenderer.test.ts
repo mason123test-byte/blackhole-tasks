@@ -82,19 +82,25 @@ describe("black-hole render profiles", () => {
     expect(blackHoleCanvasSource).toContain("return stopRenderer;");
   });
 
-  it("rejects flare energy from the direct bright core while preserving the stronger outer veil", () => {
+  it("widens only the far veiling-flare radius while preserving the accepted core guard", () => {
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec3 ivory = vec3(1.0, 0.945, 0.80);");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec3 paleGold = vec3(1.0, 0.875, 0.68);");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
       "float shadowProtect = base.a * (1.0 - smoothstep(0.012, 0.075, basePeak));",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
+      "vec4 nearGlow = flareSample(min(2.0, availableLod), 0.16, 0.42, 0.27, 0.66);",
+    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
+      "vec4 midGlow = flareSample(min(4.0, availableLod), 0.065, 0.23, 0.11, 0.40);",
+    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
+      "vec4 farGlow = flareSample(min(7.0, availableLod), 0.022, 0.10, 0.045, 0.20);",
+    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
       "float flareCoreReject = 1.0 - 0.82 * smoothstep(0.56, 0.82, basePeak);",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("* flareCoreReject");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "* smoothstep(0.008, 0.135, nearGlow.a + midGlow.a * 0.76 + farGlow.a * 0.40);",
-    );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
       "vec3 glow = (nearWarm * 0.23 + midWarm * 0.095 + farWarm * 0.030) * veilingSupport;",
     );
