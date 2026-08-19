@@ -80,14 +80,33 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 - Verdict: not accepted.
 - Do not repeat: simply raising `microCore` mix strength above `0.42`; evidence indicates it increases peak intensity more than ridge separation.
 
+### #513 — isotropic four-neighbor local ridge selector
+- Visual-code HEAD: `7f2729b9147e20787ac6c51d464edcc112d47ea2`
+- Windows run: `#513` / `32253449518`; artifact `9365521120`.
+- Selector: four direct texture neighbors, `ridgeDetail = max(basePeak - ridgeNeighborPeak, 0.0)`.
+- Parameters: ridge-detail gate `0.018 -> 0.075`, base-peak gate `0.58 -> 0.88`, white-point target `basePeak * 1.10`, ridge mix `0.24`.
+- #479 flare LOD 6.0, `flareCoreReject`, warm tone, glow weights, shadow protection, and physical geometry were unchanged.
+- Same-definition #479 -> #513 measurements: direct-core average thickness `2.202 -> 2.237 px`, median `2 -> 2 px`, core horizontal coverage `89 -> 93 px`, `>180` pixels `204 -> 217`, lower bright count `9290 -> 9291`, warm coverage `26022 -> 26018`, dead-white pixels `0 -> 0`.
+- Result: surrounding warm/lower light was preserved, but the ridge did not become visibly more knife-edge; high-intensity coverage increased slightly and the core became marginally wider rather than narrower.
+- Verdict: low value / not accepted. `#479` remains baseline.
+- Do not repeat this exact selector parameter set: `0.018–0.075 / 0.58–0.88 / 1.10 / 0.24`.
+
 ## Current exclusions / lessons
 
 1. Do not increase global flare weights to create cinematic flare; it thickens the core unless independently protected.
 2. Do not keep sweeping far-flare LOD `6.0–7.0`; benefit is below the useful threshold in the current compositor.
 3. Do not use negative-detail shoulder suppression as the main way to thin the disk; values around `0.78` make the image dry and reduce lower/warm light.
 4. Do not keep raising `microCore` scalar strength; `0.28 -> 0.42` raised peak brightness without materially narrowing the core.
-5. Favor selectors that improve peak/ridge separation without reducing surrounding warm veil or changing geometry.
+5. The first isotropic 4-neighbor ridge selector preserved the surrounding light but slightly widened the high-intensity core; do not repeat the exact #513 gate/target/mix values.
+6. Favor selectors that improve actual ridge separation, not just local peak intensity, while preserving the #479 warm veil and frozen geometry.
+
+## Operational validation notes
+
+- #499 was not a visual verdict: validation stopped at TypeScript because a renderer syntax typo was introduced during experiment preparation. The ridge parameters were not changed when fixing it.
+- #511 was not a visual verdict: typecheck/lint passed, but one unrelated diagnostic-frame test assertion contained a text typo (`sonst` instead of `const`). The ridge-specific test itself passed. The ridge parameters were not changed when fixing it.
+- Temporary placeholder files created during recovery were deleted by forward commits; they were tooling mistakes and are not visual experiments.
+- #513 is the first valid Windows visual run for the four-neighbor ridge experiment.
 
 ## Next experiment target
 
-Try a new independent photometric selector rather than another scalar-strength sweep: a narrow local ridge/peak selectivity response that distinguishes the sharp direct-disk highlight from its surrounding warm veil, while keeping #479 flare/core guard, tone, shadow protection, and all physical geometry unchanged.
+Do not continue by simply increasing the #513 ridge mix or lowering its gates. Try a selector that measures ridge *shape* or directional thinness rather than only center-versus-neighbor peak contrast, while keeping #479 flare/core guard, tone, shadow protection, and all physical geometry unchanged.
