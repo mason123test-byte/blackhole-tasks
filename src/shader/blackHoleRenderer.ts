@@ -54,26 +54,15 @@ void main() {
   vec3 ivory = vec3(1.0, 0.945, 0.80);
   vec3 paleGold = vec3(1.0, 0.875, 0.68);
   vec3 highlightTint = mix(ivory, paleGold, 0.20);
-  vec4 localBlur = textureLod(u_frame_texture, v_uv, 1.0);
-  float localPeak = max(localBlur.r, max(localBlur.g, localBlur.b));
-  float positiveDetail = max(basePeak - localPeak, 0.0);
-  float microCore = base.a
-    * smoothstep(0.035, 0.10, positiveDetail)
-    * smoothstep(0.60, 0.90, basePeak);
 
   vec3 gradedBase = base.rgb * mix(1.0, 0.90, softShoulder);
   gradedBase = mix(gradedBase, max(gradedBase, highlightTint * basePeak), highlight * 0.24);
   gradedBase += highlightTint * hotCore * 0.055;
-  gradedBase = mix(
-    gradedBase,
-    max(gradedBase, highlightTint * min(1.0, basePeak * 1.12)),
-    microCore * 0.42
-  );
 
   float availableLod = floor(log2(max(min(u_resolution.x, u_resolution.y), 1.0)));
   vec4 nearGlow = flareSample(min(2.0, availableLod), 0.16, 0.42, 0.27, 0.66);
   vec4 midGlow = flareSample(min(4.0, availableLod), 0.065, 0.23, 0.11, 0.40);
-  vec4 farGlow = flareSample(min(6.5, availableLod), 0.022, 0.10, 0.045, 0.20);
+  vec4 farGlow = flareSample(min(6.0, availableLod), 0.022, 0.10, 0.045, 0.20);
   float flareCoreReject = 1.0 - 0.82 * smoothstep(0.56, 0.82, basePeak);
   float veilingSupport = (1.0 - shadowProtect)
     * flareCoreReject
