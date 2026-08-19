@@ -40,7 +40,7 @@ const float OBSERVER_THETA = 1.515;
 const float CAMERA_VERTICAL_FOV = 0.55850536;
 
 const float DISK_INNER = 4.20;
-const float DISK_OUTER = 40.00;
+const float DISK_OUTER = 18.70;
 const int MAX_DISK_CROSSINGS = 4;
 const float STAR_GAIN = 0.0;
 const float DILATION_MIN = 0.20;
@@ -295,7 +295,7 @@ void rayTracedReference() {
     }
     previousR = r; previousPhi = phi;
     r = acceptedState.x; theta = acceptedState.y; phi = acceptedState.z; pr = acceptedState.w; ptheta = acceptedPtheta;
-    normalizePolarState(theta, phi, ptheta);
+    normalizePolarState(theta, phi, ptheta); projectKerrMomenta(r, theta, L, kappa, pr, ptheta);
     h = clamp(h * clamp(0.90 * pow(max(acceptedErrorRatio, 1e-6), -0.20), 0.55, 1.80), KERR_MIN_STEP, KERR_MAX_STEP);
     float side = theta - 0.5 * PI;
     if (side * previousSide < 0.0 && diskCrossingCount < MAX_DISK_CROSSINGS) {

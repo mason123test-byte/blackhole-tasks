@@ -34,7 +34,7 @@ describe("Kerr disk source structure", () => {
       "float radialWarp = (fineNoise - 0.5) * 5.5 + (broadNoise - 0.5) * 3.0;",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "normalizePolarState(theta, phi, ptheta);",
+      "projectKerrMomenta(r, theta, L, kappa, pr, ptheta);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("GARGANTUA_ANNULUS_CENTER");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("lowerMajorAxisScale");
