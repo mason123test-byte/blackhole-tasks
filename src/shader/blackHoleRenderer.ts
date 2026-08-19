@@ -55,9 +55,26 @@ void main() {
   vec3 paleGold = vec3(1.0, 0.875, 0.68);
   vec3 highlightTint = mix(ivory, paleGold, 0.20);
 
+  vec2 ridgeTexel = 1.0 / max(u_resolution, vec2(1.0));
+  vec4 ridgeUp1 = textureLod(u_frame_texture, v_uv + vec2(0.0, ridgeTexel.y), 0.0);
+  vec4 ridgeDown1 = textureLod(u_frame_texture, v_uv - vec2(0.0, ridgeTexel.y), 0.0);
+  vec4 ridgeUp2 = textureLod(u_frame_texture, v_uv + vec2(0.0, ridgeTexel.y * 2.0), 0.0);
+  vec4 ridgeDown2 = textureLod(u_frame_texture, v_uv - vec2(0.0, ridgeTexel.y * 2.0), 0.0);
+  float ridgeUp1Peak = max(ridgeUp1.r, max(ridgeUp1.g, ridgeUp1.b));
+  float ridgeDown1Peak = max(ridgeDown1.r, max(ridgeDown1.g, ridgeDown1.b));
+  float ridgeUp2Peak = max(ridgeUp2.r, max(ridgeUp2.g, ridgeUp2.b));
+  float ridgeDown2Peak = max(ridgeDown2.r, max(ridgeDown2.g, ridgeDown2.b));
+  float ridgeNearCurvature = max(basePeak - 0.5 * (ridgeUp1Peak + ridgeDown1Peak), 0.0);
+  float ridgeFarCurvature = max(basePeak - 0.5 * (ridgeUp2Peak + ridgeDown2Peak), 0.0);
+  float ridgeWidthEvidence =
+    smoothstep(0.012, 0.055, ridgeNearCurvature)
+    * smoothstep(0.030, 0.105, ridgeFarCurvature)
+    * smoothstep(0.58, 0.88, basePeak);
+  float ridgeHotCoreGain = mix(0.78, 1.20, ridgeWidthEvidence);
+
   vec3 gradedBase = base.rgb * mix(1.0, 0.90, softShoulder);
   gradedBase = mix(gradedBase, max(gradedBase, highlightTint * basePeak), highlight * 0.24);
-  gradedBase += highlightTint * hotCore * 0.055;
+  gradedBase += highlightTint * hotCore * 0.055 * ridgeHotCoreGain;
 
   float availableLod = floor(log2(max(min(u_resolution.x, u_resolution.y), 1.0)));
   vec4 nearGlow = flareSample(min(2.0, availableLod), 0.16, 0.42, 0.27, 0.66);
