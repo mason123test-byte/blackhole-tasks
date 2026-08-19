@@ -246,18 +246,6 @@ float crossingAlphaGain(int crossingIndex) {
   return 0.12;
 }
 
-void shapeDirectCrossingPhotometry(float candidateWeight, inout vec3 diskColor, float diskAlpha) {
-  float directPeak = max(diskColor.r, max(diskColor.g, diskColor.b));
-  float directEmissiveCore = smoothstep(0.55, 0.82, directPeak)
-    * smoothstep(0.42, 0.72, diskAlpha);
-  float directResponse = directEmissiveCore * directEmissiveCore;
-  float directColorGain = mix(0.45, 1.75, directResponse);
-  vec3 directWarmCore = vec3(1.0, 0.93, 0.74) * min(1.0, directPeak * 1.18);
-  vec3 shapedDirect = diskColor * directColorGain;
-  shapedDirect = mix(shapedDirect, max(shapedDirect, directWarmCore), directResponse * 0.72);
-  diskColor = mix(diskColor, shapedDirect, candidateWeight);
-}
-
 void rayTracedReference() {
   float aspect = u_resolution.x / max(u_resolution.y, 1.0);
   vec2 referenceUv = vec2(v_uv.x, 1.0 - v_uv.y);
@@ -315,9 +303,6 @@ void rayTracedReference() {
       if (diskRadius > DISK_INNER && diskRadius < DISK_OUTER) {
         float diskPhi = mix(previousPhi, phi, crossing); vec3 diskColor; float diskAlpha;
         sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha);
-        if (diskCrossingCount == 0) {
-          shapeDirectCrossingPhotometry(candidateWeight, diskColor, diskAlpha);
-        }
         float colorGain = crossingColorGain(diskCrossingCount);
         float alphaGain = crossingAlphaGain(diskCrossingCount);
         float effectiveAlpha = clamp(diskAlpha * alphaGain, 0.0, 0.90);
