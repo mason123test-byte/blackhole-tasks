@@ -57,22 +57,17 @@ void main() {
   vec4 localBlur = textureLod(u_frame_texture, v_uv, 1.0);
   float localPeak = max(localBlur.r, max(localBlur.g, localBlur.b));
   float positiveDetail = max(basePeak - localPeak, 0.0);
-  float negativeDetail = max(localPeak - basePeak, 0.0);
   float microCore = base.a
-    * smoothstep(0.025, 0.12, positiveDetail)
-    * smoothstep(0.52, 0.88, basePeak);
-  float microShoulder = base.a
-    * smoothstep(0.018, 0.10, negativeDetail)
-    * smoothstep(0.16, 0.64, basePeak);
+    * smoothstep(0.035, 0.10, positiveDetail)
+    * smoothstep(0.60, 0.90, basePeak);
 
   vec3 gradedBase = base.rgb * mix(1.0, 0.90, softShoulder);
   gradedBase = mix(gradedBase, max(gradedBase, highlightTint * basePeak), highlight * 0.24);
   gradedBase += highlightTint * hotCore * 0.055;
-  gradedBase *= mix(1.0, 0.78, microShoulder);
   gradedBase = mix(
     gradedBase,
-    max(gradedBase, highlightTint * min(1.0, basePeak * 1.06)),
-    microCore * 0.18
+    max(gradedBase, highlightTint * min(1.0, basePeak * 1.12)),
+    microCore * 0.28
   );
 
   float availableLod = floor(log2(max(min(u_resolution.x, u_resolution.y), 1.0)));
