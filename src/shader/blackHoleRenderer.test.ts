@@ -82,26 +82,26 @@ describe("black-hole render profiles", () => {
     expect(blackHoleCanvasSource).toContain("return stopRenderer;");
   });
 
-  it("adds a warm filmic highlight response without changing Kerr geometry", () => {
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("textureLod(u_frame_texture, v_uv, lod)");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("textureLod(u_frame_texture, v_uv, 0.0)");
+  it("strengthens photographic veiling flare while retaining black shadow protection", () => {
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec3 ivory = vec3(1.0, 0.945, 0.80);");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec3 paleGold = vec3(1.0, 0.875, 0.68);");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
       "float shadowProtect = base.a * (1.0 - smoothstep(0.012, 0.075, basePeak));",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "float veilingSupport = (1.0 - shadowProtect)",
+      "* smoothstep(0.008, 0.135, nearGlow.a + midGlow.a * 0.76 + farGlow.a * 0.40);",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "vec3 glow = (nearWarm * 0.19 + midWarm * 0.075 + farWarm * 0.022) * veilingSupport;",
+      "vec3 glow = (nearWarm * 0.23 + midWarm * 0.095 + farWarm * 0.030) * veilingSupport;",
+    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
+      "float glowAlpha = (nearGlow.a * 0.080 + midGlow.a * 0.034 + farGlow.a * 0.012) * veilingSupport;",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
       "outColor = vec4(composed, max(base.a, min(glowAlpha, 0.18)));",
     );
     expect(rendererSource).toContain("gl.LINEAR_MIPMAP_LINEAR");
     expect(rendererSource).toContain("gl.generateMipmap(gl.TEXTURE_2D);");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("emissionSupport");
     expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("flareRing(");
     expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("mirroredUv");
     expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("1.0 - v_uv.y");

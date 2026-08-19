@@ -64,12 +64,12 @@ void main() {
   vec4 midGlow = flareSample(min(4.0, availableLod), 0.065, 0.23, 0.11, 0.40);
   vec4 farGlow = flareSample(min(6.0, availableLod), 0.022, 0.10, 0.045, 0.20);
   float veilingSupport = (1.0 - shadowProtect)
-    * smoothstep(0.010, 0.16, nearGlow.a + midGlow.a * 0.72 + farGlow.a * 0.35);
+    * smoothstep(0.008, 0.135, nearGlow.a + midGlow.a * 0.76 + farGlow.a * 0.40);
   vec3 nearWarm = mix(nearGlow.rgb, ivory * nearGlow.a, 0.38);
   vec3 midWarm = mix(midGlow.rgb, highlightTint * midGlow.a, 0.48);
   vec3 farWarm = mix(farGlow.rgb, ivory * farGlow.a, 0.56);
-  vec3 glow = (nearWarm * 0.19 + midWarm * 0.075 + farWarm * 0.022) * veilingSupport;
-  float glowAlpha = (nearGlow.a * 0.075 + midGlow.a * 0.030 + farGlow.a * 0.010) * veilingSupport;
+  vec3 glow = (nearWarm * 0.23 + midWarm * 0.095 + farWarm * 0.030) * veilingSupport;
+  float glowAlpha = (nearGlow.a * 0.080 + midGlow.a * 0.034 + farGlow.a * 0.012) * veilingSupport;
   vec3 composed = clamp(gradedBase + glow, 0.0, 1.0);
   composed = mix(composed, base.rgb, shadowProtect);
   outColor = vec4(composed, max(base.a, min(glowAlpha, 0.18)));
