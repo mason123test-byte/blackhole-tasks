@@ -46,7 +46,7 @@ void main() {
   float highlight = base.a
     * smoothstep(0.34, 0.82, basePeak)
     * smoothstep(0.14, 0.58, baseFloor);
-  float hotCore = base.a * smoothstep(0.66, 0.94, basePeak);
+  float hotCore = base.a * smoothstep(0.78, 0.94, basePeak);
   float softShoulder = base.a
     * smoothstep(0.10, 0.42, basePeak)
     * (1.0 - smoothstep(0.58, 0.82, basePeak));
