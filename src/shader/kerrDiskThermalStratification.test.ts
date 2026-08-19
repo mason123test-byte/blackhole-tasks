@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { REFERENCE_BLACK_HOLE_FRAGMENT } from "./referenceBlackHoleShader";
 
-const diskFalloff = (radius: number) => Math.pow(9.26 / radius, 0.38);
+const diskFalloff = (radius: number) => Math.pow(4.20 / radius, 0.38);
 
 describe("Gargantua disk thermal stratification", () => {
   it("keeps the physical Kerr geometry while making the inner disk hotter and the outer disk warmer/dimmer", () => {
