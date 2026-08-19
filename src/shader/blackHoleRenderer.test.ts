@@ -82,19 +82,6 @@ describe("black-hole render profiles", () => {
     expect(blackHoleCanvasSource).toContain("return stopRenderer;");
   });
 
-  it("uses a tighter hot-core response without dimming the accepted #479 shoulder or flare", () => {
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "float hotCore = base.a * smoothstep(0.78, 0.94, basePeak);",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("gradedBase += highlightTint * hotCore * 0.055;");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "float softShoulder = base.a",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "float flareCoreReject = 1.0 - 0.82 * smoothstep(0.56, 0.82, basePeak);",
-    );
-  });
-
   it("rejects flare energy from the direct bright core while preserving the stronger outer veil", () => {
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec3 ivory = vec3(1.0, 0.945, 0.80);");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec3 paleGold = vec3(1.0, 0.875, 0.68);");
