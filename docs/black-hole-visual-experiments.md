@@ -102,6 +102,23 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 - Verdict: rejected / low value. `#479` remains baseline.
 - Do not repeat this exact directional selector: vertical thinness `0.018–0.075` + horizontal continuity `0.40–0.76` + base gate `0.58–0.88` with `1.10 / 0.24` amplification.
 
+### #527 — multi-scale 1px/2px ridge-width evidence
+- Commit: `d3ef6693649864c0bf876c46342bfa0b71014b70`.
+- Windows run: `#527` / `32266998167`; artifact `9370838494`.
+- Selector used 1px and 2px vertical curvature gates, then redistributed the existing hot-core contribution with `ridgeHotCoreGain = mix(0.78, 1.20, ridgeWidthEvidence)`.
+- Same-definition #479 -> #527 measurements: average core thickness `2.211 -> 2.189 px`, median `2 -> 2 px`, horizontal coverage `90 -> 90 px`, `>180` core pixels `199 -> 197`; lower-bright and warm coverage were effectively unchanged; dead-white remained `0`.
+- Result: physically harmless but visually indistinguishable at original size; about 1% core-thickness reduction is below the useful threshold.
+- Verdict: rejected / low value.
+
+### #529 — stronger multi-scale ridge redistribution
+- Commit: `8529e529db903ea282018fce65ce82d9a2421325`.
+- Windows run: `#529` / `32268184738`; artifact `9371326613`.
+- Only changed the same multi-scale selector redistribution from `mix(0.78, 1.20, ridgeWidthEvidence)` to `mix(0.60, 1.30, ridgeWidthEvidence)`; all gates, flare, shoulder, warm tone and geometry stayed fixed.
+- Same-definition measurements: average bright-core thickness `2.178 px`, median `2 px`, horizontal coverage `90 px`, `>180` core pixels `196`, lower bright `10817`, warm coverage `30806`, dead-white `0`.
+- Result: original-size screenshots could not be stably distinguished from #527. The stronger gain produced only about another 0.5% thickness reduction and did not create visible core/glow separation.
+- Verdict: rejected. `#479` remains the accepted baseline.
+- Do not continue scanning the current multi-scale ridge selector's redistribution/gain range. `0.78–1.20` and `0.60–1.30` have both demonstrated sub-visible returns; the limitation is selector separation, not gain strength.
+
 ## Current exclusions / lessons
 
 1. Do not increase global flare weights to create cinematic flare; it thickens the core unless independently protected.
@@ -110,8 +127,9 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 4. Do not keep raising `microCore` scalar strength; `0.28 -> 0.42` raised peak brightness without materially narrowing the core.
 5. The isotropic 4-neighbor ridge selector preserved surrounding light but slightly widened the high-intensity core; do not repeat the exact #513 gate/target/mix values.
 6. The first directional vertical-thinness + horizontal-continuity selector also widened high-intensity horizontal coverage; do not repeat the exact #517 gate combination or simply raise its mix.
-7. Favor a mechanism that changes the *response curve inside already-selected hot pixels* or uses multi-scale ridge width evidence, rather than another one-pixel-neighbor peak detector.
-8. Any accepted replacement must beat #479 visually while preserving its warm veil, lower brightness, shadow cleanliness, and frozen geometry.
+7. Do not continue scanning #527/#529 multi-scale ridge redistribution/gain; both conservative and stronger ranges were visually sub-threshold.
+8. Prefer physically identified direct-crossing information from the ray tracer over another screen-space neighborhood selector when shaping the direct component.
+9. Any accepted replacement must beat #479 visibly at original size while preserving its warm veil, lower brightness, shadow cleanliness, and frozen geometry.
 
 ## Operational validation notes
 
@@ -120,7 +138,8 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 - Temporary placeholder files created during recovery were deleted by forward commits; they were tooling mistakes and are not visual experiments.
 - #513 was the first valid Windows visual run for the four-neighbor ridge experiment.
 - #517 passed frontend typecheck/lint/tests, Rust fast checks, Tauri EXE build, native Windows visual capture, and artifact upload; candidate/baseline/split/expanded screenshots were opened directly.
+- #527 and #529 both passed Windows visual validation and were inspected at original size and core crop; neither met the visible-improvement bar.
 
 ## Next experiment target
 
-Do not continue by simply increasing #517 mix strength or lowering its gates. Prefer either a multi-scale width selector (for example comparing 1-pixel and 2-pixel vertical curvature while preserving horizontal support) or a narrow highlight response curve that changes peak-to-shoulder contrast without globally dimming the shoulder. Keep #479 flare/core guard, warm tone, shadow protection, and all physical geometry unchanged.
+Stop screen-space ridge/gain scanning. Inspect the physical ray-tracing crossing pipeline and, if first/direct crossing identity is already available, shape that physical component independently while preserving higher-order images and #479 compositor behavior.
