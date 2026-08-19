@@ -67,7 +67,7 @@ void main() {
   gradedBase = mix(
     gradedBase,
     max(gradedBase, highlightTint * min(1.0, basePeak * 1.12)),
-    microCore * 0.28
+    microCore * 0.42
   );
 
   float availableLod = floor(log2(max(min(u_resolution.x, u_resolution.y), 1.0)));
