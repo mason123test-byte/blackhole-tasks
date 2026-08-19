@@ -68,7 +68,7 @@ void main() {
   vec3 gradedBase = base.rgb * mix(1.0, 0.90, softShoulder);
   gradedBase = mix(gradedBase, max(gradedBase, highlightTint * basePeak), highlight * 0.24);
   gradedBase += highlightTint * hotCore * 0.055;
-  gradedBase *= mix(1.0, 0.88, microShoulder);
+  gradedBase *= mix(1.0, 0.78, microShoulder);
   gradedBase = mix(
     gradedBase,
     max(gradedBase, highlightTint * min(1.0, basePeak * 1.06)),

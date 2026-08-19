@@ -82,7 +82,7 @@ describe("black-hole render profiles", () => {
     expect(blackHoleCanvasSource).toContain("return stopRenderer;");
   });
 
-  it("strengthens only local negative-detail shoulder rejection while preserving the micro-core response", () => {
+  it("tightens only local negative-detail shoulder rejection while preserving the micro-core response", () => {
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec4 localBlur = textureLod(u_frame_texture, v_uv, 1.0);");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
       "float positiveDetail = max(basePeak - localPeak, 0.0);",
@@ -92,7 +92,7 @@ describe("black-hole render profiles", () => {
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("smoothstep(0.025, 0.12, positiveDetail)");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("smoothstep(0.018, 0.10, negativeDetail)");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("gradedBase *= mix(1.0, 0.88, microShoulder);");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("gradedBase *= mix(1.0, 0.78, microShoulder);");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("microCore * 0.18");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
       "vec4 farGlow = flareSample(min(6.5, availableLod), 0.022, 0.10, 0.045, 0.20);",
