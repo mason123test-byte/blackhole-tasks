@@ -70,7 +70,7 @@ void main() {
     smoothstep(0.012, 0.055, ridgeNearCurvature)
     * smoothstep(0.030, 0.105, ridgeFarCurvature)
     * smoothstep(0.58, 0.88, basePeak);
-  float ridgeHotCoreGain = mix(0.78, 1.20, ridgeWidthEvidence);
+  float ridgeHotCoreGain = mix(0.60, 1.30, ridgeWidthEvidence);
 
   vec3 gradedBase = base.rgb * mix(1.0, 0.90, softShoulder);
   gradedBase = mix(gradedBase, max(gradedBase, highlightTint * basePeak), highlight * 0.24);

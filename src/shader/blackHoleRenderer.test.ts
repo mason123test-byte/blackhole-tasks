@@ -99,7 +99,7 @@ describe("black-hole render profiles", () => {
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("smoothstep(0.012, 0.055, ridgeNearCurvature)");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("smoothstep(0.030, 0.105, ridgeFarCurvature)");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("float ridgeHotCoreGain = mix(0.78, 1.20, ridgeWidthEvidence);");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("float ridgeHotCoreGain = mix(0.60, 1.30, ridgeWidthEvidence);");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
       "gradedBase += highlightTint * hotCore * 0.055 * ridgeHotCoreGain;",
     );
