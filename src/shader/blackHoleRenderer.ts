@@ -283,7 +283,7 @@ function startBlackHoleSession(
     gl.bindFramebuffer(gl.FRAMEBUFFER, outputFramebuffer);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, outputTexture, 0);
     if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
-      throw new Error "黑洞输出帧缓冲不完整");
+      throw new Error("黑洞输出帧缓冲不完整");
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.activeTexture(gl.TEXTURE0);
