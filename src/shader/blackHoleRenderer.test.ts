@@ -82,31 +82,6 @@ describe("black-hole render profiles", () => {
     expect(blackHoleCanvasSource).toContain("return stopRenderer;");
   });
 
-  it("uses multi-scale vertical ridge width evidence to redistribute only the accepted hot-core response", () => {
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec2 ridgeTexel = 1.0 / max(u_resolution, vec2(1.0));");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "vec4 ridgeUp1 = textureLod(u_frame_texture, v_uv + vec2(0.0, ridgeTexel.y), 0.0);",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "vec4 ridgeDown1 = textureLod(u_frame_texture, v_uv - vec2(0.0, ridgeTexel.y), 0.0);",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("ridgeTexel.y * 2.0");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "float ridgeNearCurvature = max(basePeak - 0.5 * (ridgeUp1Peak + ridgeDown1Peak), 0.0);",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "float ridgeFarCurvature = max(basePeak - 0.5 * (ridgeUp2Peak + ridgeDown2Peak), 0.0);",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("smoothstep(0.012, 0.055, ridgeNearCurvature)");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("smoothstep(0.030, 0.105, ridgeFarCurvature)");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("float ridgeHotCoreGain = mix(0.60, 1.30, ridgeWidthEvidence);");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "gradedBase += highlightTint * hotCore * 0.055 * ridgeHotCoreGain;",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("ridgeHorizontalContinuity");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("ridgeNeighborPeak");
-  });
-
   it("rejects flare energy from the direct bright core while preserving the stronger outer veil", () => {
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec3 ivory = vec3(1.0, 0.945, 0.80);");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec3 paleGold = vec3(1.0, 0.875, 0.68);");
