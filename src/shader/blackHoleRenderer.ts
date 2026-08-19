@@ -55,9 +55,30 @@ void main() {
   vec3 paleGold = vec3(1.0, 0.875, 0.68);
   vec3 highlightTint = mix(ivory, paleGold, 0.20);
 
+  vec2 ridgeTexel = 1.0 / max(u_resolution, vec2(1.0));
+  vec4 ridgeLeft = textureLod(u_frame_texture, v_uv - vec2(ridgeTexel.x, 0.0), 0.0);
+  vec4 ridgeRight = textureLod(u_frame_texture, v_uv + vec2(ridgeTexel.x, 0.0), 0.0);
+  vec4 ridgeUp = textureLod(u_frame_texture, v_uv + vec2(0.0, ridgeTexel.y), 0.0);
+  vec4 ridgeDown = textureLod(u_frame_texture, v_uv - vec2(0.0, ridgeTexel.y), 0.0);
+  float ridgeNeighborPeak = 0.25 * (
+    max(ridgeLeft.r, max(ridgeLeft.g, ridgeLeft.b))
+    + max(ridgeRight.r, max(ridgeRight.g, ridgeRight.b))
+    + max(ridgeUp.r, max(ridgeUp.g, ridgeUp.b))
+    + max(ridgeDown.r, max(ridgeDown.g, ridgeDown.b))
+  );
+  float ridgeDetail = max(basePeak - ridgeNeighborPeak, 0.0);
+  float ridgeCore = base.a
+    * smoothstep(0.018, 0.075, ridgeDetail)
+    * smoothstep(0.58, 0.88, basePeak);
+
   vec3 gradedBase = base.rgb * mix(1.0, 0.90, softShoulder);
   gradedBase = mix(gradedBase, max(gradedBase, highlightTint * basePeak), highlight * 0.24);
   gradedBase += highlightTint * hotCore * 0.055;
+  gradedBase = mix(
+    gradedBase,
+    max(gradedBase, highlightTint * min(1.0, basePeak * 1.10)),
+    ridgeCore * 0.24
+  );
 
   float availableLod = floor(log2(max(min(u_resolution.x, u_resolution.y), 1.0)));
   vec4 nearGlow = flareSample(min(2.0, availableLod), 0.16, 0.42, 0.27, 0.66);
@@ -262,7 +283,7 @@ function startBlackHoleSession(
     gl.bindFramebuffer(gl.FRAMEBUFFER, outputFramebuffer);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, outputTexture, 0);
     if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
-      throw new Error("黑洞输出帧缓冲不完整");
+      throw new Error "黑洞输出帧缓冲不完整");
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.activeTexture(gl.TEXTURE0);
