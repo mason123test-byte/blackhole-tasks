@@ -82,12 +82,16 @@ describe("black-hole render profiles", () => {
     expect(blackHoleCanvasSource).toContain("return stopRenderer;");
   });
 
-  it("strengthens photographic veiling flare while retaining black shadow protection", () => {
+  it("rejects flare energy from the direct bright core while preserving the stronger outer veil", () => {
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec3 ivory = vec3(1.0, 0.945, 0.80);");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec3 paleGold = vec3(1.0, 0.875, 0.68);");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
       "float shadowProtect = base.a * (1.0 - smoothstep(0.012, 0.075, basePeak));",
     );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
+      "float flareCoreReject = 1.0 - 0.82 * smoothstep(0.56, 0.82, basePeak);",
+    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("* flareCoreReject");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
       "* smoothstep(0.008, 0.135, nearGlow.a + midGlow.a * 0.76 + farGlow.a * 0.40);",
     );

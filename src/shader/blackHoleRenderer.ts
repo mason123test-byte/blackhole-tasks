@@ -63,7 +63,9 @@ void main() {
   vec4 nearGlow = flareSample(min(2.0, availableLod), 0.16, 0.42, 0.27, 0.66);
   vec4 midGlow = flareSample(min(4.0, availableLod), 0.065, 0.23, 0.11, 0.40);
   vec4 farGlow = flareSample(min(6.0, availableLod), 0.022, 0.10, 0.045, 0.20);
+  float flareCoreReject = 1.0 - 0.82 * smoothstep(0.56, 0.82, basePeak);
   float veilingSupport = (1.0 - shadowProtect)
+    * flareCoreReject
     * smoothstep(0.008, 0.135, nearGlow.a + midGlow.a * 0.76 + farGlow.a * 0.40);
   vec3 nearWarm = mix(nearGlow.rgb, ivory * nearGlow.a, 0.38);
   vec3 midWarm = mix(midGlow.rgb, highlightTint * midGlow.a, 0.48);
