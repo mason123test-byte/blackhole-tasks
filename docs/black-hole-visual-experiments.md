@@ -119,6 +119,17 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 - Verdict: rejected. `#479` remains the accepted baseline.
 - Do not continue scanning the current multi-scale ridge selector's redistribution/gain range. `0.78–1.20` and `0.60–1.30` have both demonstrated sub-visible returns; the limitation is selector separation, not gain strength.
 
+### #535 — strong physical first-crossing photometric response
+- Commit: `c09c60dcd199d5dd838f9bf400ce36df9cff59ea`.
+- Windows run: `#535` / `32271183829`; artifact `9372425947`.
+- Mechanism: used the ray tracer's existing `diskCrossingCount == 0` identity, leaving crossing geometry and crossing 1/2/3 gains unchanged. The first crossing used `directEmissiveCore = smoothstep(0.55, 0.82, directPeak) * smoothstep(0.42, 0.72, diskAlpha)`, squared the response, then applied an intentionally strong `0.45 -> 1.75` color-gain range with a `vec3(1.0, 0.93, 0.74)` warm core. Alpha/transmittance were not changed.
+- Code-diff verification before push: reference shader had only 15 added lines and zero deletions; no Kerr/geodesic, `DISK_OUTER`, `OBSERVER_THETA`, crossing geometry or compositor line was modified.
+- Same fixed #529-validation script, #479 -> #535: average bright-core thickness `2.211 -> 5.446 px`, median `2 -> 4 px`, horizontal high-intensity coverage `90 -> 437 px`, `>180` core pixels `199 -> 2380`, lower bright `10817 -> 6937` (-35.9%), warm coverage `30816 -> 17023` (-44.8%), dead-white `0 -> 102`.
+- Original-size and core-crop screenshots show a clearly visible but incorrect change: the entire primary/lensed first-crossing light family becomes high-contrast and white rather than isolating the horizontal direct disk.
+- Result: strong failure. `diskCrossingCount == 0` is physical first-crossing identity, but it is not a sufficiently selective proxy for the screen-visible horizontal direct image; it also contributes broadly to primary/lensed structures.
+- Verdict: rejected. Restore #479.
+- Do not tune the `0.45 -> 1.75` strength range to rescue this mechanism. The selector identity itself is too broad. A future physical approach needs richer metadata than crossing ordinal alone (for example a direct-image/transfer classification that does not alter geodesic geometry).
+
 ## Current exclusions / lessons
 
 1. Do not increase global flare weights to create cinematic flare; it thickens the core unless independently protected.
@@ -128,8 +139,9 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 5. The isotropic 4-neighbor ridge selector preserved surrounding light but slightly widened the high-intensity core; do not repeat the exact #513 gate/target/mix values.
 6. The first directional vertical-thinness + horizontal-continuity selector also widened high-intensity horizontal coverage; do not repeat the exact #517 gate combination or simply raise its mix.
 7. Do not continue scanning #527/#529 multi-scale ridge redistribution/gain; both conservative and stronger ranges were visually sub-threshold.
-8. Prefer physically identified direct-crossing information from the ray tracer over another screen-space neighborhood selector when shaping the direct component.
-9. Any accepted replacement must beat #479 visibly at original size while preserving its warm veil, lower brightness, shadow cleanliness, and frozen geometry.
+8. Do not equate `diskCrossingCount == 0` with the horizontal direct-disk image for photometric isolation; #535 proves the first crossing is shared by a much broader primary/lensed light family.
+9. Prefer richer physical transfer/direct-image metadata if available or derive it without modifying ray geometry; do not return to screen-space neighborhood selectors.
+10. Any accepted replacement must beat #479 visibly at original size while preserving its warm veil, lower brightness, shadow cleanliness, and frozen geometry.
 
 ## Operational validation notes
 
@@ -139,7 +151,8 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 - #513 was the first valid Windows visual run for the four-neighbor ridge experiment.
 - #517 passed frontend typecheck/lint/tests, Rust fast checks, Tauri EXE build, native Windows visual capture, and artifact upload; candidate/baseline/split/expanded screenshots were opened directly.
 - #527 and #529 both passed Windows visual validation and were inspected at original size and core crop; neither met the visible-improvement bar.
+- #535 passed all fast checks and Windows visual capture; all required screenshots plus #479 original-size and core comparison were opened. It failed the visual/quantitative acceptance gates decisively.
 
 ## Next experiment target
 
-Stop screen-space ridge/gain scanning. Inspect the physical ray-tracing crossing pipeline and, if first/direct crossing identity is already available, shape that physical component independently while preserving higher-order images and #479 compositor behavior.
+Do not continue ridge/gain scanning and do not use first-crossing ordinal alone as a direct-image selector. Before another photometric experiment, inspect whether the physical tracer can expose a richer transfer/image-order discriminator without changing Kerr geometry or crossing structure.
