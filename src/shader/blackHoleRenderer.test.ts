@@ -82,25 +82,23 @@ describe("black-hole render profiles", () => {
     expect(blackHoleCanvasSource).toContain("return stopRenderer;");
   });
 
-  it("adds only isotropic local ridge selection on top of the accepted #479 compositor", () => {
+  it("selects a horizontally continuous, vertically thin ridge on top of the accepted #479 compositor", () => {
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec2 ridgeTexel = 1.0 / max(u_resolution, vec2(1.0));");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "vec4 ridgeLeft = textureLod(u_frame_texture, v_uv - vec2(ridgeTexel.x, 0.0), 0.0);",
+      "float ridgeVerticalNeighbor = 0.5 * (ridgeUpPeak + ridgeDownPeak);",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "vec4 ridgeRight = textureLod(u_frame_texture, v_uv + vec2(ridgeTexel.x, 0.0), 0.0);",
+      "float ridgeVerticalThinness = max(basePeak - ridgeVerticalNeighbor, 0.0);",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "vec4 ridgeUp = textureLod(u_frame_texture, v_uv + vec2(0.0, ridgeTexel.y), 0.0);",
+      "float ridgeHorizontalContinuity = min(ridgeLeftPeak, ridgeRightPeak);",
     );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "vec4 ridgeDown = textureLod(u_frame_texture, v_uv - vec2(0.0, ridgeTexel.y), 0.0);",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("float ridgeDetail = max(basePeak - ridgeNeighborPeak, 0.0);");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("smoothstep(0.018, 0.075, ridgeDetail)");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("smoothstep(0.018, 0.075, ridgeVerticalThinness)");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("smoothstep(0.40, 0.76, ridgeHorizontalContinuity)");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("smoothstep(0.58, 0.88, basePeak)");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("basePeak * 1.10");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("ridgeCore * 0.24");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("ridgeNeighborPeak = 0.25");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
       "vec4 farGlow = flareSample(min(6.0, availableLod), 0.022, 0.10, 0.045, 0.20);",
     );

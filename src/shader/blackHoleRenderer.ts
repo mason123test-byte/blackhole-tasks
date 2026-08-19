@@ -60,15 +60,16 @@ void main() {
   vec4 ridgeRight = textureLod(u_frame_texture, v_uv + vec2(ridgeTexel.x, 0.0), 0.0);
   vec4 ridgeUp = textureLod(u_frame_texture, v_uv + vec2(0.0, ridgeTexel.y), 0.0);
   vec4 ridgeDown = textureLod(u_frame_texture, v_uv - vec2(0.0, ridgeTexel.y), 0.0);
-  float ridgeNeighborPeak = 0.25 * (
-    max(ridgeLeft.r, max(ridgeLeft.g, ridgeLeft.b))
-    + max(ridgeRight.r, max(ridgeRight.g, ridgeRight.b))
-    + max(ridgeUp.r, max(ridgeUp.g, ridgeUp.b))
-    + max(ridgeDown.r, max(ridgeDown.g, ridgeDown.b))
-  );
-  float ridgeDetail = max(basePeak - ridgeNeighborPeak, 0.0);
+  float ridgeLeftPeak = max(ridgeLeft.r, max(ridgeLeft.g, ridgeLeft.b));
+  float ridgeRightPeak = max(ridgeRight.r, max(ridgeRight.g, ridgeRight.b));
+  float ridgeUpPeak = max(ridgeUp.r, max(ridgeUp.g, ridgeUp.b));
+  float ridgeDownPeak = max(ridgeDown.r, max(ridgeDown.g, ridgeDown.b));
+  float ridgeVerticalNeighbor = 0.5 * (ridgeUpPeak + ridgeDownPeak);
+  float ridgeVerticalThinness = max(basePeak - ridgeVerticalNeighbor, 0.0);
+  float ridgeHorizontalContinuity = min(ridgeLeftPeak, ridgeRightPeak);
   float ridgeCore = base.a
-    * smoothstep(0.018, 0.075, ridgeDetail)
+    * smoothstep(0.018, 0.075, ridgeVerticalThinness)
+    * smoothstep(0.40, 0.76, ridgeHorizontalContinuity)
     * smoothstep(0.58, 0.88, basePeak);
 
   vec3 gradedBase = base.rgb * mix(1.0, 0.90, softShoulder);
