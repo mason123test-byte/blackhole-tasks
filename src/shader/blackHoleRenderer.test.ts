@@ -82,7 +82,7 @@ describe("black-hole render profiles", () => {
     expect(blackHoleCanvasSource).toContain("return stopRenderer;");
   });
 
-  it("widens only the far veiling-flare radius while preserving the accepted core guard", () => {
+  it("uses an intermediate far veiling-flare radius while preserving the accepted core guard", () => {
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec3 ivory = vec3(1.0, 0.945, 0.80);");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec3 paleGold = vec3(1.0, 0.875, 0.68);");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
@@ -95,7 +95,7 @@ describe("black-hole render profiles", () => {
       "vec4 midGlow = flareSample(min(4.0, availableLod), 0.065, 0.23, 0.11, 0.40);",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "vec4 farGlow = flareSample(min(7.0, availableLod), 0.022, 0.10, 0.045, 0.20);",
+      "vec4 farGlow = flareSample(min(6.5, availableLod), 0.022, 0.10, 0.045, 0.20);",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
       "float flareCoreReject = 1.0 - 0.82 * smoothstep(0.56, 0.82, basePeak);",
