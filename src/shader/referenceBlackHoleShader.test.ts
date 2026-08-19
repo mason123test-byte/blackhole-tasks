@@ -39,7 +39,7 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float OBSERVER_R = 74.1;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float OBSERVER_THETA = 1.515;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_INNER = 4.20;");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_OUTER = 18.70;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float DISK_OUTER = 30.00;");
   });
 
   it("launches every production ray from the same DNGR camera event and varies only local-sky direction", () => {
