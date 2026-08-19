@@ -82,34 +82,26 @@ describe("black-hole render profiles", () => {
     expect(blackHoleCanvasSource).toContain("return stopRenderer;");
   });
 
-  it("uses an intermediate far veiling-flare radius while preserving the accepted core guard", () => {
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec3 ivory = vec3(1.0, 0.945, 0.80);");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec3 paleGold = vec3(1.0, 0.875, 0.68);");
+  it("adds only a local mip micro-contrast layer while preserving the current flare stack", () => {
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec4 localBlur = textureLod(u_frame_texture, v_uv, 1.0);");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "float shadowProtect = base.a * (1.0 - smoothstep(0.012, 0.075, basePeak));",
+      "float positiveDetail = max(basePeak - localPeak, 0.0);",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "vec4 nearGlow = flareSample(min(2.0, availableLod), 0.16, 0.42, 0.27, 0.66);",
+      "float negativeDetail = max(localPeak - basePeak, 0.0);",
     );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "vec4 midGlow = flareSample(min(4.0, availableLod), 0.065, 0.23, 0.11, 0.40);",
-    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("smoothstep(0.025, 0.12, positiveDetail)");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("smoothstep(0.018, 0.10, negativeDetail)");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("gradedBase *= mix(1.0, 0.94, microShoulder);");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("microCore * 0.18");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
       "vec4 farGlow = flareSample(min(6.5, availableLod), 0.022, 0.10, 0.045, 0.20);",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
       "float flareCoreReject = 1.0 - 0.82 * smoothstep(0.56, 0.82, basePeak);",
     );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("* flareCoreReject");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "vec3 glow = (nearWarm * 0.23 + midWarm * 0.095 + farWarm * 0.030) * veilingSupport;",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "float glowAlpha = (nearGlow.a * 0.080 + midGlow.a * 0.034 + farGlow.a * 0.012) * veilingSupport;",
-    );
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "outColor = vec4(composed, max(base.a, min(glowAlpha, 0.18)));",
-    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec3 ivory = vec3(1.0, 0.945, 0.80);");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec3 paleGold = vec3(1.0, 0.875, 0.68);");
     expect(rendererSource).toContain("gl.LINEAR_MIPMAP_LINEAR");
     expect(rendererSource).toContain("gl.generateMipmap(gl.TEXTURE_2D);");
     expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("flareRing(");
