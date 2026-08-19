@@ -17,6 +17,10 @@ const rendererSource = readFileSync(
   resolve(process.cwd(), "src/shader/blackHoleRenderer.ts"),
   "utf8",
 );
+const referenceShaderSource = readFileSync(
+  resolve(process.cwd(), "src/shader/referenceBlackHoleShader.ts"),
+  "utf8",
+);
 
 describe("black-hole render profiles", () => {
   it("uses the reference author's WebGL pixel-ratio ceiling", () => {
@@ -80,6 +84,25 @@ describe("black-hole render profiles", () => {
     expect(blackHoleCanvasSource).not.toContain("freezeTimer");
     expect(blackHoleCanvasSource).not.toContain("stopVisualRenderer");
     expect(blackHoleCanvasSource).toContain("return stopRenderer;");
+  });
+
+  it("shapes only the physical first disk crossing with a strong direct-core response", () => {
+    expect(referenceShaderSource).toContain(
+      "void shapeDirectCrossingPhotometry(float candidateWeight, inout vec3 diskColor, float diskAlpha)",
+    );
+    expect(referenceShaderSource).toContain("float directEmissiveCore = smoothstep(0.55, 0.82, directPeak)");
+    expect(referenceShaderSource).toContain("* smoothstep(0.42, 0.72, diskAlpha);");
+    expect(referenceShaderSource).toContain("float directResponse = directEmissiveCore * directEmissiveCore;");
+    expect(referenceShaderSource).toContain("float directColorGain = mix(0.45, 1.75, directResponse);");
+    expect(referenceShaderSource).toContain("vec3 directWarmCore = vec3(1.0, 0.93, 0.74)");
+    expect(referenceShaderSource).toContain("if (diskCrossingCount == 0) {");
+    expect(referenceShaderSource).toContain(
+      "shapeDirectCrossingPhotometry(candidateWeight, diskColor, diskAlpha);",
+    );
+    expect(referenceShaderSource).toContain("if (crossingIndex == 1) return 0.80;");
+    expect(referenceShaderSource).toContain("if (crossingIndex == 1) return 0.72;");
+    expect(referenceShaderSource).toContain("const float OBSERVER_THETA = 1.515;");
+    expect(referenceShaderSource).toContain("const float DISK_OUTER = 35.00;");
   });
 
   it("rejects flare energy from the direct bright core while preserving the stronger outer veil", () => {
