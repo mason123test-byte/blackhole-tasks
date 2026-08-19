@@ -39,7 +39,7 @@ const float OBSERVER_R = 74.1;
 const float OBSERVER_THETA = 1.515;
 const float CAMERA_VERTICAL_FOV = 0.55850536;
 
-const float DISK_INNER = 4.20;
+const float DISK_INNER = 9.26;
 const float DISK_OUTER = 40.00;
 const int MAX_DISK_CROSSINGS = 4;
 const float STAR_GAIN = 0.0;
