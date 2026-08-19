@@ -36,11 +36,11 @@ const float KERR_MAX_STEP = 1.55;
 const float KERR_ERROR_TOL = 0.00035;
 const int KERR_MAX_RETRIES = 5;
 const float OBSERVER_R = 74.1;
-const float OBSERVER_THETA = 1.535;
+const float OBSERVER_THETA = 1.475;
 const float CAMERA_VERTICAL_FOV = 0.55850536;
 
 const float DISK_INNER = 4.20;
-const float DISK_OUTER = 28.00;
+const float DISK_OUTER = 40.00;
 const int MAX_DISK_CROSSINGS = 4;
 const float STAR_GAIN = 0.0;
 const float DILATION_MIN = 0.20;
