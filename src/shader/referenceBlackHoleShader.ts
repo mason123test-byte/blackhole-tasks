@@ -37,7 +37,7 @@ const float KERR_ERROR_TOL = 0.00035;
 const int KERR_MAX_RETRIES = 5;
 const float OBSERVER_R = 74.1;
 const float OBSERVER_THETA = 1.515;
-const float CAMERA_VERTICAL_FOV = 0.66322512;
+const float CAMERA_VERTICAL_FOV = 0.55850536;
 
 const float DISK_INNER = 4.20;
 const float DISK_OUTER = 40.00;
@@ -276,7 +276,7 @@ void rayTracedReference() {
     h = clamp(h, KERR_MIN_STEP, KERR_MAX_STEP);
     float axisDistance = min(theta, PI - theta); float axisStepLimit = 0.20 * axisDistance / max(abs(dtheta0), 1e-4);
     h = min(h, max(KERR_MIN_STEP, axisStepLimit));
-    float angularStepLimit = 0.24 / max(abs(dtheta0) + abs(dphi0), 1e-4); h = min(h, max(KERR_MIN_STEP, angularStepLimit));
+    float angularStepLimit = 0.08 / max(abs(dtheta0) + abs(dphi0), 1e-4); h = min(h, max(KERR_MIN_STEP, angularStepLimit));
     float horizonDistance = max(r - KERR_HORIZON, 0.02); float radialStepLimit = 0.25 * horizonDistance / max(abs(dr0), 1e-4);
     h = min(h, max(KERR_MIN_STEP, radialStepLimit));
     vec4 state = vec4(r, theta, phi, pr); vec4 derivative = vec4(dr0, dtheta0, dphi0, dpr0);
@@ -338,6 +338,6 @@ export const REFERENCE_BLACK_HOLE_INFO = {
   styleReference: "https://arxiv.org/abs/1502.03808",
   physicsReference: "https://github.com/hungyipu/Odyssey",
   cameraReference: "DNGR Appendix A.1 fixed-event FIDO local sky",
-  cameraVerticalFovDeg: 38,
+  cameraVerticalFovDeg: 32,
   webglReference: "https://ebruneton.github.io/black_hole_shader/",
 } as const;
