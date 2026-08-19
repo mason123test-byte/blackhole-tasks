@@ -82,21 +82,26 @@ describe("black-hole render profiles", () => {
     expect(blackHoleCanvasSource).toContain("return stopRenderer;");
   });
 
-  it("keeps mip flare inside pixels that already contain physical Kerr emission", () => {
+  it("adds a warm filmic highlight response without changing Kerr geometry", () => {
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("textureLod(u_frame_texture, v_uv, lod)");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("textureLod(u_frame_texture, v_uv, 0.0)");
-    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("float basePeak = max(base.r, max(base.g, base.b));");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec3 ivory = vec3(1.0, 0.945, 0.80);");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain("vec3 paleGold = vec3(1.0, 0.875, 0.68);");
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "float emissionSupport = base.a * smoothstep(0.015, 0.18, basePeak);",
+      "float shadowProtect = base.a * (1.0 - smoothstep(0.012, 0.075, basePeak));",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "vec3 glow = (nearGlow.rgb * 0.22 + midGlow.rgb * 0.10 + farGlow.rgb * 0.04) * emissionSupport;",
+      "float veilingSupport = (1.0 - shadowProtect)",
     );
     expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
-      "float glowAlpha = (nearGlow.a * 0.12 + midGlow.a * 0.05 + farGlow.a * 0.02) * emissionSupport;",
+      "vec3 glow = (nearWarm * 0.19 + midWarm * 0.075 + farWarm * 0.022) * veilingSupport;",
+    );
+    expect(MIRROR_COMPOSITOR_FRAGMENT).toContain(
+      "outColor = vec4(composed, max(base.a, min(glowAlpha, 0.18)));",
     );
     expect(rendererSource).toContain("gl.LINEAR_MIPMAP_LINEAR");
     expect(rendererSource).toContain("gl.generateMipmap(gl.TEXTURE_2D);");
+    expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("emissionSupport");
     expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("flareRing(");
     expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("mirroredUv");
     expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("1.0 - v_uv.y");

@@ -26,33 +26,53 @@ vec4 flareSample(
   float whiteLow,
   float whiteHigh,
   float peakLow,
-  float peakHigh,
-  float warmLow,
-  float warmHigh
+  float peakHigh
 ) {
   vec4 sampleColor = textureLod(u_frame_texture, v_uv, lod);
   float peak = max(sampleColor.r, max(sampleColor.g, sampleColor.b));
   float whiteFloor = min(sampleColor.r, min(sampleColor.g, sampleColor.b));
-  float warm = sampleColor.r - sampleColor.b;
+  float warmBalance = smoothstep(-0.015, 0.085, sampleColor.r - sampleColor.b);
   float mask = sampleColor.a
     * smoothstep(whiteLow, whiteHigh, whiteFloor)
     * smoothstep(peakLow, peakHigh, peak)
-    * smoothstep(warmLow, warmHigh, warm);
+    * warmBalance;
   return vec4(sampleColor.rgb * mask, mask);
 }
 
 void main() {
   vec4 base = textureLod(u_frame_texture, v_uv, 0.0);
   float basePeak = max(base.r, max(base.g, base.b));
-  float emissionSupport = base.a * smoothstep(0.015, 0.18, basePeak);
-  float availableLod = floor(log2(max(min(u_resolution.x, u_resolution.y), 1.0)));
-  vec4 nearGlow = flareSample(min(2.0, availableLod), 0.18, 0.45, 0.30, 0.70, 0.003, 0.08);
-  vec4 midGlow = flareSample(min(4.0, availableLod), 0.08, 0.28, 0.14, 0.48, 0.002, 0.06);
-  vec4 farGlow = flareSample(min(6.0, availableLod), 0.025, 0.12, 0.06, 0.24, 0.001, 0.04);
+  float baseFloor = min(base.r, min(base.g, base.b));
+  float highlight = base.a
+    * smoothstep(0.34, 0.82, basePeak)
+    * smoothstep(0.14, 0.58, baseFloor);
+  float hotCore = base.a * smoothstep(0.66, 0.94, basePeak);
+  float softShoulder = base.a
+    * smoothstep(0.10, 0.42, basePeak)
+    * (1.0 - smoothstep(0.58, 0.82, basePeak));
+  float shadowProtect = base.a * (1.0 - smoothstep(0.012, 0.075, basePeak));
+  vec3 ivory = vec3(1.0, 0.945, 0.80);
+  vec3 paleGold = vec3(1.0, 0.875, 0.68);
+  vec3 highlightTint = mix(ivory, paleGold, 0.20);
 
-  vec3 glow = (nearGlow.rgb * 0.22 + midGlow.rgb * 0.10 + farGlow.rgb * 0.04) * emissionSupport;
-  float glowAlpha = (nearGlow.a * 0.12 + midGlow.a * 0.05 + farGlow.a * 0.02) * emissionSupport;
-  outColor = vec4(clamp(base.rgb + glow, 0.0, 1.0), max(base.a, min(glowAlpha, 0.28)));
+  vec3 gradedBase = base.rgb * mix(1.0, 0.90, softShoulder);
+  gradedBase = mix(gradedBase, max(gradedBase, highlightTint * basePeak), highlight * 0.24);
+  gradedBase += highlightTint * hotCore * 0.055;
+
+  float availableLod = floor(log2(max(min(u_resolution.x, u_resolution.y), 1.0)));
+  vec4 nearGlow = flareSample(min(2.0, availableLod), 0.16, 0.42, 0.27, 0.66);
+  vec4 midGlow = flareSample(min(4.0, availableLod), 0.065, 0.23, 0.11, 0.40);
+  vec4 farGlow = flareSample(min(6.0, availableLod), 0.022, 0.10, 0.045, 0.20);
+  float veilingSupport = (1.0 - shadowProtect)
+    * smoothstep(0.010, 0.16, nearGlow.a + midGlow.a * 0.72 + farGlow.a * 0.35);
+  vec3 nearWarm = mix(nearGlow.rgb, ivory * nearGlow.a, 0.38);
+  vec3 midWarm = mix(midGlow.rgb, highlightTint * midGlow.a, 0.48);
+  vec3 farWarm = mix(farGlow.rgb, ivory * farGlow.a, 0.56);
+  vec3 glow = (nearWarm * 0.19 + midWarm * 0.075 + farWarm * 0.022) * veilingSupport;
+  float glowAlpha = (nearGlow.a * 0.075 + midGlow.a * 0.030 + farGlow.a * 0.010) * veilingSupport;
+  vec3 composed = clamp(gradedBase + glow, 0.0, 1.0);
+  composed = mix(composed, base.rgb, shadowProtect);
+  outColor = vec4(composed, max(base.a, min(glowAlpha, 0.18)));
 }`;
 
 function reportOrbFrame(renderer: "webgl2", energy: number, width: number, height: number, diagnostic = "") {
