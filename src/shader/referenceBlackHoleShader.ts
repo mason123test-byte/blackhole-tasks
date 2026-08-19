@@ -276,7 +276,7 @@ void rayTracedReference() {
     h = clamp(h, KERR_MIN_STEP, KERR_MAX_STEP);
     float axisDistance = min(theta, PI - theta); float axisStepLimit = 0.20 * axisDistance / max(abs(dtheta0), 1e-4);
     h = min(h, max(KERR_MIN_STEP, axisStepLimit));
-    float angularStepLimit = 0.08 / max(abs(dtheta0) + abs(dphi0), 1e-4); h = min(h, max(KERR_MIN_STEP, angularStepLimit));
+    float angularStepLimit = 0.24 / max(abs(dtheta0) + abs(dphi0), 1e-4); h = min(h, max(KERR_MIN_STEP, angularStepLimit));
     float horizonDistance = max(r - KERR_HORIZON, 0.02); float radialStepLimit = 0.25 * horizonDistance / max(abs(dr0), 1e-4);
     h = min(h, max(KERR_MIN_STEP, radialStepLimit));
     vec4 state = vec4(r, theta, phi, pr); vec4 derivative = vec4(dr0, dtheta0, dphi0, dpr0);
@@ -295,7 +295,7 @@ void rayTracedReference() {
     }
     previousR = r; previousPhi = phi;
     r = acceptedState.x; theta = acceptedState.y; phi = acceptedState.z; pr = acceptedState.w; ptheta = acceptedPtheta;
-    normalizePolarState(theta, phi, ptheta); projectKerrMomenta(r, theta, L, kappa, pr, ptheta);
+    normalizePolarState(theta, phi, ptheta);
     h = clamp(h * clamp(0.90 * pow(max(acceptedErrorRatio, 1e-6), -0.20), 0.55, 1.80), KERR_MIN_STEP, KERR_MAX_STEP);
     float side = theta - 0.5 * PI;
     if (side * previousSide < 0.0 && diskCrossingCount < MAX_DISK_CROSSINGS) {
