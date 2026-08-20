@@ -130,6 +130,17 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 - Verdict: rejected. Restore #479.
 - Do not tune the `0.45 -> 1.75` strength range to rescue this mechanism. The selector identity itself is too broad. A future physical approach needs richer metadata than crossing ordinal alone (for example a direct-image/transfer classification that does not alter geodesic geometry).
 
+### #541 — inbound first-crossing radial-leg classifier
+- Commit: `f8e9aaab985e282932edcdc1a55d3b2a146466b6`.
+- Windows run: `#541` / `32317351153`; artifact `9388702029`.
+- Mechanism: added photometric-only path metadata `radialTurned` and `inboundStep = r < previousR`; the direct response applied only when `diskCrossingCount == 0 && !radialTurned && inboundStep`. The Kerr equations, integration step control, disk-plane crossing geometry, `DISK_OUTER`, `OBSERVER_THETA`, crossing gains, transmittance and compositor were unchanged.
+- Response: `directCore = smoothstep(0.60, 0.86, directPeak) * smoothstep(0.48, 0.74, diskAlpha)`, squared response, `directColorGain = mix(0.40, 1.45, directResponse)`, warm core `vec3(0.98, 0.91, 0.72)` capped below full white.
+- Fixed validation definition, #479 -> #541: average bright-core thickness `2.211 -> 2.733 px` (+23.6%), median `2 -> 2 px`, horizontal high-intensity coverage `90 -> 258 px`, direct-span threshold envelope `682 -> 631 px` (-7.5%), lower bright `10817 -> 8304` (-23.2%), warm coverage `30816 -> 21916` (-28.9%), dead-white `0 -> 9`.
+- A fixed central-shadow ROI remained unchanged in >5 contamination count, so the failure was not shadow pollution.
+- Original-size comparison is clearly visible: the horizontal region becomes much higher contrast and the surrounding direct-disk shoulder darkens, but the high-intensity core spreads horizontally rather than becoming a continuous thinner knife-edge; lower and warm-light retention fail badly.
+- Result: rejected. Radial-leg metadata is more selective than crossing ordinal alone, but `first crossing + no radial turn + inbound` still covers too broad a primary direct-disk family to isolate the desired screen-visible knife-edge core.
+- Do not tune the `0.40 -> 1.45` gain range or nearby response thresholds to rescue this exact classifier. The remaining problem is physical-image classification, not response strength.
+
 ## Current exclusions / lessons
 
 1. Do not increase global flare weights to create cinematic flare; it thickens the core unless independently protected.
@@ -140,8 +151,9 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 6. The first directional vertical-thinness + horizontal-continuity selector also widened high-intensity horizontal coverage; do not repeat the exact #517 gate combination or simply raise its mix.
 7. Do not continue scanning #527/#529 multi-scale ridge redistribution/gain; both conservative and stronger ranges were visually sub-threshold.
 8. Do not equate `diskCrossingCount == 0` with the horizontal direct-disk image for photometric isolation; #535 proves the first crossing is shared by a much broader primary/lensed light family.
-9. Prefer richer physical transfer/direct-image metadata if available or derive it without modifying ray geometry; do not return to screen-space neighborhood selectors.
-10. Any accepted replacement must beat #479 visibly at original size while preserving its warm veil, lower brightness, shadow cleanliness, and frozen geometry.
+9. Do not treat `diskCrossingCount == 0 && !radialTurned && inboundStep` as a sufficient direct-core mask; #541 still destroys lower/warm retention and broadens high-intensity coverage.
+10. Prefer richer physical transfer/direct-image metadata if available or derive it without modifying ray geometry; do not return to screen-space neighborhood selectors.
+11. Any accepted replacement must beat #479 visibly at original size while preserving its warm veil, lower brightness, shadow cleanliness, and frozen geometry.
 
 ## Operational validation notes
 
@@ -152,7 +164,8 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 - #517 passed frontend typecheck/lint/tests, Rust fast checks, Tauri EXE build, native Windows visual capture, and artifact upload; candidate/baseline/split/expanded screenshots were opened directly.
 - #527 and #529 both passed Windows visual validation and were inspected at original size and core crop; neither met the visible-improvement bar.
 - #535 passed all fast checks and Windows visual capture; all required screenshots plus #479 original-size and core comparison were opened. It failed the visual/quantitative acceptance gates decisively.
+- #541 passed all fast checks and Windows visual capture; candidate/baseline/split/expanded plus #479 original-size and core comparisons were opened. It was visibly different but failed the core-width, lower, warm and dead-white gates.
 
 ## Next experiment target
 
-Do not continue ridge/gain scanning and do not use first-crossing ordinal alone as a direct-image selector. Before another photometric experiment, inspect whether the physical tracer can expose a richer transfer/image-order discriminator without changing Kerr geometry or crossing structure.
+Do not continue gain/threshold scanning on #541. The next physical discriminator must add information orthogonal to crossing ordinal and radial leg, such as accumulated azimuthal deflection / transfer path length / emission-angle information at the disk hit, while leaving Kerr geometry and disk-crossing structure untouched.
