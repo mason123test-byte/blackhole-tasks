@@ -116,16 +116,32 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 - Candidate commit: `5ac6adba5629058ebede393fa46fcf9f04a0cccd`.
 - Windows run: `#553` / `32320401192`.
 - First Windows visual attempt built the Tauri EXE and captured baseline/candidate successfully, but timed out during the later visual capture stage (`Orb did not produce a non-empty WebGL2 frame within 20000ms`). Partial artifact: `9389670021`. No visual parameters were changed in response.
-- The exact same Windows visual job was rerun with the same SHA and parameters; the second attempt completed successfully, including baseline/candidate/split capture and artifact upload. Valid artifact: `9389827608`, digest `sha256:1e0943e09dba758161ccbdbdd569c2f2482318bc634f683d46927887ce811f88`.
-- Mechanism: accumulated accepted affine step length before the first disk crossing, interpolated the hit path length at the crossing, then normalized by the radial direct-distance proxy: `pathStretch = hitPathLength / max(OBSERVER_R - diskRadius, 1.0)`.
+- The exact same Windows visual job was rerun with the same SHA and parameters; the second attempt completed successfully. Valid artifact: `9389827608`, digest `sha256:1e0943e09dba758161ccbdbdd569c2f2482318bc634f683d46927887ce811f88`.
+- Mechanism: accumulated accepted affine step length before the first disk crossing and normalized by radial direct distance: `pathStretch = hitPathLength / max(OBSERVER_R - diskRadius, 1.0)`.
 - Selector: `shortPathWeight = 1.0 - smoothstep(1.05, 1.45, pathStretch)` on crossing 0 only.
-- Photometric response deliberately did not boost the peak above baseline: `directColorGain = mix(0.32, 1.00, directResponse)`. It strongly suppressed the selected mid-bright shoulder while retaining only the high-emissivity core.
-- Kerr equations, integration controls, `DISK_OUTER`, `OBSERVER_THETA`, disk-plane crossing geometry, crossing gains, alpha/transmittance and #479 compositor were not changed.
-- Same fixed validation script, #479 -> #553: average bright-core thickness `2.211 -> 1.176 px` (-46.8%), median `2 -> 1 px`, horizontal high-intensity coverage `90 -> 17 px`, `>180` core pixels `199 -> 20`, direct span `682 -> 499 px` (-26.8%), lower bright `10817 -> 4905` (-54.7%), warm coverage `30816 -> 12015` (-61.0%), dead-white `0 -> 0`, fixed shadow >5 count `3454 -> 3449`.
-- Original-size candidate is plainly distinguishable from #479 and the core crop shows a genuinely thinner 1px-class highlight. This is the first tested physical discriminator in this sequence that clearly reduces measured bright-core thickness by much more than the 15% target and changes the median from 2px to 1px.
-- However, the response removes far too much legitimate direct-disk length, lower light and warm veil. Direct span loses about 27%, lower bright about 55%, and warm coverage about 61%; these failures are far outside the acceptance limits.
-- Verdict: rejected. Path stretch contains useful separation information, but this exact `1.05–1.45` selector plus shoulder-suppression response is not selective enough to preserve the accepted image family.
-- Do not accept or re-use this exact broad path-stretch suppression. Future work may use path-stretch only as one component of a richer physical classifier, preferably combined with an independent local disk-hit invariant such as emission angle, while keeping geometry frozen.
+- Response: `directColorGain = mix(0.32, 1.00, directResponse)`; strong shoulder suppression with no peak boost.
+- #479 -> #553: average bright-core thickness `2.211 -> 1.176 px` (-46.8%), median `2 -> 1 px`, coverage `90 -> 17`, direct span `682 -> 499` (-26.8%), lower bright heavily reduced, warm coverage heavily reduced, dead-white `0 -> 0`.
+- Result: first physical signal to produce real 1px-class thinning, but it destroys too much direct span/lower/warm light.
+- Verdict: rejected. Do not reuse the exact broad `1.05–1.45` path-stretch suppression as a standalone classifier.
+
+### #559 — incidence-qualified path-stretch shoulder suppression
+- Candidate commit: `c89bda0707964eaa573625a58afee59397c5c18e`.
+- Windows run: `#559` / `32322673121`; valid artifact `9390455145`, digest `sha256:9816ea6aa4756e114264a16560d7ed53925d9bd41c64e44ff1cbc4e70b86c85a`.
+- Initial workflow was cancelled before any job step ran; the same SHA was re-run without visual changes. Frontend, Rust and Windows visual subsequently completed successfully.
+- Mechanism: combines #553 short-path metadata with a new local disk-incidence classifier derived from Kerr hit-state momenta. `grazingWeight = 1.0 - smoothstep(0.07, 0.26, incidenceCosine)`; `directTransferWeight = shortPathWeight * grazingWeight`.
+- Response suppresses only the selected mid-bright shoulder, with a floor around `0.38`, while protecting low-light and high-emissivity core regions.
+- Same fixed script, #479 -> #559: average core thickness `2.211 -> 1.400 px` (-36.7%), median `2 -> 1`, direct span `682 -> 456`, lower `9270 -> 9231`, warm coverage `25992 -> 18720`, dead-white `0 -> 0`, fixed shadow >5 `152 -> 152`.
+- Result: incidence metadata preserves lower much better than #553 and retains real 1px-class thinning, but direct span remains badly shortened and warm veil falls by about 28%.
+- Verdict: rejected. Do not accept #559 as a baseline replacement.
+
+### #561 — narrowed incidence-qualified shoulder band
+- Candidate commit: `68827a8902e682b2ee562b5e07b9fe1170dc15b1`.
+- Windows run: `#561` / `32323820546`; artifact `9390841530`, digest `sha256:aed4172bf16b4f9306e35bdb3ddf1172d07ea547045761df296dd503e1a55f3b`.
+- Same physical classifier as #559. The only visual parameter change narrowed the suppressed directPeak shoulder from approximately `0.42–0.64` to `0.58–0.72`; incidence gate, path-stretch gate, suppression floor, geometry and compositor stayed fixed.
+- Required candidate/baseline/split/expanded screenshots were opened, along with original-size and core comparisons against #479/#559.
+- Same fixed script, #479 -> #561: average core thickness `2.211 -> 1.333 px` (-39.7%), median `2 -> 1`, `>180` core pixels `199 -> 8`, high-intensity columns `90 -> 6`, direct span `682 -> 681`, lower bright `9270 -> 9266`, warm coverage `25992 -> 19830` (-23.7%), dead-white `0 -> 0`, shadow >5 `152 -> 152`.
+- Result: #561 fixes #559's direct-span and lower-light losses while keeping clearly visible 1px-class thinning. However, the warm ivory/pale-gold veil remains far outside the ±5% retention target and is visibly drier/greyer than #479.
+- Verdict: rejected. Do not continue scanning this same shoulder-band threshold as the primary fix. The remaining failure is chromatic/warm-layer preservation, not disk length or core thickness.
 
 ## Current exclusions / lessons
 
@@ -138,9 +154,11 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 7. Do not equate `diskCrossingCount == 0` with the horizontal direct-disk image.
 8. Do not use `first crossing + no radial turn + inbound` as a sufficient direct-core mask.
 9. Do not use raw `abs(diskPhi)` as a direct-image mask.
-10. Do not use the exact #553 `pathStretch 1.05–1.45 + 0.32–1.00 shoulder suppression` as a standalone direct-image mask; it succeeds at thinning but destroys direct-span/lower/warm retention.
-11. Path stretch is the first physical signal tested here that demonstrated strong real core-thinning separation, so it remains useful as metadata, but not as a standalone selector.
-12. Any accepted replacement must beat #479 visibly at original size while preserving its warm veil, lower brightness, shadow cleanliness and frozen geometry.
+10. Do not use the exact #553 `pathStretch 1.05–1.45 + 0.32–1.00 shoulder suppression` as a standalone direct-image mask.
+11. Path stretch has real core-thinning separation value but requires an independent physical qualifier.
+12. Local incidence geometry substantially improves path-stretch selectivity; #561 demonstrates that direct span and lower light can be preserved while achieving 1px-class thinning.
+13. Do not continue scanning #559/#561's shoulder threshold alone. #561's remaining failure is a ~24% loss of warm coverage.
+14. Any accepted replacement must beat #479 visibly while preserving warm veil, lower brightness, shadow cleanliness and frozen geometry.
 
 ## Operational validation notes
 
@@ -149,10 +167,10 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 - Temporary placeholder files created during earlier recovery were deleted by forward commits; they were tooling mistakes, not visual experiments.
 - During #545 preparation, an unattached noop commit object and an unpushed incorrect candidate object were created by tool error; neither was connected to a branch ref.
 - During #553 preparation, a schema-probing mistake accidentally created a `DO_NOT_USE` file in commit `80d04d006dde3e500d51dc27866b7e752f2cead6`; it was immediately removed by forward commit `fa31d802493c2521af1408bf035fe668d08a544f`. No reset/rebase/force operation was used.
-- During #553 preparation, earlier unattached candidate objects were not connected to the branch; the valid candidate is `5ac6adba5629058ebede393fa46fcf9f04a0cccd`.
 - #553's first visual attempt failed after baseline/candidate capture; the identical job rerun succeeded. Only the successful second artifact is valid for final visual judgment.
-- Required #553 candidate/baseline/split/expanded screenshots plus #479 original-size and direct-core comparisons were opened before the verdict.
+- #559's first workflow was cancelled before any job step executed. The same commit was validated by subsequent re-runs without changing visual code.
+- Required #559 and #561 Windows screenshots plus #479 comparison and direct-core crops were opened before verdicts.
 
 ## Next experiment target
 
-Do not rescan #553's broad path-stretch gate or simply weaken/strengthen its `0.32–1.00` suppression. The key result is that path length has real separating power but is insufficient alone. The next physical experiment should add an independent disk-hit invariant—preferably local emission angle / incidence geometry—and use path-stretch only as supporting transfer metadata, while leaving Kerr geometry and disk-crossing structure untouched.
+Do not perform another threshold scan of #561's `directPeak` shoulder band. The incidence-qualified classifier is the first mechanism in this sequence that simultaneously preserves direct span/lower light and produces strong 1px-class thinning. The next experiment should keep that physical separation concept but change the photometric response so it preserves or explicitly reconstructs the accepted warm ivory/pale-gold veil without re-thickening the high-intensity core. Keep geometry, path-stretch and incidence semantics frozen while testing one independent warm-response mechanism.
