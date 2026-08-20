@@ -141,6 +141,17 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 - Result: rejected. Radial-leg metadata is more selective than crossing ordinal alone, but `first crossing + no radial turn + inbound` still covers too broad a primary direct-disk family to isolate the desired screen-visible knife-edge core.
 - Do not tune the `0.40 -> 1.45` gain range or nearby response thresholds to rescue this exact classifier. The remaining problem is physical-image classification, not response strength.
 
+### #545 — first-crossing azimuthal-deflection weighting
+- Commit: `db33dced4b50436f8b2f6ff46d48439d4055183c`.
+- Windows run: `#545` / `32318716581`; artifact `9389121668`.
+- Mechanism: used `abs(diskPhi)` at the first disk crossing as a continuous physical azimuthal-deflection discriminator. `lowDeflection = 1.0 - smoothstep(1.15, 2.75, azimuthalDeflection)` weighted the photometric response while all Kerr equations, integration controls, disk crossing geometry, `DISK_OUTER`, `OBSERVER_THETA`, crossing gains, alpha/transmittance and the #479 compositor remained unchanged.
+- Response: `directCore = smoothstep(0.58, 0.84, directPeak) * smoothstep(0.45, 0.72, diskAlpha)`, squared core response, `directGain = mix(0.58, 1.42, coreResponse)`, warm core `vec3(0.99, 0.92, 0.74)` capped below full white.
+- Fixed validation definition, #479 -> #545: average bright-core thickness `2.211 -> 3.000 px` (+35.7%), median `2 -> 2 px`, horizontal high-intensity coverage `90 -> 309 px`, `>180` core pixels `199 -> 927`, direct span `682 -> 661 px` (-3.1%), lower bright `10817 -> 8894` (-17.8%), warm coverage `30816 -> 24848` (-19.4%), dead-white `0 -> 12`.
+- The fixed central-shadow ROI had the same >5 contamination count in #479 and #545, so shadow cleanliness did not regress.
+- Original-size and core comparisons are clearly distinguishable, but the candidate becomes harder and locally whiter rather than producing a thinner continuous knife-edge; the high-intensity footprint expands more than 3x while lower and warm retention fail.
+- Verdict: rejected. `abs(diskPhi)` is orthogonal to crossing ordinal and radial-leg state, but it is still not a sufficient direct-image classifier because disk coordinate azimuth mixes true path deflection with the physical azimuth of the disk hit.
+- Do not scan the `1.15–2.75` deflection window or `0.58–1.42` gain around this exact mechanism. The classifier is semantically contaminated, not merely mistuned.
+
 ## Current exclusions / lessons
 
 1. Do not increase global flare weights to create cinematic flare; it thickens the core unless independently protected.
@@ -152,8 +163,9 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 7. Do not continue scanning #527/#529 multi-scale ridge redistribution/gain; both conservative and stronger ranges were visually sub-threshold.
 8. Do not equate `diskCrossingCount == 0` with the horizontal direct-disk image for photometric isolation; #535 proves the first crossing is shared by a much broader primary/lensed light family.
 9. Do not treat `diskCrossingCount == 0 && !radialTurned && inboundStep` as a sufficient direct-core mask; #541 still destroys lower/warm retention and broadens high-intensity coverage.
-10. Prefer richer physical transfer/direct-image metadata if available or derive it without modifying ray geometry; do not return to screen-space neighborhood selectors.
-11. Any accepted replacement must beat #479 visibly at original size while preserving its warm veil, lower brightness, shadow cleanliness, and frozen geometry.
+10. Do not use raw `abs(diskPhi)` as a direct-image mask; #545 shows coordinate azimuth is not clean path-deflection metadata and still over-selects the primary disk family.
+11. Prefer genuinely transfer-specific metadata, such as accumulated affine/path length or a local emission-angle invariant at the disk hit, without modifying ray geometry.
+12. Any accepted replacement must beat #479 visibly at original size while preserving its warm veil, lower brightness, shadow cleanliness, and frozen geometry.
 
 ## Operational validation notes
 
@@ -165,7 +177,9 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 - #527 and #529 both passed Windows visual validation and were inspected at original size and core crop; neither met the visible-improvement bar.
 - #535 passed all fast checks and Windows visual capture; all required screenshots plus #479 original-size and core comparison were opened. It failed the visual/quantitative acceptance gates decisively.
 - #541 passed all fast checks and Windows visual capture; candidate/baseline/split/expanded plus #479 original-size and core comparisons were opened. It was visibly different but failed the core-width, lower, warm and dead-white gates.
+- #545 passed all fast checks and Windows visual capture; candidate/baseline/split/expanded plus #479 original-size and core comparisons were opened. It failed core-width, lower, warm and dead-white gates.
+- During #545 preparation, an unattached `noop` commit object `7207b90d596331f37470388474d575fb3018952a` was created by tool error, plus an unpushed candidate object that would have overwritten an existing test file. Neither object was connected to any branch ref; the branch history was not modified by them. Do not repeat this workflow error.
 
 ## Next experiment target
 
-Do not continue gain/threshold scanning on #541. The next physical discriminator must add information orthogonal to crossing ordinal and radial leg, such as accumulated azimuthal deflection / transfer path length / emission-angle information at the disk hit, while leaving Kerr geometry and disk-crossing structure untouched.
+Do not continue gain/threshold scanning on #545. The next physical discriminator should use transfer/path information that is independent of the disk hit's coordinate azimuth, preferably accumulated affine/path length or a local emission-angle quantity at the disk crossing, while leaving Kerr geometry and disk-crossing structure untouched.

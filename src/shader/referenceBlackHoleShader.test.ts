@@ -173,21 +173,4 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
     expect(getRenderProfile("high")).toEqual({ fps: 40, pixelRatioCap: 2 });
     expect(getRenderSize(920, 700, 2, 2)).toEqual({ width: 1840, height: 1400 });
   });
-
-  it("weights first-crossing photometry by physical azimuthal deflection", () => {
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "void shapeLowDeflectionDirectPhotometry(float candidateWeight, float azimuthalDeflection, inout vec3 diskColor, float diskAlpha)",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float lowDeflection = 1.0 - smoothstep(1.15, 2.75, azimuthalDeflection);",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float directGain = mix(0.58, 1.42, coreResponse);");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("vec3 directWarmCore = vec3(0.99, 0.92, 0.74)");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("if (diskCrossingCount == 0) {");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "shapeLowDeflectionDirectPhotometry(candidateWeight, abs(diskPhi), diskColor, diskAlpha);",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("radialTurned");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("fakeAnnulus");
-  });
 });
