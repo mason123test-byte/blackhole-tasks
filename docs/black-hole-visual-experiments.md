@@ -10,176 +10,149 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 - One experiment changes one main photometric variable or one independent visual layer.
 - Shader implementation and its test must be committed atomically.
 - A candidate is not accepted until the Windows visual workflow succeeds and the actual artifact screenshots are opened and compared.
+- Rejected mechanisms are recorded so later rounds do not re-scan the same weak selector or gain range.
 
 ## Accepted baseline history
 
 ### #473 — geometry compromise accepted
-- Commit: `3ec58116fb952f62a3edde360eee682f1e59aca0`
+- Commit: `3ec58116fb952f62a3edde360eee682f1e59aca0`.
 - `DISK_OUTER=35M`.
 - Geometry compromise accepted; geometry frozen after this point.
 
 ### #475 — warm filmic highlight response
-- Commit: `f765aa8ab137e088a44caae7dea76bdfd2b85df8`
-- Warm ivory / pale-gold highlight response and protected veiling flare.
-- Direction accepted; flare remained conservative.
+- Commit: `f765aa8ab137e088a44caae7dea76bdfd2b85df8`.
+- Added warm ivory / pale-gold highlight response and protected veiling flare.
+- Direction accepted.
 
 ### #479 — current visual baseline
-- Commit: `8e83056d29f6bda610700dba6ca09be9e89fd7a4`
+- Commit: `8e83056d29f6bda610700dba6ca09be9e89fd7a4`.
 - Added `flareCoreReject = 1.0 - 0.82 * smoothstep(0.56, 0.82, basePeak)`.
 - Result: retained the stronger outer veil while preventing the direct disk core from becoming thick and overexposed.
 - Accepted as the current baseline.
 
 ## Rejected / low-value experiments
 
-### #477 — stronger veiling flare without enough core rejection
-- Commit: `e991501b4e8e844c6c7440731983aee9c8880394`
-- Result: flare became more visible, but direct core thickness rose strongly and overexposed pixels increased substantially.
-- Verdict: rejected.
-- Do not repeat: simple global increases of near/mid/far flare weights without core protection.
+### #477 — stronger veiling flare
+- Commit: `e991501b4e8e844c6c7440731983aee9c8880394`.
+- Result: core and overexposure increased strongly.
+- Verdict: rejected. Do not globally raise flare weights without independent core protection.
 
-### #481 — far-flare radius LOD 7.0
-- Commit: `d39da653d6ad8397f30980b603fb05f825219f87`
-- Change: far flare LOD `6.0 -> 7.0`.
-- Result: energy spread too broadly; visible warm coverage and lower brightness slightly decreased with little visual benefit.
-- Verdict: rejected.
-- Do not repeat: far flare LOD `7.0`.
+### #481 / #483 — far-flare LOD radius scan
+- #481 commit: `d39da653d6ad8397f30980b603fb05f825219f87`, LOD 7.0.
+- #483 commit: `7dfe8f1c73c6b3fbbbec73323e92e067f056fcf8`, LOD 6.5.
+- Result: wider far flare reduced local warmth with no clear advantage over #479.
+- Do not continue fine LOD scans in the `6.0–7.0` range unless another independent layer materially changes the flare response.
 
-### #483 — far-flare radius LOD 6.5
-- Commit: `7dfe8f1c73c6b3fbbbec73323e92e067f056fcf8`
-- Change: far flare LOD `7.0 -> 6.5`.
-- Result: better than 7.0, but still no clear advantage over #479; gains were below meaningful visual threshold.
-- Verdict: not accepted.
-- Do not spend more rounds on fine LOD radius sweeps around `6.0–7.0` unless another layer changes the flare response materially.
+### #485 / #487 / #489 — local micro-contrast shoulder suppression
+- #485: initial LOD1 micro-contrast shoulder.
+- #487: `microShoulder=0.88`.
+- #489: `microShoulder=0.78`.
+- Result: stronger suppression made the ridge thinner but progressively removed warm/lower light and photographic richness.
+- Do not push negative-detail shoulder suppression below about `0.88`; `0.78` is known to be too dry.
 
-### #485 — first LOD1 micro-contrast shoulder experiment
-- Commit: `0dca9fa5875855a64b47558bda6fed484b9e75a5`
-- Result: only a very small core-thickness reduction; visually difficult to distinguish.
-- Verdict: low value.
+### #491 / #493 — isolated positive-detail core
+- #491 commit: `40b64c24788c87804a9a8e6702e213c52b661ed6`, `microCore=0.28`.
+- #493 commit: `808251557aa232756e239978630aa9344d295ef0`, `microCore=0.42`.
+- Result: increasing strength raised peak brightness but did not materially narrow the core.
+- Do not simply raise `microCore` beyond `0.42`.
 
-### #487 — `microShoulder=0.88`
-- Commit: `988f26321beb801ab13daa679ac2d53497491db5`
-- Result: slightly cleaner/thinner direct core, but change remained too small.
-- Verdict: not accepted.
-
-### #489 — `microShoulder=0.78`
-- Commit: `2d48ac8abd08a32e47ecd81c75d0e0f079361866`
-- Result: core became thinner, but warm highlight coverage, lower brightness, and overall photographic richness fell.
-- Verdict: rejected as a baseline replacement.
-- Do not repeat: pushing negative-detail shoulder suppression below `0.88`; `0.78` is specifically known to be too dry.
-
-### #491 — isolated positive-detail core, `microCore=0.28`
-- Commit: `40b64c24788c87804a9a8e6702e213c52b661ed6`
-- Removed shoulder suppression from the main path and isolated positive-detail core response.
-- Result: warm/flare richness recovered compared with #489, but direct-core thinning/peak separation was still too small to beat #479.
-- Verdict: direction valid, strength insufficient.
-
-### #493 — isolated positive-detail core, `microCore=0.42`
-- Commit: `808251557aa232756e239978630aa9344d295ef0`
-- Change: peak-only mix strength `0.28 -> 0.42` with the same white-point target.
-- Result: high-intensity pixels increased slightly, but core thickness stayed effectively unchanged and the visual difference remained small.
-- Verdict: not accepted.
-- Do not repeat: simply raising `microCore` mix strength above `0.42`; evidence indicates it increases peak intensity more than ridge separation.
-
-### #513 — isotropic four-neighbor local ridge selector
-- Visual-code HEAD: `7f2729b9147e20787ac6c51d464edcc112d47ea2`
+### #513 — isotropic four-neighbor ridge selector
+- Visual-code HEAD: `7f2729b9147e20787ac6c51d464edcc112d47ea2`.
 - Windows run: `#513` / `32253449518`; artifact `9365521120`.
-- Selector: four direct texture neighbors, `ridgeDetail = max(basePeak - ridgeNeighborPeak, 0.0)`.
-- Parameters: ridge-detail gate `0.018 -> 0.075`, base-peak gate `0.58 -> 0.88`, white-point target `basePeak * 1.10`, ridge mix `0.24`.
-- #479 flare LOD 6.0, `flareCoreReject`, warm tone, glow weights, shadow protection, and physical geometry were unchanged.
-- Same-definition #479 -> #513 measurements: direct-core average thickness `2.202 -> 2.237 px`, median `2 -> 2 px`, core horizontal coverage `89 -> 93 px`, `>180` pixels `204 -> 217`, lower bright count `9290 -> 9291`, warm coverage `26022 -> 26018`, dead-white pixels `0 -> 0`.
-- Result: surrounding warm/lower light was preserved, but the ridge did not become visibly more knife-edge; high-intensity coverage increased slightly and the core became marginally wider rather than narrower.
-- Verdict: low value / not accepted. `#479` remains baseline.
-- Do not repeat this exact selector parameter set: `0.018–0.075 / 0.58–0.88 / 1.10 / 0.24`.
+- Selector: `ridgeDetail = max(basePeak - ridgeNeighborPeak, 0.0)` using four direct texture neighbors.
+- Gates: ridge detail `0.018–0.075`, base peak `0.58–0.88`, white target `1.10`, mix `0.24`.
+- Result: lower/warm light preserved but high-intensity core slightly widened instead of thinning.
+- Verdict: rejected / low value. Do not repeat this exact selector and parameter set.
 
 ### #517 — directional vertical-thinness + horizontal-continuity selector
 - Commit: `fcc4ac51387d96dc52b8b73e0ec9234e89786cf8`.
 - Windows run: `#517` / `32255050216`; artifact `9366336438`.
-- Replaced #513 isotropic center-vs-four-neighbor average with directional shape tests: `ridgeVerticalThinness = max(basePeak - 0.5 * (ridgeUpPeak + ridgeDownPeak), 0.0)` plus `ridgeHorizontalContinuity = min(ridgeLeftPeak, ridgeRightPeak)`.
-- Kept #513 amplification fixed so only selector shape changed: thinness gate `0.018 -> 0.075`, base gate `0.58 -> 0.88`, white-point target `basePeak * 1.10`, mix `0.24`; added horizontal-continuity gate `0.40 -> 0.76`.
-- #479 far flare LOD 6.0, `flareCoreReject`, warm tone, glow weights, shadow protection, and all physical geometry were unchanged.
-- Same-definition #479 / #513 / #517 measurements: core average thickness `2.211 / 2.245 / 2.229 px`; median `2 / 2 / 2 px`; core horizontal coverage `90 / 94 / 96 px`; `>180` pixels `199 / 211 / 214`; lower bright count `9270 / 9272 / 9270`; warm coverage `25992 / 25986 / 25983`; dead-white `0 / 0 / 0`.
-- Result: directional selection preserved lower/warm light and shadow, but did not create a visibly thinner knife-edge core. It slightly reduced average thickness versus #513 while widening high-intensity horizontal coverage beyond both #513 and #479.
-- Verdict: rejected / low value. `#479` remains baseline.
-- Do not repeat this exact directional selector: vertical thinness `0.018–0.075` + horizontal continuity `0.40–0.76` + base gate `0.58–0.88` with `1.10 / 0.24` amplification.
+- Used vertical thinness plus horizontal continuity with the same amplification as #513.
+- Same-definition #479 / #513 / #517 average core thickness: `2.211 / 2.245 / 2.229 px`; high-intensity coverage `90 / 94 / 96 px`.
+- Result: preserved surrounding light but still widened high-intensity coverage.
+- Verdict: rejected. Do not repeat the exact #517 gate combination or simply raise its mix.
 
 ### #527 — multi-scale 1px/2px ridge-width evidence
 - Commit: `d3ef6693649864c0bf876c46342bfa0b71014b70`.
 - Windows run: `#527` / `32266998167`; artifact `9370838494`.
-- Selector used 1px and 2px vertical curvature gates, then redistributed the existing hot-core contribution with `ridgeHotCoreGain = mix(0.78, 1.20, ridgeWidthEvidence)`.
-- Same-definition #479 -> #527 measurements: average core thickness `2.211 -> 2.189 px`, median `2 -> 2 px`, horizontal coverage `90 -> 90 px`, `>180` core pixels `199 -> 197`; lower-bright and warm coverage were effectively unchanged; dead-white remained `0`.
-- Result: physically harmless but visually indistinguishable at original size; about 1% core-thickness reduction is below the useful threshold.
+- Redistribution: `mix(0.78, 1.20, ridgeWidthEvidence)`.
+- #479 -> #527 core thickness: `2.211 -> 2.189 px`; median `2 -> 2`; coverage `90 -> 90`.
+- Result: harmless but visually sub-threshold.
 - Verdict: rejected / low value.
 
 ### #529 — stronger multi-scale ridge redistribution
 - Commit: `8529e529db903ea282018fce65ce82d9a2421325`.
 - Windows run: `#529` / `32268184738`; artifact `9371326613`.
-- Only changed the same multi-scale selector redistribution from `mix(0.78, 1.20, ridgeWidthEvidence)` to `mix(0.60, 1.30, ridgeWidthEvidence)`; all gates, flare, shoulder, warm tone and geometry stayed fixed.
-- Same-definition measurements: average bright-core thickness `2.178 px`, median `2 px`, horizontal coverage `90 px`, `>180` core pixels `196`, lower bright `10817`, warm coverage `30806`, dead-white `0`.
-- Result: original-size screenshots could not be stably distinguished from #527. The stronger gain produced only about another 0.5% thickness reduction and did not create visible core/glow separation.
-- Verdict: rejected. `#479` remains the accepted baseline.
-- Do not continue scanning the current multi-scale ridge selector's redistribution/gain range. `0.78–1.20` and `0.60–1.30` have both demonstrated sub-visible returns; the limitation is selector separation, not gain strength.
+- Redistribution: `mix(0.60, 1.30, ridgeWidthEvidence)`.
+- Average bright-core thickness `2.178 px`, median `2 px`, horizontal coverage `90 px`, `>180` pixels `196`, lower bright `10817`, warm coverage `30806`, dead-white `0`.
+- Result: could not be stably distinguished from #527 at original size.
+- Verdict: rejected. Do not continue scanning the current multi-scale ridge selector redistribution/gain; the limitation is selector separation, not gain strength.
 
-### #535 — strong physical first-crossing photometric response
+### #535 — physical first-crossing photometric response
 - Commit: `c09c60dcd199d5dd838f9bf400ce36df9cff59ea`.
 - Windows run: `#535` / `32271183829`; artifact `9372425947`.
-- Mechanism: used the ray tracer's existing `diskCrossingCount == 0` identity, leaving crossing geometry and crossing 1/2/3 gains unchanged. The first crossing used `directEmissiveCore = smoothstep(0.55, 0.82, directPeak) * smoothstep(0.42, 0.72, diskAlpha)`, squared the response, then applied an intentionally strong `0.45 -> 1.75` color-gain range with a `vec3(1.0, 0.93, 0.74)` warm core. Alpha/transmittance were not changed.
-- Code-diff verification before push: reference shader had only 15 added lines and zero deletions; no Kerr/geodesic, `DISK_OUTER`, `OBSERVER_THETA`, crossing geometry or compositor line was modified.
-- Same fixed #529-validation script, #479 -> #535: average bright-core thickness `2.211 -> 5.446 px`, median `2 -> 4 px`, horizontal high-intensity coverage `90 -> 437 px`, `>180` core pixels `199 -> 2380`, lower bright `10817 -> 6937` (-35.9%), warm coverage `30816 -> 17023` (-44.8%), dead-white `0 -> 102`.
-- Original-size and core-crop screenshots show a clearly visible but incorrect change: the entire primary/lensed first-crossing light family becomes high-contrast and white rather than isolating the horizontal direct disk.
-- Result: strong failure. `diskCrossingCount == 0` is physical first-crossing identity, but it is not a sufficiently selective proxy for the screen-visible horizontal direct image; it also contributes broadly to primary/lensed structures.
-- Verdict: rejected. Restore #479.
-- Do not tune the `0.45 -> 1.75` strength range to rescue this mechanism. The selector identity itself is too broad. A future physical approach needs richer metadata than crossing ordinal alone (for example a direct-image/transfer classification that does not alter geodesic geometry).
+- Mechanism: `diskCrossingCount == 0`, with strong `0.45 -> 1.75` direct color gain and warm core; alpha/transmittance and geometry unchanged.
+- #479 -> #535: core thickness `2.211 -> 5.446 px`, median `2 -> 4`, coverage `90 -> 437`, `>180` `199 -> 2380`, lower `10817 -> 6937`, warm `30816 -> 17023`, dead-white `0 -> 102`.
+- Result: first physical crossing belongs to a broad primary/lensed family and is not the screen-visible horizontal direct-image identity.
+- Verdict: rejected. Do not tune the `0.45 -> 1.75` strength range to rescue this selector.
 
 ### #541 — inbound first-crossing radial-leg classifier
 - Commit: `f8e9aaab985e282932edcdc1a55d3b2a146466b6`.
 - Windows run: `#541` / `32317351153`; artifact `9388702029`.
-- Mechanism: added photometric-only path metadata `radialTurned` and `inboundStep = r < previousR`; the direct response applied only when `diskCrossingCount == 0 && !radialTurned && inboundStep`. The Kerr equations, integration step control, disk-plane crossing geometry, `DISK_OUTER`, `OBSERVER_THETA`, crossing gains, transmittance and compositor were unchanged.
-- Response: `directCore = smoothstep(0.60, 0.86, directPeak) * smoothstep(0.48, 0.74, diskAlpha)`, squared response, `directColorGain = mix(0.40, 1.45, directResponse)`, warm core `vec3(0.98, 0.91, 0.72)` capped below full white.
-- Fixed validation definition, #479 -> #541: average bright-core thickness `2.211 -> 2.733 px` (+23.6%), median `2 -> 2 px`, horizontal high-intensity coverage `90 -> 258 px`, direct-span threshold envelope `682 -> 631 px` (-7.5%), lower bright `10817 -> 8304` (-23.2%), warm coverage `30816 -> 21916` (-28.9%), dead-white `0 -> 9`.
-- A fixed central-shadow ROI remained unchanged in >5 contamination count, so the failure was not shadow pollution.
-- Original-size comparison is clearly visible: the horizontal region becomes much higher contrast and the surrounding direct-disk shoulder darkens, but the high-intensity core spreads horizontally rather than becoming a continuous thinner knife-edge; lower and warm-light retention fail badly.
-- Result: rejected. Radial-leg metadata is more selective than crossing ordinal alone, but `first crossing + no radial turn + inbound` still covers too broad a primary direct-disk family to isolate the desired screen-visible knife-edge core.
-- Do not tune the `0.40 -> 1.45` gain range or nearby response thresholds to rescue this exact classifier. The remaining problem is physical-image classification, not response strength.
+- Mechanism: `diskCrossingCount == 0 && !radialTurned && inboundStep`.
+- #479 -> #541: core thickness `2.211 -> 2.733 px`, median `2 -> 2`, coverage `90 -> 258`, direct span `682 -> 631`, lower `10817 -> 8304`, warm `30816 -> 21916`, dead-white `0 -> 9`.
+- Result: radial-leg metadata is more selective than crossing ordinal alone but still covers too broad a primary image family.
+- Verdict: rejected. Do not tune the `0.40 -> 1.45` gain range or nearby response thresholds to rescue this classifier.
 
 ### #545 — first-crossing azimuthal-deflection weighting
 - Commit: `db33dced4b50436f8b2f6ff46d48439d4055183c`.
 - Windows run: `#545` / `32318716581`; artifact `9389121668`.
-- Mechanism: used `abs(diskPhi)` at the first disk crossing as a continuous physical azimuthal-deflection discriminator. `lowDeflection = 1.0 - smoothstep(1.15, 2.75, azimuthalDeflection)` weighted the photometric response while all Kerr equations, integration controls, disk crossing geometry, `DISK_OUTER`, `OBSERVER_THETA`, crossing gains, alpha/transmittance and the #479 compositor remained unchanged.
-- Response: `directCore = smoothstep(0.58, 0.84, directPeak) * smoothstep(0.45, 0.72, diskAlpha)`, squared core response, `directGain = mix(0.58, 1.42, coreResponse)`, warm core `vec3(0.99, 0.92, 0.74)` capped below full white.
-- Fixed validation definition, #479 -> #545: average bright-core thickness `2.211 -> 3.000 px` (+35.7%), median `2 -> 2 px`, horizontal high-intensity coverage `90 -> 309 px`, `>180` core pixels `199 -> 927`, direct span `682 -> 661 px` (-3.1%), lower bright `10817 -> 8894` (-17.8%), warm coverage `30816 -> 24848` (-19.4%), dead-white `0 -> 12`.
-- The fixed central-shadow ROI had the same >5 contamination count in #479 and #545, so shadow cleanliness did not regress.
-- Original-size and core comparisons are clearly distinguishable, but the candidate becomes harder and locally whiter rather than producing a thinner continuous knife-edge; the high-intensity footprint expands more than 3x while lower and warm retention fail.
-- Verdict: rejected. `abs(diskPhi)` is orthogonal to crossing ordinal and radial-leg state, but it is still not a sufficient direct-image classifier because disk coordinate azimuth mixes true path deflection with the physical azimuth of the disk hit.
-- Do not scan the `1.15–2.75` deflection window or `0.58–1.42` gain around this exact mechanism. The classifier is semantically contaminated, not merely mistuned.
+- Mechanism: used `abs(diskPhi)` with `1.0 - smoothstep(1.15, 2.75, azimuthalDeflection)`.
+- #479 -> #545: core thickness `2.211 -> 3.000 px`, median `2 -> 2`, coverage `90 -> 309`, `>180` `199 -> 927`, direct span `682 -> 661`, lower `10817 -> 8894`, warm `30816 -> 24848`, dead-white `0 -> 12`.
+- Result: raw disk azimuth mixes true path deflection with physical disk-hit azimuth and still over-selects the primary image family.
+- Verdict: rejected. Do not scan the `1.15–2.75` window or `0.58–1.42` gain for this mechanism.
+
+### #553 — affine path-stretch first-crossing classifier
+- Candidate commit: `5ac6adba5629058ebede393fa46fcf9f04a0cccd`.
+- Windows run: `#553` / `32320401192`.
+- First Windows visual attempt built the Tauri EXE and captured baseline/candidate successfully, but timed out during the later visual capture stage (`Orb did not produce a non-empty WebGL2 frame within 20000ms`). Partial artifact: `9389670021`. No visual parameters were changed in response.
+- The exact same Windows visual job was rerun with the same SHA and parameters; the second attempt completed successfully, including baseline/candidate/split capture and artifact upload. Valid artifact: `9389827608`, digest `sha256:1e0943e09dba758161ccbdbdd569c2f2482318bc634f683d46927887ce811f88`.
+- Mechanism: accumulated accepted affine step length before the first disk crossing, interpolated the hit path length at the crossing, then normalized by the radial direct-distance proxy: `pathStretch = hitPathLength / max(OBSERVER_R - diskRadius, 1.0)`.
+- Selector: `shortPathWeight = 1.0 - smoothstep(1.05, 1.45, pathStretch)` on crossing 0 only.
+- Photometric response deliberately did not boost the peak above baseline: `directColorGain = mix(0.32, 1.00, directResponse)`. It strongly suppressed the selected mid-bright shoulder while retaining only the high-emissivity core.
+- Kerr equations, integration controls, `DISK_OUTER`, `OBSERVER_THETA`, disk-plane crossing geometry, crossing gains, alpha/transmittance and #479 compositor were not changed.
+- Same fixed validation script, #479 -> #553: average bright-core thickness `2.211 -> 1.176 px` (-46.8%), median `2 -> 1 px`, horizontal high-intensity coverage `90 -> 17 px`, `>180` core pixels `199 -> 20`, direct span `682 -> 499 px` (-26.8%), lower bright `10817 -> 4905` (-54.7%), warm coverage `30816 -> 12015` (-61.0%), dead-white `0 -> 0`, fixed shadow >5 count `3454 -> 3449`.
+- Original-size candidate is plainly distinguishable from #479 and the core crop shows a genuinely thinner 1px-class highlight. This is the first tested physical discriminator in this sequence that clearly reduces measured bright-core thickness by much more than the 15% target and changes the median from 2px to 1px.
+- However, the response removes far too much legitimate direct-disk length, lower light and warm veil. Direct span loses about 27%, lower bright about 55%, and warm coverage about 61%; these failures are far outside the acceptance limits.
+- Verdict: rejected. Path stretch contains useful separation information, but this exact `1.05–1.45` selector plus shoulder-suppression response is not selective enough to preserve the accepted image family.
+- Do not accept or re-use this exact broad path-stretch suppression. Future work may use path-stretch only as one component of a richer physical classifier, preferably combined with an independent local disk-hit invariant such as emission angle, while keeping geometry frozen.
 
 ## Current exclusions / lessons
 
-1. Do not increase global flare weights to create cinematic flare; it thickens the core unless independently protected.
-2. Do not keep sweeping far-flare LOD `6.0–7.0`; benefit is below the useful threshold in the current compositor.
-3. Do not use negative-detail shoulder suppression as the main way to thin the disk; values around `0.78` make the image dry and reduce lower/warm light.
-4. Do not keep raising `microCore` scalar strength; `0.28 -> 0.42` raised peak brightness without materially narrowing the core.
-5. The isotropic 4-neighbor ridge selector preserved surrounding light but slightly widened the high-intensity core; do not repeat the exact #513 gate/target/mix values.
-6. The first directional vertical-thinness + horizontal-continuity selector also widened high-intensity horizontal coverage; do not repeat the exact #517 gate combination or simply raise its mix.
-7. Do not continue scanning #527/#529 multi-scale ridge redistribution/gain; both conservative and stronger ranges were visually sub-threshold.
-8. Do not equate `diskCrossingCount == 0` with the horizontal direct-disk image for photometric isolation; #535 proves the first crossing is shared by a much broader primary/lensed light family.
-9. Do not treat `diskCrossingCount == 0 && !radialTurned && inboundStep` as a sufficient direct-core mask; #541 still destroys lower/warm retention and broadens high-intensity coverage.
-10. Do not use raw `abs(diskPhi)` as a direct-image mask; #545 shows coordinate azimuth is not clean path-deflection metadata and still over-selects the primary disk family.
-11. Prefer genuinely transfer-specific metadata, such as accumulated affine/path length or a local emission-angle invariant at the disk hit, without modifying ray geometry.
-12. Any accepted replacement must beat #479 visibly at original size while preserving its warm veil, lower brightness, shadow cleanliness, and frozen geometry.
+1. Do not increase global flare weights without core protection.
+2. Do not keep sweeping far-flare LOD `6.0–7.0` in the current compositor.
+3. Do not use strong negative-detail shoulder suppression as the primary thinning mechanism.
+4. Do not keep raising `microCore` scalar strength beyond the tested range.
+5. Do not repeat #513/#517 screen-space neighborhood ridge selectors or their exact gates.
+6. Do not continue #527/#529 multi-scale ridge redistribution/gain scans.
+7. Do not equate `diskCrossingCount == 0` with the horizontal direct-disk image.
+8. Do not use `first crossing + no radial turn + inbound` as a sufficient direct-core mask.
+9. Do not use raw `abs(diskPhi)` as a direct-image mask.
+10. Do not use the exact #553 `pathStretch 1.05–1.45 + 0.32–1.00 shoulder suppression` as a standalone direct-image mask; it succeeds at thinning but destroys direct-span/lower/warm retention.
+11. Path stretch is the first physical signal tested here that demonstrated strong real core-thinning separation, so it remains useful as metadata, but not as a standalone selector.
+12. Any accepted replacement must beat #479 visibly at original size while preserving its warm veil, lower brightness, shadow cleanliness and frozen geometry.
 
 ## Operational validation notes
 
-- #499 was not a visual verdict: validation stopped at TypeScript because a renderer syntax typo was introduced during experiment preparation. The ridge parameters were not changed when fixing it.
-- #511 was not a visual verdict: typecheck/lint passed, but one unrelated diagnostic-frame test assertion contained a text typo (`sonst` instead of `const`). The ridge-specific test itself passed. The ridge parameters were not changed when fixing it.
-- Temporary placeholder files created during recovery were deleted by forward commits; they were tooling mistakes and are not visual experiments.
-- #513 was the first valid Windows visual run for the four-neighbor ridge experiment.
-- #517 passed frontend typecheck/lint/tests, Rust fast checks, Tauri EXE build, native Windows visual capture, and artifact upload; candidate/baseline/split/expanded screenshots were opened directly.
-- #527 and #529 both passed Windows visual validation and were inspected at original size and core crop; neither met the visible-improvement bar.
-- #535 passed all fast checks and Windows visual capture; all required screenshots plus #479 original-size and core comparison were opened. It failed the visual/quantitative acceptance gates decisively.
-- #541 passed all fast checks and Windows visual capture; candidate/baseline/split/expanded plus #479 original-size and core comparisons were opened. It was visibly different but failed the core-width, lower, warm and dead-white gates.
-- #545 passed all fast checks and Windows visual capture; candidate/baseline/split/expanded plus #479 original-size and core comparisons were opened. It failed core-width, lower, warm and dead-white gates.
-- During #545 preparation, an unattached `noop` commit object `7207b90d596331f37470388474d575fb3018952a` was created by tool error, plus an unpushed candidate object that would have overwritten an existing test file. Neither object was connected to any branch ref; the branch history was not modified by them. Do not repeat this workflow error.
+- #499 was not a visual verdict: validation stopped at TypeScript because of a renderer syntax typo during experiment preparation.
+- #511 was not a visual verdict: typecheck/lint passed but an unrelated diagnostic-frame test assertion contained a text typo.
+- Temporary placeholder files created during earlier recovery were deleted by forward commits; they were tooling mistakes, not visual experiments.
+- During #545 preparation, an unattached noop commit object and an unpushed incorrect candidate object were created by tool error; neither was connected to a branch ref.
+- During #553 preparation, a schema-probing mistake accidentally created a `DO_NOT_USE` file in commit `80d04d006dde3e500d51dc27866b7e752f2cead6`; it was immediately removed by forward commit `fa31d802493c2521af1408bf035fe668d08a544f`. No reset/rebase/force operation was used.
+- During #553 preparation, earlier unattached candidate objects were not connected to the branch; the valid candidate is `5ac6adba5629058ebede393fa46fcf9f04a0cccd`.
+- #553's first visual attempt failed after baseline/candidate capture; the identical job rerun succeeded. Only the successful second artifact is valid for final visual judgment.
+- Required #553 candidate/baseline/split/expanded screenshots plus #479 original-size and direct-core comparisons were opened before the verdict.
 
 ## Next experiment target
 
-Do not continue gain/threshold scanning on #545. The next physical discriminator should use transfer/path information that is independent of the disk hit's coordinate azimuth, preferably accumulated affine/path length or a local emission-angle quantity at the disk crossing, while leaving Kerr geometry and disk-crossing structure untouched.
+Do not rescan #553's broad path-stretch gate or simply weaken/strengthen its `0.32–1.00` suppression. The key result is that path length has real separating power but is insufficient alone. The next physical experiment should add an independent disk-hit invariant—preferably local emission angle / incidence geometry—and use path-stretch only as supporting transfer metadata, while leaving Kerr geometry and disk-crossing structure untouched.
