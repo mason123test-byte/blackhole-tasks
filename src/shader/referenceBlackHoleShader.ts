@@ -246,6 +246,18 @@ float crossingAlphaGain(int crossingIndex) {
   return 0.12;
 }
 
+void shapeInboundDirectPhotometry(float candidateWeight, inout vec3 diskColor, float diskAlpha) {
+  float directPeak = max(diskColor.r, max(diskColor.g, diskColor.b));
+  float directCore = smoothstep(0.60, 0.86, directPeak)
+    * smoothstep(0.48, 0.74, diskAlpha);
+  float directResponse = directCore * directCore;
+  float directColorGain = mix(0.40, 1.45, directResponse);
+  vec3 directWarmCore = vec3(0.98, 0.91, 0.72) * min(0.96, directPeak * 1.08);
+  vec3 shapedDirect = diskColor * directColorGain;
+  shapedDirect = mix(shapedDirect, max(shapedDirect, directWarmCore), directResponse * 0.64);
+  diskColor = mix(diskColor, shapedDirect, candidateWeight);
+}
+
 void rayTracedReference() {
   float aspect = u_resolution.x / max(u_resolution.y, 1.0);
   vec2 referenceUv = vec2(v_uv.x, 1.0 - v_uv.y);
@@ -266,7 +278,7 @@ void rayTracedReference() {
   float r; float theta; float phi; float pr; float ptheta; float L; float kappa;
   initDngrCameraRay(cameraPlane.x, cameraPlane.y, r, theta, phi, pr, ptheta, L, kappa);
   float previousR = r; float previousPhi = phi; float previousSide = theta - 0.5 * PI;
-  bool captured = false; int diskCrossingCount = 0; vec3 accumulatedDisk = vec3(0.0); float transmittance = 1.0;
+  bool captured = false; bool radialTurned = false; int diskCrossingCount = 0; vec3 accumulatedDisk = vec3(0.0); float transmittance = 1.0;
   float dilation = mix(1.0, DILATION_MIN, u_expanded); float patternTime = u_time * dilation; float h = 0.90;
   for (int i = 0; i < N_STEPS; i++) {
     if (r <= KERR_HORIZON + 0.015) { captured = true; break; }
@@ -297,12 +309,16 @@ void rayTracedReference() {
     r = acceptedState.x; theta = acceptedState.y; phi = acceptedState.z; pr = acceptedState.w; ptheta = acceptedPtheta;
     normalizePolarState(theta, phi, ptheta); projectKerrMomenta(r, theta, L, kappa, pr, ptheta);
     h = clamp(h * clamp(0.90 * pow(max(acceptedErrorRatio, 1e-6), -0.20), 0.55, 1.80), KERR_MIN_STEP, KERR_MAX_STEP);
+    bool inboundStep = r < previousR;
     float side = theta - 0.5 * PI;
     if (side * previousSide < 0.0 && diskCrossingCount < MAX_DISK_CROSSINGS) {
       float crossing = previousSide / (previousSide - side); float diskRadius = mix(previousR, r, crossing);
       if (diskRadius > DISK_INNER && diskRadius < DISK_OUTER) {
         float diskPhi = mix(previousPhi, phi, crossing); vec3 diskColor; float diskAlpha;
         sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha);
+        if (diskCrossingCount == 0 && !radialTurned && inboundStep) {
+          shapeInboundDirectPhotometry(candidateWeight, diskColor, diskAlpha);
+        }
         float colorGain = crossingColorGain(diskCrossingCount);
         float alphaGain = crossingAlphaGain(diskCrossingCount);
         float effectiveAlpha = clamp(diskAlpha * alphaGain, 0.0, 0.90);
@@ -312,6 +328,7 @@ void rayTracedReference() {
         if (transmittance < 0.02) break;
       }
     }
+    if (!inboundStep) radialTurned = true;
     previousSide = side;
   }
   if (diskCrossingCount > 0) {

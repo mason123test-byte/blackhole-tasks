@@ -17,6 +17,10 @@ const rendererSource = readFileSync(
   resolve(process.cwd(), "src/shader/blackHoleRenderer.ts"),
   "utf8",
 );
+const referenceShaderSource = readFileSync(
+  resolve(process.cwd(), "src/shader/referenceBlackHoleShader.ts"),
+  "utf8",
+);
 
 describe("black-hole render profiles", () => {
   it("uses the reference author's WebGL pixel-ratio ceiling", () => {
@@ -111,5 +115,18 @@ describe("black-hole render profiles", () => {
     expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("1.0 - v_uv.y");
     expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("annulusMask");
     expect(MIRROR_COMPOSITOR_FRAGMENT).not.toContain("screen.y");
+  });
+
+  it("classifies the physical inbound first crossing without changing Kerr geometry", () => {
+    expect(referenceShaderSource).toContain("bool captured = false; bool radialTurned = false;");
+    expect(referenceShaderSource).toContain("bool inboundStep = r < previousR;");
+    expect(referenceShaderSource).toContain("if (diskCrossingCount == 0 && !radialTurned && inboundStep) {");
+    expect(referenceShaderSource).toContain("shapeInboundDirectPhotometry(candidateWeight, diskColor, diskAlpha);");
+    expect(referenceShaderSource).toContain("if (!inboundStep) radialTurned = true;");
+    expect(referenceShaderSource).toContain("float directColorGain = mix(0.40, 1.45, directResponse);");
+    expect(referenceShaderSource).toContain("vec3 directWarmCore = vec3(0.98, 0.91, 0.72)");
+    expect(referenceShaderSource).toContain("const float DISK_OUTER = 35.00;");
+    expect(referenceShaderSource).toContain("const float OBSERVER_THETA = 1.515;");
+    expect(referenceShaderSource).not.toContain("fakeAnnulus");
   });
 });
