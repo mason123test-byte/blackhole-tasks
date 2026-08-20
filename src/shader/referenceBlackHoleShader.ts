@@ -36,7 +36,7 @@ void shapeIncidenceQualifiedDirectShoulder(
   float grazingWeight = 1.0 - smoothstep(0.07, 0.26, incidenceCosine);
   float directTransferWeight = shortPathWeight * grazingWeight;
   float directPeak = max(diskColor.r, max(diskColor.g, diskColor.b));
-  float shoulderBand = smoothstep(0.42, 0.64, directPeak)
+  float shoulderBand = smoothstep(0.58, 0.72, directPeak)
     * (1.0 - smoothstep(0.78, 0.90, directPeak));
   float coreProtect = smoothstep(0.80, 0.94, directPeak)
     * smoothstep(0.50, 0.76, diskAlpha);

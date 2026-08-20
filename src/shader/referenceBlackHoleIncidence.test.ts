@@ -20,9 +20,9 @@ describe("incidence-qualified direct-disk photometry", () => {
     );
   });
 
-  it("suppresses only the selected mid-bright shoulder while protecting the core", () => {
+  it("suppresses only the higher mid-bright shoulder while protecting low light and the core", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float shoulderBand = smoothstep(0.42, 0.64, directPeak)",
+      "float shoulderBand = smoothstep(0.58, 0.72, directPeak)",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "* (1.0 - smoothstep(0.78, 0.90, directPeak));",
