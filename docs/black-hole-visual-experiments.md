@@ -102,6 +102,16 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 - Warmth partially recovered while keeping a thin core and lower light, but warm coverage was still about 24% below #479 and the high-intensity ridge remained too discontinuous.
 - Do not continue scalar scans of `0.78 / 0.60 / 0.84`; the successful #571 result came from changing response topology instead.
 
+### #575 — dual-band warm veil + knife-core reconstruction
+- Candidate `ce5cf0826bd25be027d214429b3568a40adfc3ad`; Windows Build `#575`, run ID `32433553427`, workflow ID `328346937`.
+- Artifact `9430055338`, digest `sha256:ede116d6fa31af620df068ddfc7839b4f65048ef60351e4be38ead767e4076a1`.
+- Kept the #561/#571 path-stretch + local-incidence classifier and shoulder thinning unchanged, then explicitly formed `warmLowFrequency` and `directHighFrequency` layers before `max` reconstruction. The knife core used only the same physical direct-transfer weight plus source peak/alpha gates; no screen-space neighborhood selector or y-position patch was introduced.
+- Same fixed #479 validation definitions: #479 -> #575 average bright-core thickness `2.211 -> 1.231 px` (-44.3%), median `2 -> 1 px`, `>180` core pixels `199 -> 32`, high-intensity columns `90 -> 26`, direct span `682 -> 682 px`, lower bright `10817 -> 10636` (-1.7%), warm coverage `30816 -> 29693` (-3.6%), shadow `>5` count `152 -> 152`, dead-white `0 -> 0`.
+- Relative to accepted #571, only one additional `>180` core pixel appeared: thickness `1.192 -> 1.231 px`, high-intensity columns stayed `26`, and direct span/lower/warm/shadow/dead-white were numerically identical.
+- Actual Windows `visual-candidate.png`, `visual-baseline.png`, `visual-split.png`, expanded screenshot, #479/#575 original-size side-by-side, and #479/#571/#575 core enlargement were opened before verdict.
+- Visual result: #575 remains clearly thinner than #479, but it is effectively indistinguishable from #571 at original size and in the core enlargement. The new high-frequency layer did not restore additional horizontal continuity; it only moved one core pixel above the fixed threshold.
+- Verdict: rejected. Do not scan the `0.76–0.88` knife-core peak gate, `0.44–0.72` alpha gate, or nearby core strength values. The limitation is that source-intensity gating does not add an independent continuity signal beyond the already accepted #571 response.
+
 ## Current exclusions / lessons
 
 1. Do not increase global flare weights without core protection.
@@ -115,7 +125,8 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 9. Path stretch has useful thinning separation but requires local-incidence qualification.
 10. The accepted physical selector is currently the #561/#571 path-stretch + local-incidence combination; do not casually retune its semantic gates.
 11. Do not return to #567 scalar tint recovery. The accepted solution uses a separate sub-white warm shelf topology.
-12. Geometry remains frozen. Any future baseline must preserve #571's direct span, lower image, shadow cleanliness and full Kerr geometry.
+12. Do not add another source-intensity/alpha-only knife-core gate on top of #571; #575 proved it does not create additional horizontal continuity.
+13. Geometry remains frozen. Any future baseline must preserve #571's direct span, lower image, shadow cleanliness and full Kerr geometry.
 
 ## Operational validation notes
 
@@ -126,8 +137,8 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 - During #553 preparation, accidental `DO_NOT_USE` commit `80d04d006dde3e500d51dc27866b7e752f2cead6` was immediately cleaned by forward commit `fa31d802493c2521af1408bf035fe668d08a544f`; no reset/rebase/force.
 - #553's first visual attempt failed after partial capture; identical rerun succeeded.
 - #559's initial workflow was cancelled before any step; same SHA later validated successfully.
-- Required #559, #561, #567 and #571 Windows screenshots plus baseline comparisons were opened before verdicts.
+- Required #559, #561, #567, #571 and #575 Windows screenshots plus baseline comparisons were opened before verdicts.
 
 ## Next experiment target
 
-`#571` is the accepted baseline. Do not immediately retune its physical classifier or warm shelf. Any next visual round should start from #571 and change one genuinely independent layer only. Priority should be preserving the now-thin direct core and warm shoulder while evaluating a separate photographic refinement (for example subtle higher-order/lower-image tonal separation) without changing geometry or the accepted direct-disk response.
+`#571` remains the accepted baseline. Do not retune its physical classifier, warm shelf, or the rejected #575 source-intensity knife-core gate. A future attempt at stronger horizontal core continuity needs a genuinely independent physical signal available at the disk hit or transfer stage; otherwise leave the accepted direct response unchanged and evaluate a separate photographic layer such as higher-order/lower-image tonal separation without changing geometry.
