@@ -112,6 +112,16 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 - Visual result: #575 remains clearly thinner than #479, but it is effectively indistinguishable from #571 at original size and in the core enlargement. The new high-frequency layer did not restore additional horizontal continuity; it only moved one core pixel above the fixed threshold.
 - Verdict: rejected. Do not scan the `0.76–0.88` knife-core peak gate, `0.44–0.72` alpha gate, or nearby core strength values. The limitation is that source-intensity gating does not add an independent continuity signal beyond the already accepted #571 response.
 
+### #581 — physical disk-source high-frequency residual
+- Candidate `f9a5b6bfd1d248127a9bbb0fdc2a7e2f0cfb4216`; Windows Build `#581`, run ID `32435891284`, workflow ID `328346937`.
+- Artifact `9430844776`, digest `sha256:52d7d20896ddb24554a2a5b93918fca26da9c7590b77de2d33120466de6c4a96`.
+- Kept the accepted #571 path-stretch/local-incidence classifier, shoulder suppression and warm shelf unchanged. `sampleDiskSurface` additionally exported a source-domain residual `sourceHighFrequency = max(physicalLayers - broadSourceLayers, 0.0)`, where `broadSourceLayers` excludes the primary ribbon/filament excess. Only direct first-crossing rays qualified by the accepted transfer classifier could use that residual to reconstruct a sub-white warm knife core. No screen-space neighborhood selector, y-position patch, geometry change or second renderer was introduced.
+- Same fixed #479 validation definitions: #479 -> #581 average bright-core thickness `2.211 -> 1.256 px` (-43.2%), median `2 -> 1 px`, `>180` core pixels `199 -> 49`, high-intensity columns `90 -> 39`, direct span `682 -> 682 px`, lower bright `10817 -> 11122` (+2.8%), warm coverage `30816 -> 30091` (-2.4%), shadow `>5` count `152 -> 152`, dead-white `0 -> 0`.
+- Relative to accepted #571: average thickness `1.192 -> 1.256 px`, high-intensity columns `26 -> 39`, longest contiguous >180 column run `7 -> 10`, lower bright `10636 -> 11122`, warm coverage `29693 -> 30091`, direct span/shadow/dead-white unchanged. For reference #479 has 90 high-intensity columns and a longest contiguous run of 38.
+- Actual Windows `visual-candidate.png`, `visual-baseline.png`, `visual-split.png`, expanded screenshot, #479/#581 original-size side-by-side, and #479/#571/#581 core enlargement were opened before verdict.
+- Visual result: the source residual is a genuinely independent physical signal and restores more bright samples than #575/#571, but the added energy appears as sparse source-structure highlights rather than a visibly continuous horizontal knife edge. At original size the change from #571 is modest, and the core enlargement shows only short runs/speckles rather than the required long high-intensity ridge.
+- Verdict: rejected. Do not scan the `sourceHighFrequency` support window `0.055–0.24`, the `+0.22` source-core lift, or nearby gains. The signal is physically independent but its topology is source texture, not the transfer continuity needed for a long knife-edge core.
+
 ## Current exclusions / lessons
 
 1. Do not increase global flare weights without core protection.
@@ -126,7 +136,8 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 10. The accepted physical selector is currently the #561/#571 path-stretch + local-incidence combination; do not casually retune its semantic gates.
 11. Do not return to #567 scalar tint recovery. The accepted solution uses a separate sub-white warm shelf topology.
 12. Do not add another source-intensity/alpha-only knife-core gate on top of #571; #575 proved it does not create additional horizontal continuity.
-13. Geometry remains frozen. Any future baseline must preserve #571's direct span, lower image, shadow cleanliness and full Kerr geometry.
+13. Do not continue source-texture residual recovery from #581; it increases sparse bright samples but does not create the required long transfer-continuous knife edge.
+14. Geometry remains frozen. Any future baseline must preserve #571's direct span, lower image, shadow cleanliness and full Kerr geometry.
 
 ## Operational validation notes
 
@@ -137,8 +148,8 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 - During #553 preparation, accidental `DO_NOT_USE` commit `80d04d006dde3e500d51dc27866b7e752f2cead6` was immediately cleaned by forward commit `fa31d802493c2521af1408bf035fe668d08a544f`; no reset/rebase/force.
 - #553's first visual attempt failed after partial capture; identical rerun succeeded.
 - #559's initial workflow was cancelled before any step; same SHA later validated successfully.
-- Required #559, #561, #567, #571 and #575 Windows screenshots plus baseline comparisons were opened before verdicts.
+- Required #559, #561, #567, #571, #575 and #581 Windows screenshots plus baseline comparisons were opened before verdicts.
 
 ## Next experiment target
 
-`#571` remains the accepted baseline. Do not retune its physical classifier, warm shelf, or the rejected #575 source-intensity knife-core gate. A future attempt at stronger horizontal core continuity needs a genuinely independent physical signal available at the disk hit or transfer stage; otherwise leave the accepted direct response unchanged and evaluate a separate photographic layer such as higher-order/lower-image tonal separation without changing geometry.
+`#571` remains the accepted baseline. Do not retune its physical classifier or warm shelf, and do not continue #575 source-intensity gates or #581 source-texture residual recovery. A future direct-core continuity attempt needs a transfer-domain signal that is longitudinally coherent across the direct image (for example a physically derived transfer/Jacobian or ray-bundle coherence quantity); otherwise leave the accepted direct response unchanged and work on a separate photographic layer such as higher-order/lower-image tonal separation without changing geometry.
