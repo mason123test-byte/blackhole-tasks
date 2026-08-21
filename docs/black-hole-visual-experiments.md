@@ -132,6 +132,16 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 - Visual result: polar momentum is genuinely transfer-domain and produces the first strong horizontal continuity recovery, but it does so by lighting a broad first-crossing strip rather than isolating a ~1px knife edge. The direct core becomes visibly thicker than #479 and the lower/warm response is substantially over-raised.
 - Verdict: rejected. Do not scan the `0.10–0.22` polar-momentum window, the fixed `0.82` core level, or nearby scalar variants. The signal is too broad as a standalone core-support coordinate; continuity without an independent vertical-width/Jacobian discriminator simply recreates a thick bright band.
 
+### #591 — polar-momentum continuity + polar-path detour gate
+- Candidate `1637e5036fc3c527de19b969af76b3d037d150e2`; Windows Build `#591`, run ID `32444151683`, workflow ID `328346937`.
+- Artifact `9433569755`, digest `sha256:3668995df3675900504415ca4ae8dae8d93117e1e3b4f688f9ec9ca86e85ac22`.
+- Kept the accepted #571 classifier/warm shelf and kept #585 polar-momentum continuity semantics unchanged. Added one independent transfer-domain width discriminator: accumulated polar travel to the first disk hit, `hitPolarTravel = polarTravel + crossing * abs(side - previousSide)`, normalized by the observer-to-equator shortest polar distance. The resulting `polarStretch` was mapped by `polarPathCoherence = 1.0 - smoothstep(1.02, 1.18, polarStretch)` and multiplied into #585 core support. No screen-space selector, source-texture gate, geometry change, compositor change or second renderer was introduced.
+- Same fixed #479 validation definitions: #479 -> #591 average bright-core thickness `2.211 -> 2.616 px` (+18.3%), median `2 -> 2 px`, `>180` core pixels `199 -> 382`, high-intensity columns `90 -> 146`, longest contiguous >180 run `38 -> 37`, direct span `682 -> 682 px`, lower bright `10817 -> 17633` (+63.0%), warm coverage `30816 -> 35644` (+15.7%), shadow `>5` count `152 -> 152`, dead-white `0 -> 0`.
+- Relative to #585, average thickness only changes `2.691 -> 2.616 px` (-2.8%), core pixels `401 -> 382`, high-intensity columns `149 -> 146`, lower bright `17635 -> 17633`, warm coverage `35628 -> 35644`; only the longest contiguous >180 run falls materially, `58 -> 37`.
+- Actual Windows `visual-candidate.png`, `visual-baseline.png`, `visual-split.png`, #571/#585/#591 original-size comparison, and #479/#571/#585/#591 core enlargement were opened before verdict.
+- Visual result: the polar-path detour gate breaks some long contiguous runs but does not reject the broad direct-ray family responsible for #585's excessive thickness and lower/warm energy. At original size #591 remains essentially the same thick bright strip as #585, not a ~1px knife edge.
+- Verdict: rejected. Do not scan the `1.02–1.18` polar-path stretch window or nearby scalar variants. Polar detour is not the missing vertical-width discriminator for the #585 continuity family.
+
 ## Current exclusions / lessons
 
 1. Do not increase global flare weights without core protection.
@@ -148,7 +158,8 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 12. Do not add another source-intensity/alpha-only knife-core gate on top of #571; #575 proved it does not create additional horizontal continuity.
 13. Do not continue source-texture residual recovery from #581; it increases sparse bright samples but does not create the required long transfer-continuous knife edge.
 14. Do not continue standalone local-polar-momentum core reconstruction from #585; it restores continuity by broadening the bright strip and heavily over-raises lower/warm energy.
-15. Geometry remains frozen. Any future baseline must preserve #571's direct span, lower image, shadow cleanliness and full Kerr geometry.
+15. Do not continue #591 polar-path detour gating or scan `1.02–1.18`; it barely changes #585 thickness/energy and mainly fragments the longest run.
+16. Geometry remains frozen. Any future baseline must preserve #571's direct span, lower image, shadow cleanliness and full Kerr geometry.
 
 ## Operational validation notes
 
@@ -159,8 +170,8 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 - During #553 preparation, accidental `DO_NOT_USE` commit `80d04d006dde3e500d51dc27866b7e752f2cead6` was immediately cleaned by forward commit `fa31d802493c2521af1408bf035fe668d08a544f`; no reset/rebase/force.
 - #553's first visual attempt failed after partial capture; identical rerun succeeded.
 - #559's initial workflow was cancelled before any step; same SHA later validated successfully.
-- Required #559, #561, #567, #571, #575, #581 and #585 Windows screenshots plus baseline comparisons were opened before verdicts.
+- Required #559, #561, #567, #571, #575, #581, #585 and #591 Windows screenshots plus baseline comparisons were opened before verdicts.
 
 ## Next experiment target
 
-`#571` remains the accepted baseline. Do not retune its physical classifier or warm shelf, and do not continue #575 source-intensity gates, #581 source-texture residual recovery, or #585 standalone polar-momentum reconstruction. #585 proves that a smooth transfer-domain coordinate can recover horizontal continuity, but an acceptable next attempt needs a genuinely independent vertical-width / ray-bundle magnification discriminator so that continuity is retained without broadening the strip. Otherwise leave the accepted direct response unchanged and work on a separate photographic layer such as higher-order/lower-image tonal separation without changing geometry.
+`#571` remains the accepted baseline. Do not retune its physical classifier or warm shelf, and do not continue #575 source-intensity gates, #581 source-texture residual recovery, #585 standalone polar-momentum reconstruction, or #591 polar-path detour gating. #585 still proves that polar momentum contains useful horizontal continuity, but #591 shows that path detour is not an independent width coordinate for the same broad direct family. A future continuity attempt needs a genuinely local ray-bundle magnification/focusing discriminator (for example an analytically derived transfer/Jacobian proxy), not another accumulated path-length-like scalar. Otherwise leave the accepted direct response unchanged and work on a separate photographic layer without changing geometry.
