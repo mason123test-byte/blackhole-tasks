@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { REFERENCE_BLACK_HOLE_FRAGMENT } from "./referenceBlackHoleShader";
 
-describe("incidence-qualified direct-disk dual-band reconstruction", () => {
+describe("incidence-qualified direct-disk warm shelf", () => {
   it("keeps the #561 physical incidence and path-stretch classifier unchanged", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float shortPathWeight = 1.0 - smoothstep(1.05, 1.45, pathStretch);",
@@ -16,31 +16,24 @@ describe("incidence-qualified direct-disk dual-band reconstruction", () => {
       "* (1.0 - smoothstep(0.78, 0.90, directPeak));",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "vec3 thinnedDirect = diskColor * mix(1.0, 0.38, shoulderSuppression);",
+      "diskColor *= mix(1.0, 0.38, shoulderSuppression);",
     );
   });
 
-  it("separates warm low-frequency response from the high-frequency knife core", () => {
+  it("uses a nonlinear sub-white warm shelf instead of scanning #567 tint strength", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float warmVeilSupport = smoothstep(0.22, 0.68, shoulderSuppression);",
+      "float warmShelfSupport = smoothstep(0.22, 0.68, shoulderSuppression);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "vec3 warmLowFrequency = mix(thinnedDirect, max(thinnedDirect, warmVeil), warmVeilSupport);",
+      "float warmShelfPeak = min(0.68, max(0.0, directPeak * 0.94));",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float knifeCoreSupport = candidateWeight",
+      "vec3 warmShelf = vec3(1.0, 0.93, 0.74) * warmShelfPeak;",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "* smoothstep(0.76, 0.88, directPeak)",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "vec3 directHighFrequency = directKnifeCore * knifeCoreSupport;",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "diskColor = max(warmLowFrequency, directHighFrequency);",
+      "diskColor = mix(diskColor, max(diskColor, warmShelf), warmShelfSupport);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("directPeak * 0.78");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("ridgeNeighborPeak");
   });
 
   it("keeps geometry and forbidden screen-space paths unchanged", () => {
