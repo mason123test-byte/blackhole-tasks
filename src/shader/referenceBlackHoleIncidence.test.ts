@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { REFERENCE_BLACK_HOLE_FRAGMENT } from "./referenceBlackHoleShader";
 
-describe("incidence-qualified direct-disk Jacobi conjugate-history core", () => {
-  it("keeps the accepted #561/#571 transfer classifier and warm shelf unchanged", () => {
+describe("incidence-qualified direct-disk warm shelf", () => {
+  it("keeps the #561 physical incidence and path-stretch classifier unchanged", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float shortPathWeight = 1.0 - smoothstep(1.05, 1.45, pathStretch);",
     );
@@ -10,41 +10,30 @@ describe("incidence-qualified direct-disk Jacobi conjugate-history core", () => 
       "float grazingWeight = 1.0 - smoothstep(0.07, 0.26, incidenceCosine);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float shoulderBand = smoothstep(0.58, 0.72, directPeak)",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "* (1.0 - smoothstep(0.78, 0.90, directPeak));",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "diskColor *= mix(1.0, 0.38, shoulderSuppression);",
     );
+  });
+
+  it("uses a nonlinear sub-white warm shelf instead of scanning #567 tint strength", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float warmShelfSupport = smoothstep(0.22, 0.68, shoulderSuppression);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float warmShelfPeak = min(0.68, max(0.0, directPeak * 0.94));",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "vec3 warmShelf = vec3(1.0, 0.93, 0.74) * warmShelfPeak;",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "diskColor = mix(diskColor, max(diskColor, warmShelf), warmShelfSupport);",
     );
-  });
-
-  it("tracks the minimum coupled-Jacobi rank ratio along the physical path before first hit", () => {
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float polarMomentumCoherence = 1.0 - smoothstep(0.10, 0.22, polarMomentum);",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float compactBundleWeight = smoothstep(3.2, 5.2, incidenceJacobian);",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float minJacobiRankRatio = 1.0;",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float pathRankRatio = clamp(2.0 * pathDeterminant / max(pathFrobenius2, 1e-5), 0.0, 1.0);",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "minJacobiRankRatio = min(minJacobiRankRatio, pathRankRatio);",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float historicalRankRatio = min(minJacobiRankRatio, hitRankRatio);",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float conjugateProximity = 1.0 - historicalRankRatio;",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("jacobiRankDeficiency");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("jacobiShearWeight");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("jacobiCompression");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("directPeak * 0.78");
   });
 
   it("keeps geometry and forbidden screen-space paths unchanged", () => {
