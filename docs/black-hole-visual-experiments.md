@@ -196,3 +196,21 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 - #599 confirms that a local screen-to-transfer derivative is the right class of discriminator: unlike #591, it materially reduces #585 thickness and restores lower/warm energy without losing horizontal continuity.
 - Do not fine-scan the first-order incidence derivative. A future direct-core attempt should preserve the idea of local bundle compactness but use a more caustic-specific quantity, such as curvature/second derivative of the transfer map or an analytic determinant-like combination, while retaining the accepted #571 baseline and frozen geometry.
 - `#571` remains the accepted production baseline.
+
+## Post-#603 update
+
+### #603 — three-point polar-transfer curvature gate
+- Candidate `734e2d536c925dbd788b2ed5f63cc6b5e6fbc31c`; Windows Build `#603`, run ID `32450568043`, workflow ID `328346937`.
+- Artifact `9435633965`, digest `sha256:b060d15dc443a512b4e63c55e4e5724192ce4024b212a682e1839b71b775ea2e`.
+- Kept #571 path-stretch/local-incidence shoulder shaping and warm shelf unchanged and kept #585 polar-momentum continuity semantics unchanged. Added a three-point local transfer-curvature discriminator: camera-up offsets `±0.002` are passed only through `initDngrCameraRay` to obtain neighboring Kerr invariants, and at the current physical disk crossing radius `polarPlus - 2*polarMomentum + polarMinus` estimates the second derivative of local polar momentum. It is normalized by the first-difference span as `foldCurvature = abs(secondDifference) / max(abs(polarPlus - polarMinus), 1e-5)` and mapped by `smoothstep(0.08, 0.22, foldCurvature)`. No neighboring geodesic integration, framebuffer-neighbor sampling, geometry change, compositor change or second renderer was introduced.
+- Same fixed #479 validation definitions: #479 -> #603 average bright-core thickness `2.211 -> 2.608 px` (+17.9%), median `2 -> 2 px`, `>180` core pixels `199 -> 133`, high-intensity columns `90 -> 51`, longest contiguous >180 run `38 -> 31`, direct span `682 -> 682 px`, lower bright `10817 -> 10640` (-1.6%), warm coverage `30816 -> 29846` (-3.1%), shadow `>5` count `152 -> 152`, dead-white `0 -> 0`.
+- Relative to #599, average selected-core thickness worsens `2.161 -> 2.608 px`, core pixels fall `309 -> 133`, high-intensity columns collapse `143 -> 51`, longest contiguous run falls `45 -> 31`, while lower bright/warm return very close to accepted #571/#479 levels and direct span/shadow/dead-white remain unchanged.
+- Actual Windows `visual-candidate.png`, `visual-baseline.png`, `visual-split.png`, expanded screenshot, #479/#571/#599/#603 original-size comparison, and #479/#571/#599/#603 core enlargement were opened before verdict.
+- Visual result: second-order curvature is genuinely more caustic-specific, but in this normalized one-dimensional form it selects only a subset of still-thick bright segments rather than a long 1px ridge. It therefore loses the main continuity advantage of #599 without solving median thickness.
+- Verdict: rejected. Do not scan the `0.08–0.22` fold-curvature gate or nearby scalar variants. The next direct-core attempt should not be another 1D derivative threshold; it needs either a genuinely two-dimensional transfer-area/Jacobian determinant proxy or a different independent physical observable.
+
+### Current lesson after #603
+- #599 remains the strongest rejected continuity/energy compromise: first-order local incidence Jacobian kept 143 bright columns and restored lower/warm energy, but stayed ~2 px thick.
+- #603 shows that simply moving from first derivative to normalized second derivative over-selects localized folds: continuity collapses while selected segments remain 2 px-class.
+- Do not combine or fine-scan #599/#603 scalar windows as a rescue. A future continuation attempt should derive a 2D transfer-area / determinant-like proxy from independent camera-right and camera-up invariant responses, without tracing neighboring geodesics or sampling neighboring framebuffer pixels.
+- `#571` remains the accepted production baseline.
