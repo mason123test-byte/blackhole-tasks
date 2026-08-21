@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { REFERENCE_BLACK_HOLE_FRAGMENT } from "./referenceBlackHoleShader";
 
-describe("incidence-qualified direct-disk warm shelf", () => {
-  it("keeps the #561 physical incidence and path-stretch classifier unchanged", () => {
+describe("incidence-qualified direct-disk propagated Jacobi core", () => {
+  it("keeps the accepted #561/#571 transfer classifier and warm shelf unchanged", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float shortPathWeight = 1.0 - smoothstep(1.05, 1.45, pathStretch);",
     );
@@ -18,22 +18,39 @@ describe("incidence-qualified direct-disk warm shelf", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "diskColor *= mix(1.0, 0.38, shoulderSuppression);",
     );
-  });
-
-  it("uses a nonlinear sub-white warm shelf instead of scanning #567 tint strength", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float warmShelfSupport = smoothstep(0.22, 0.68, shoulderSuppression);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float warmShelfPeak = min(0.68, max(0.0, directPeak * 0.94));",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "vec3 warmShelf = vec3(1.0, 0.93, 0.74) * warmShelfPeak;",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "diskColor = mix(diskColor, max(diskColor, warmShelf), warmShelfSupport);",
     );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("directPeak * 0.78");
+  });
+
+  it("keeps #599 continuity gates and adds one propagated scalar Jacobi focusing state", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float polarMomentumCoherence = 1.0 - smoothstep(0.10, 0.22, polarMomentum);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float compactBundleWeight = smoothstep(3.2, 5.2, incidenceJacobian);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float jacobiSeparation = 0.0; float jacobiSlope = 1.0;",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float opticalTidalCurvature = 3.0 / max(r * r * r, 1.0);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "jacobiSlope -= opticalTidalCurvature * jacobiSeparation * acceptedStepLength;",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float jacobiCompression = clamp(1.0 - jacobiScale, 0.0, 1.0);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float jacobiFocusingWeight = smoothstep(0.035, 0.11, jacobiCompression);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("momentumShearWeight");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("transferAreaWeight");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("foldCurvature");
   });
 
   it("keeps geometry and forbidden screen-space paths unchanged", () => {

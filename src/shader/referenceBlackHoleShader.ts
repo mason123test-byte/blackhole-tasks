@@ -25,10 +25,29 @@ float diskLocalIncidenceCosine(float diskRadius, float L, float kappa) {
   return localTheta / max(length(vec3(localRadial, localTheta, localPhi)), 1e-4);
 }
 
+float diskLocalPolarMomentum(float diskRadius, float L, float kappa) {
+  float equatorialPtheta = sqrt(max(kappa - KERR_A2 - L * L, 0.0));
+  return equatorialPtheta / max(diskRadius, 1e-4);
+}
+
+float diskIncidenceCameraJacobian(float diskRadius, vec2 cameraPlane) {
+  const float bundleEpsilon = 0.002;
+  float rPlus; float thetaPlus; float phiPlus; float prPlus; float pthetaPlus; float LPlus; float kappaPlus;
+  float rMinus; float thetaMinus; float phiMinus; float prMinus; float pthetaMinus; float LMinus; float kappaMinus;
+  initDngrCameraRay(cameraPlane.x, cameraPlane.y + bundleEpsilon, rPlus, thetaPlus, phiPlus, prPlus, pthetaPlus, LPlus, kappaPlus);
+  initDngrCameraRay(cameraPlane.x, cameraPlane.y - bundleEpsilon, rMinus, thetaMinus, phiMinus, prMinus, pthetaMinus, LMinus, kappaMinus);
+  float incidencePlus = diskLocalIncidenceCosine(diskRadius, LPlus, kappaPlus);
+  float incidenceMinus = diskLocalIncidenceCosine(diskRadius, LMinus, kappaMinus);
+  return abs(incidencePlus - incidenceMinus) / (2.0 * bundleEpsilon);
+}
+
 void shapeIncidenceQualifiedDirectShoulder(
   float candidateWeight,
   float pathStretch,
   float incidenceCosine,
+  float polarMomentum,
+  float incidenceJacobian,
+  float jacobiCompression,
   inout vec3 diskColor,
   float diskAlpha
 ) {
@@ -50,6 +69,17 @@ void shapeIncidenceQualifiedDirectShoulder(
   float warmShelfPeak = min(0.68, max(0.0, directPeak * 0.94));
   vec3 warmShelf = vec3(1.0, 0.93, 0.74) * warmShelfPeak;
   diskColor = mix(diskColor, max(diskColor, warmShelf), warmShelfSupport);
+
+  float polarMomentumCoherence = 1.0 - smoothstep(0.10, 0.22, polarMomentum);
+  float compactBundleWeight = smoothstep(3.2, 5.2, incidenceJacobian);
+  float jacobiFocusingWeight = smoothstep(0.035, 0.11, jacobiCompression);
+  float transferCoreSupport = candidateWeight
+    * directTransferWeight
+    * polarMomentumCoherence
+    * compactBundleWeight
+    * jacobiFocusingWeight;
+  vec3 transferKnifeCore = vec3(1.0, 0.965, 0.84) * 0.82;
+  diskColor = max(diskColor, transferKnifeCore * transferCoreSupport);
 }
 `;
 
@@ -62,7 +92,7 @@ fragment = replaceOnce(
 fragment = replaceOnce(
   fragment,
   "  bool captured = false; int diskCrossingCount = 0; vec3 accumulatedDisk = vec3(0.0); float transmittance = 1.0;",
-  "  bool captured = false; int diskCrossingCount = 0; vec3 accumulatedDisk = vec3(0.0); float transmittance = 1.0; float pathLength = 0.0;",
+  "  bool captured = false; int diskCrossingCount = 0; vec3 accumulatedDisk = vec3(0.0); float transmittance = 1.0; float pathLength = 0.0; float jacobiSeparation = 0.0; float jacobiSlope = 1.0;",
 );
 fragment = replaceOnce(
   fragment,
@@ -72,12 +102,12 @@ fragment = replaceOnce(
 fragment = replaceOnce(
   fragment,
   "        sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha);\n        float colorGain = crossingColorGain(diskCrossingCount);",
-  `        sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha);\n        if (diskCrossingCount == 0) {\n          float hitPathLength = pathLength + crossing * acceptedStepLength;\n          float radialDirectDistance = max(OBSERVER_R - diskRadius, 1.0);\n          float pathStretch = hitPathLength / radialDirectDistance;\n          float incidenceCosine = diskLocalIncidenceCosine(diskRadius, L, kappa);\n          shapeIncidenceQualifiedDirectShoulder(candidateWeight, pathStretch, incidenceCosine, diskColor, diskAlpha);\n        }\n        float colorGain = crossingColorGain(diskCrossingCount);`,
+  `        sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha);\n        if (diskCrossingCount == 0) {\n          float hitPathLength = pathLength + crossing * acceptedStepLength;\n          float radialDirectDistance = max(OBSERVER_R - diskRadius, 1.0);\n          float pathStretch = hitPathLength / radialDirectDistance;\n          float incidenceCosine = diskLocalIncidenceCosine(diskRadius, L, kappa);\n          float polarMomentum = diskLocalPolarMomentum(diskRadius, L, kappa);\n          float incidenceJacobian = diskIncidenceCameraJacobian(diskRadius, cameraPlane);\n          float hitJacobiSeparation = jacobiSeparation + jacobiSlope * crossing * acceptedStepLength;\n          float jacobiScale = abs(hitJacobiSeparation) / max(hitPathLength, 1e-4);\n          float jacobiCompression = clamp(1.0 - jacobiScale, 0.0, 1.0);\n          shapeIncidenceQualifiedDirectShoulder(candidateWeight, pathStretch, incidenceCosine, polarMomentum, incidenceJacobian, jacobiCompression, diskColor, diskAlpha);\n        }\n        float colorGain = crossingColorGain(diskCrossingCount);`,
 );
 fragment = replaceOnce(
   fragment,
   "    previousSide = side;",
-  "    pathLength += acceptedStepLength;\n    previousSide = side;",
+  "    float opticalTidalCurvature = 3.0 / max(r * r * r, 1.0);\n    jacobiSlope -= opticalTidalCurvature * jacobiSeparation * acceptedStepLength;\n    jacobiSeparation += jacobiSlope * acceptedStepLength;\n    pathLength += acceptedStepLength;\n    previousSide = side;",
 );
 
 export const REFERENCE_BLACK_HOLE_FRAGMENT = fragment;
