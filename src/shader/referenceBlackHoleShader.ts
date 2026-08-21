@@ -29,7 +29,6 @@ void shapeIncidenceQualifiedDirectShoulder(
   float candidateWeight,
   float pathStretch,
   float incidenceCosine,
-  float sourceHighFrequency,
   inout vec3 diskColor,
   float diskAlpha
 ) {
@@ -51,27 +50,10 @@ void shapeIncidenceQualifiedDirectShoulder(
   float warmShelfPeak = min(0.68, max(0.0, directPeak * 0.94));
   vec3 warmShelf = vec3(1.0, 0.93, 0.74) * warmShelfPeak;
   diskColor = mix(diskColor, max(diskColor, warmShelf), warmShelfSupport);
-
-  float sourceCoreSupport = candidateWeight
-    * directTransferWeight
-    * smoothstep(0.055, 0.24, sourceHighFrequency);
-  float sourceCorePeak = min(0.84, directPeak + sourceHighFrequency * 0.22);
-  vec3 sourceKnifeCore = vec3(1.0, 0.965, 0.84) * sourceCorePeak;
-  diskColor = max(diskColor, sourceKnifeCore * sourceCoreSupport);
 }
 `;
 
 let fragment = BASE_REFERENCE_BLACK_HOLE_FRAGMENT;
-fragment = replaceOnce(
-  fragment,
-  "void sampleDiskSurface(float hitRadius, float hitPhi, float patternTime, out vec3 diskColor, out float diskAlpha) {",
-  "void sampleDiskSurface(float hitRadius, float hitPhi, float patternTime, out vec3 diskColor, out float diskAlpha, out float sourceHighFrequency) {",
-);
-fragment = replaceOnce(
-  fragment,
-  "  float physicalLayers = mix(laneStructure * filaments, 1.0, DISK_SOURCE_DIAGNOSTIC);\n  float brightness = radialEmission * streak * grazing;",
-  "  float physicalLayers = mix(laneStructure * filaments, 1.0, DISK_SOURCE_DIAGNOSTIC);\n  float broadSourceLayers = mix(0.60 + 0.18 * pow(secondaryRibbon, 1.5) + 0.12 * fineNoise, 1.0, DISK_SOURCE_DIAGNOSTIC);\n  sourceHighFrequency = max(physicalLayers - broadSourceLayers, 0.0);\n  float brightness = radialEmission * streak * grazing;",
-);
 fragment = replaceOnce(
   fragment,
   "\nvoid rayTracedReference() {",
@@ -89,8 +71,8 @@ fragment = replaceOnce(
 );
 fragment = replaceOnce(
   fragment,
-  "        float diskPhi = mix(previousPhi, phi, crossing); vec3 diskColor; float diskAlpha;\n        sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha);\n        float colorGain = crossingColorGain(diskCrossingCount);",
-  `        float diskPhi = mix(previousPhi, phi, crossing); vec3 diskColor; float diskAlpha; float sourceHighFrequency;\n        sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha, sourceHighFrequency);\n        if (diskCrossingCount == 0) {\n          float hitPathLength = pathLength + crossing * acceptedStepLength;\n          float radialDirectDistance = max(OBSERVER_R - diskRadius, 1.0);\n          float pathStretch = hitPathLength / radialDirectDistance;\n          float incidenceCosine = diskLocalIncidenceCosine(diskRadius, L, kappa);\n          shapeIncidenceQualifiedDirectShoulder(candidateWeight, pathStretch, incidenceCosine, sourceHighFrequency, diskColor, diskAlpha);\n        }\n        float colorGain = crossingColorGain(diskCrossingCount);`,
+  "        sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha);\n        float colorGain = crossingColorGain(diskCrossingCount);",
+  `        sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha);\n        if (diskCrossingCount == 0) {\n          float hitPathLength = pathLength + crossing * acceptedStepLength;\n          float radialDirectDistance = max(OBSERVER_R - diskRadius, 1.0);\n          float pathStretch = hitPathLength / radialDirectDistance;\n          float incidenceCosine = diskLocalIncidenceCosine(diskRadius, L, kappa);\n          shapeIncidenceQualifiedDirectShoulder(candidateWeight, pathStretch, incidenceCosine, diskColor, diskAlpha);\n        }\n        float colorGain = crossingColorGain(diskCrossingCount);`,
 );
 fragment = replaceOnce(
   fragment,
