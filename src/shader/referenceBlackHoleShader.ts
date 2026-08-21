@@ -25,10 +25,17 @@ float diskLocalIncidenceCosine(float diskRadius, float L, float kappa) {
   return localTheta / max(length(vec3(localRadial, localTheta, localPhi)), 1e-4);
 }
 
+float diskLocalPolarMomentum(float diskRadius, float L, float kappa) {
+  float equatorialPtheta = sqrt(max(kappa - KERR_A2 - L * L, 0.0));
+  return equatorialPtheta / max(diskRadius, 1e-4);
+}
+
 void shapeIncidenceQualifiedDirectShoulder(
   float candidateWeight,
   float pathStretch,
   float incidenceCosine,
+  float polarMomentum,
+  float foldCurvature,
   inout vec3 diskColor,
   float diskAlpha
 ) {
@@ -50,6 +57,15 @@ void shapeIncidenceQualifiedDirectShoulder(
   float warmShelfPeak = min(0.68, max(0.0, directPeak * 0.94));
   vec3 warmShelf = vec3(1.0, 0.93, 0.74) * warmShelfPeak;
   diskColor = mix(diskColor, max(diskColor, warmShelf), warmShelfSupport);
+
+  float polarMomentumCoherence = 1.0 - smoothstep(0.10, 0.22, polarMomentum);
+  float causticCurvatureWeight = smoothstep(0.08, 0.22, foldCurvature);
+  float transferCoreSupport = candidateWeight
+    * directTransferWeight
+    * polarMomentumCoherence
+    * causticCurvatureWeight;
+  vec3 transferKnifeCore = vec3(1.0, 0.965, 0.84) * 0.82;
+  diskColor = max(diskColor, transferKnifeCore * transferCoreSupport);
 }
 `;
 
@@ -58,6 +74,11 @@ fragment = replaceOnce(
   fragment,
   "\nvoid rayTracedReference() {",
   `${incidenceHelpers}\nvoid rayTracedReference() {`,
+);
+fragment = replaceOnce(
+  fragment,
+  "  float r; float theta; float phi; float pr; float ptheta; float L; float kappa;\n  initDngrCameraRay(cameraPlane.x, cameraPlane.y, r, theta, phi, pr, ptheta, L, kappa);",
+  `  float r; float theta; float phi; float pr; float ptheta; float L; float kappa;\n  initDngrCameraRay(cameraPlane.x, cameraPlane.y, r, theta, phi, pr, ptheta, L, kappa);\n  float bundleEpsilon = 0.002;\n  float rp; float thetap; float phip; float prp; float pthetap; float Lp; float kappap;\n  float rm; float thetam; float phim; float prm; float pthetam; float Lm; float kappam;\n  initDngrCameraRay(cameraPlane.x, cameraPlane.y + bundleEpsilon, rp, thetap, phip, prp, pthetap, Lp, kappap);\n  initDngrCameraRay(cameraPlane.x, cameraPlane.y - bundleEpsilon, rm, thetam, phim, prm, pthetam, Lm, kappam);`,
 );
 fragment = replaceOnce(
   fragment,
@@ -72,7 +93,7 @@ fragment = replaceOnce(
 fragment = replaceOnce(
   fragment,
   "        sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha);\n        float colorGain = crossingColorGain(diskCrossingCount);",
-  `        sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha);\n        if (diskCrossingCount == 0) {\n          float hitPathLength = pathLength + crossing * acceptedStepLength;\n          float radialDirectDistance = max(OBSERVER_R - diskRadius, 1.0);\n          float pathStretch = hitPathLength / radialDirectDistance;\n          float incidenceCosine = diskLocalIncidenceCosine(diskRadius, L, kappa);\n          shapeIncidenceQualifiedDirectShoulder(candidateWeight, pathStretch, incidenceCosine, diskColor, diskAlpha);\n        }\n        float colorGain = crossingColorGain(diskCrossingCount);`,
+  `        sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha);\n        if (diskCrossingCount == 0) {\n          float hitPathLength = pathLength + crossing * acceptedStepLength;\n          float radialDirectDistance = max(OBSERVER_R - diskRadius, 1.0);\n          float pathStretch = hitPathLength / radialDirectDistance;\n          float incidenceCosine = diskLocalIncidenceCosine(diskRadius, L, kappa);\n          float polarMomentum = diskLocalPolarMomentum(diskRadius, L, kappa);\n          float polarPlus = diskLocalPolarMomentum(diskRadius, Lp, kappap);\n          float polarMinus = diskLocalPolarMomentum(diskRadius, Lm, kappam);\n          float curvatureNumerator = abs(polarPlus - 2.0 * polarMomentum + polarMinus);\n          float slopeSpan = max(abs(polarPlus - polarMinus), 1e-5);\n          float foldCurvature = curvatureNumerator / slopeSpan;\n          shapeIncidenceQualifiedDirectShoulder(candidateWeight, pathStretch, incidenceCosine, polarMomentum, foldCurvature, diskColor, diskAlpha);\n        }\n        float colorGain = crossingColorGain(diskCrossingCount);`,
 );
 fragment = replaceOnce(
   fragment,

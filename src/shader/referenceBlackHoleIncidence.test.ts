@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { REFERENCE_BLACK_HOLE_FRAGMENT } from "./referenceBlackHoleShader";
 
-describe("incidence-qualified direct-disk warm shelf", () => {
-  it("keeps the #561 physical incidence and path-stretch classifier unchanged", () => {
+describe("incidence-qualified direct-disk warm shelf with transfer curvature", () => {
+  it("keeps the #561/#571 physical incidence and path-stretch classifier unchanged", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float shortPathWeight = 1.0 - smoothstep(1.05, 1.45, pathStretch);",
     );
@@ -20,7 +20,7 @@ describe("incidence-qualified direct-disk warm shelf", () => {
     );
   });
 
-  it("uses a nonlinear sub-white warm shelf instead of scanning #567 tint strength", () => {
+  it("keeps the accepted nonlinear sub-white warm shelf unchanged", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float warmShelfSupport = smoothstep(0.22, 0.68, shoulderSuppression);",
     );
@@ -33,7 +33,30 @@ describe("incidence-qualified direct-disk warm shelf", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "diskColor = mix(diskColor, max(diskColor, warmShelf), warmShelfSupport);",
     );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("directPeak * 0.78");
+  });
+
+  it("uses a three-point second-order polar transfer curvature proxy without tracing neighbor geodesics", () => {
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float bundleEpsilon = 0.002;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "initDngrCameraRay(cameraPlane.x, cameraPlane.y + bundleEpsilon",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "initDngrCameraRay(cameraPlane.x, cameraPlane.y - bundleEpsilon",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float curvatureNumerator = abs(polarPlus - 2.0 * polarMomentum + polarMinus);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float foldCurvature = curvatureNumerator / slopeSpan;",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float causticCurvatureWeight = smoothstep(0.08, 0.22, foldCurvature);",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "* causticCurvatureWeight;",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("incidenceJacobian");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("polarPathCoherence");
   });
 
   it("keeps geometry and forbidden screen-space paths unchanged", () => {
