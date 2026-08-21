@@ -175,3 +175,24 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 ## Next experiment target
 
 `#571` remains the accepted baseline. Do not retune its physical classifier or warm shelf, and do not continue #575 source-intensity gates, #581 source-texture residual recovery, #585 standalone polar-momentum reconstruction, or #591 polar-path detour gating. #585 still proves that polar momentum contains useful horizontal continuity, but #591 shows that path detour is not an independent width coordinate for the same broad direct family. A future continuity attempt needs a genuinely local ray-bundle magnification/focusing discriminator (for example an analytically derived transfer/Jacobian proxy), not another accumulated path-length-like scalar. Otherwise leave the accepted direct response unchanged and work on a separate photographic layer without changing geometry.
+
+## Post-#599 update
+
+### #599 — polar-momentum continuity + screen-to-transfer incidence Jacobian
+- Candidate `92ca02ba98e735f671c5f6259da86a70a40288d7`; Windows Build `#599`, run ID `32449303088`, workflow ID `328346937`.
+- Artifact `9435214835`, digest `sha256:b89d38f7d3c5fdc1602d8e345cd18da259b1a27b2c8fd032c6fe9e7ad7236314`.
+- Kept #571 path-stretch/local-incidence shoulder shaping and warm shelf unchanged and kept #585 polar-momentum continuity semantics unchanged. Added one local bundle-width discriminator: at the current physical disk radius, two infinitesimally offset camera-up directions (`±0.002`) are passed only through `initDngrCameraRay` to obtain neighboring Kerr invariants; no neighboring geodesic is integrated. Their local disk incidence difference estimates `|d incidence / d cameraUp|`, mapped through `compactBundleWeight = smoothstep(3.2, 5.2, incidenceJacobian)` and multiplied into #585 core support. No framebuffer-neighbor sampling, second renderer, second geodesic trace, geometry change or compositor change was introduced.
+- Same fixed #479 validation definitions: #479 -> #599 average bright-core thickness `2.211 -> 2.161 px` (-2.3%), median `2 -> 2 px`, `>180` core pixels `199 -> 309`, high-intensity columns `90 -> 143`, longest contiguous >180 run `38 -> 45`, direct span `682 -> 682 px`, lower bright `10817 -> 10988` (+1.6%), warm coverage `30816 -> 30113` (-2.3%), shadow `>5` count `152 -> 152`, dead-white `0 -> 0`.
+- Relative to #585, average thickness improves `2.691 -> 2.161 px` (-19.7%), core pixels `401 -> 309`, high-intensity columns `149 -> 143`, lower bright `17635 -> 10988`, warm coverage `35628 -> 30113`, while longest contiguous run remains strong at `45` and direct span/shadow/dead-white remain unchanged.
+- Actual Windows `visual-candidate.png`, `visual-baseline.png`, #571/#585/#591/#599 original-size comparison, and #479/#571/#585/#591/#599 core enlargement were opened before verdict.
+- Visual result: this is the first local Jacobian-style discriminator that clearly removes most of #585's broad energy while retaining strong horizontal continuity and restoring lower/warm energy to the accepted band. However the direct high-intensity ridge remains visually about 2 px thick: average thickness is only 2.3% below #479 and the median remains 2 px, so it does not meet the required >=15% thinning / 1px-class target.
+- Verdict: rejected. Do not scan the `3.2–5.2` incidence-Jacobian gate or nearby scalar thresholds. The topology is materially better than #591, but this first-order incidence derivative still does not isolate the 1px transfer caustic.
+
+### #599 operational note
+- During candidate preparation, accidental contents-API commit `53d51d6a74757b93421312cc9cabd118dc52813b` added `DO_NOT_USE.txt`. It was not an experiment and contained no production change.
+- The immediately following forward Git-object candidate commit `92ca02ba98e735f671c5f6259da86a70a40288d7` deleted that file while adding the intended shader/test changes. Net diff from the accepted #571 restore contains exactly the two intended files; no reset, rebase or force push was used.
+
+### Current lesson after #599
+- #599 confirms that a local screen-to-transfer derivative is the right class of discriminator: unlike #591, it materially reduces #585 thickness and restores lower/warm energy without losing horizontal continuity.
+- Do not fine-scan the first-order incidence derivative. A future direct-core attempt should preserve the idea of local bundle compactness but use a more caustic-specific quantity, such as curvature/second derivative of the transfer map or an analytic determinant-like combination, while retaining the accepted #571 baseline and frozen geometry.
+- `#571` remains the accepted production baseline.
