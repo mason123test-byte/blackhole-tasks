@@ -25,10 +25,16 @@ float diskLocalIncidenceCosine(float diskRadius, float L, float kappa) {
   return localTheta / max(length(vec3(localRadial, localTheta, localPhi)), 1e-4);
 }
 
+float diskLocalPolarMomentum(float diskRadius, float L, float kappa) {
+  float equatorialPtheta = sqrt(max(kappa - KERR_A2 - L * L, 0.0));
+  return equatorialPtheta / max(diskRadius, 1e-4);
+}
+
 void shapeIncidenceQualifiedDirectShoulder(
   float candidateWeight,
   float pathStretch,
   float incidenceCosine,
+  float polarMomentum,
   inout vec3 diskColor,
   float diskAlpha
 ) {
@@ -50,6 +56,11 @@ void shapeIncidenceQualifiedDirectShoulder(
   float warmShelfPeak = min(0.68, max(0.0, directPeak * 0.94));
   vec3 warmShelf = vec3(1.0, 0.93, 0.74) * warmShelfPeak;
   diskColor = mix(diskColor, max(diskColor, warmShelf), warmShelfSupport);
+
+  float polarCoherence = 1.0 - smoothstep(0.10, 0.22, polarMomentum);
+  float transferCoreSupport = candidateWeight * directTransferWeight * polarCoherence;
+  vec3 transferKnifeCore = vec3(1.0, 0.965, 0.84) * 0.82;
+  diskColor = max(diskColor, transferKnifeCore * transferCoreSupport);
 }
 `;
 
@@ -72,7 +83,7 @@ fragment = replaceOnce(
 fragment = replaceOnce(
   fragment,
   "        sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha);\n        float colorGain = crossingColorGain(diskCrossingCount);",
-  `        sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha);\n        if (diskCrossingCount == 0) {\n          float hitPathLength = pathLength + crossing * acceptedStepLength;\n          float radialDirectDistance = max(OBSERVER_R - diskRadius, 1.0);\n          float pathStretch = hitPathLength / radialDirectDistance;\n          float incidenceCosine = diskLocalIncidenceCosine(diskRadius, L, kappa);\n          shapeIncidenceQualifiedDirectShoulder(candidateWeight, pathStretch, incidenceCosine, diskColor, diskAlpha);\n        }\n        float colorGain = crossingColorGain(diskCrossingCount);`,
+  `        sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha);\n        if (diskCrossingCount == 0) {\n          float hitPathLength = pathLength + crossing * acceptedStepLength;\n          float radialDirectDistance = max(OBSERVER_R - diskRadius, 1.0);\n          float pathStretch = hitPathLength / radialDirectDistance;\n          float incidenceCosine = diskLocalIncidenceCosine(diskRadius, L, kappa);\n          float polarMomentum = diskLocalPolarMomentum(diskRadius, L, kappa);\n          shapeIncidenceQualifiedDirectShoulder(candidateWeight, pathStretch, incidenceCosine, polarMomentum, diskColor, diskAlpha);\n        }\n        float colorGain = crossingColorGain(diskCrossingCount);`,
 );
 fragment = replaceOnce(
   fragment,
