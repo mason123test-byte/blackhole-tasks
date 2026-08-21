@@ -122,6 +122,16 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 - Visual result: the source residual is a genuinely independent physical signal and restores more bright samples than #575/#571, but the added energy appears as sparse source-structure highlights rather than a visibly continuous horizontal knife edge. At original size the change from #571 is modest, and the core enlargement shows only short runs/speckles rather than the required long high-intensity ridge.
 - Verdict: rejected. Do not scan the `sourceHighFrequency` support window `0.055–0.24`, the `+0.22` source-core lift, or nearby gains. The signal is physically independent but its topology is source texture, not the transfer continuity needed for a long knife-edge core.
 
+### #585 — Kerr local-polar-momentum coherence core
+- Candidate `33216e2b5b87c09d963ac02dc44858de3d8c8b4f`; Windows Build `#585`, run ID `32437680295`, workflow ID `328346937`.
+- Artifact `9431425755`, digest `sha256:d092879661eb61271ae3d9a63d1df910fffb9de1ee821c39d826cd6ec980004c`.
+- Kept #571 path-stretch/local-incidence classification, shoulder suppression and warm shelf unchanged, then derived `diskLocalPolarMomentum = sqrt(max(kappa - KERR_A2 - L*L, 0.0)) / diskRadius`. Only direct first-crossing rays already qualified by #571 could reconstruct a sub-white core through `polarCoherence = 1.0 - smoothstep(0.10, 0.22, polarMomentum)` and a fixed `0.82` warm core level. No screen-space y selector, neighborhood ridge selector, source-texture gate, geometry change or second renderer was introduced.
+- Same fixed #479 validation definitions: #479 -> #585 average bright-core thickness `2.211 -> 2.691 px` (+21.7%), median `2 -> 2 px`, `>180` core pixels `199 -> 401`, high-intensity columns `90 -> 149`, longest contiguous >180 run `38 -> 58`, direct span `682 -> 682 px`, lower bright `10817 -> 17635` (+63.0%), warm coverage `30816 -> 35628` (+15.6%), shadow `>5` count `152 -> 152`, dead-white `0 -> 0`.
+- Relative to accepted #571: average thickness `1.192 -> 2.691 px`, median `1 -> 2 px`, high-intensity columns `26 -> 149`, longest contiguous run `7 -> 58`, while lower bright and warm coverage increase far beyond their allowed bands.
+- Actual Windows `visual-candidate.png`, `visual-baseline.png`, `visual-split.png`, expanded screenshot, #479/#571/#585 original-size comparison, and #479/#571/#585 core enlargement were opened before verdict.
+- Visual result: polar momentum is genuinely transfer-domain and produces the first strong horizontal continuity recovery, but it does so by lighting a broad first-crossing strip rather than isolating a ~1px knife edge. The direct core becomes visibly thicker than #479 and the lower/warm response is substantially over-raised.
+- Verdict: rejected. Do not scan the `0.10–0.22` polar-momentum window, the fixed `0.82` core level, or nearby scalar variants. The signal is too broad as a standalone core-support coordinate; continuity without an independent vertical-width/Jacobian discriminator simply recreates a thick bright band.
+
 ## Current exclusions / lessons
 
 1. Do not increase global flare weights without core protection.
@@ -137,7 +147,8 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 11. Do not return to #567 scalar tint recovery. The accepted solution uses a separate sub-white warm shelf topology.
 12. Do not add another source-intensity/alpha-only knife-core gate on top of #571; #575 proved it does not create additional horizontal continuity.
 13. Do not continue source-texture residual recovery from #581; it increases sparse bright samples but does not create the required long transfer-continuous knife edge.
-14. Geometry remains frozen. Any future baseline must preserve #571's direct span, lower image, shadow cleanliness and full Kerr geometry.
+14. Do not continue standalone local-polar-momentum core reconstruction from #585; it restores continuity by broadening the bright strip and heavily over-raises lower/warm energy.
+15. Geometry remains frozen. Any future baseline must preserve #571's direct span, lower image, shadow cleanliness and full Kerr geometry.
 
 ## Operational validation notes
 
@@ -148,8 +159,8 @@ This file records Windows-validated black-hole visual tuning experiments on `age
 - During #553 preparation, accidental `DO_NOT_USE` commit `80d04d006dde3e500d51dc27866b7e752f2cead6` was immediately cleaned by forward commit `fa31d802493c2521af1408bf035fe668d08a544f`; no reset/rebase/force.
 - #553's first visual attempt failed after partial capture; identical rerun succeeded.
 - #559's initial workflow was cancelled before any step; same SHA later validated successfully.
-- Required #559, #561, #567, #571, #575 and #581 Windows screenshots plus baseline comparisons were opened before verdicts.
+- Required #559, #561, #567, #571, #575, #581 and #585 Windows screenshots plus baseline comparisons were opened before verdicts.
 
 ## Next experiment target
 
-`#571` remains the accepted baseline. Do not retune its physical classifier or warm shelf, and do not continue #575 source-intensity gates or #581 source-texture residual recovery. A future direct-core continuity attempt needs a transfer-domain signal that is longitudinally coherent across the direct image (for example a physically derived transfer/Jacobian or ray-bundle coherence quantity); otherwise leave the accepted direct response unchanged and work on a separate photographic layer such as higher-order/lower-image tonal separation without changing geometry.
+`#571` remains the accepted baseline. Do not retune its physical classifier or warm shelf, and do not continue #575 source-intensity gates, #581 source-texture residual recovery, or #585 standalone polar-momentum reconstruction. #585 proves that a smooth transfer-domain coordinate can recover horizontal continuity, but an acceptable next attempt needs a genuinely independent vertical-width / ray-bundle magnification discriminator so that continuity is retained without broadening the strip. Otherwise leave the accepted direct response unchanged and work on a separate photographic layer such as higher-order/lower-image tonal separation without changing geometry.
