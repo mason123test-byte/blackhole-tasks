@@ -1,216 +1,133 @@
 # Black-hole visual experiment log
 
-This file records Windows-validated black-hole visual tuning experiments on `agent/initial-blackhole-tasks`.
+This file is the canonical experiment registry for `agent/initial-blackhole-tasks`.
+It was consolidated after #627 because #607/#613/#621 had been recorded in scattered follow-up files/commits instead of this canonical path. Older verbose detail remains available in Git history, including prior canonical blob `c9f461a90a95edc52c0f4c3fba7d15ad43e30df8` and experiment-specific history. This registry preserves the acceptance baseline, fixed measurement definitions, every active exclusion family, and the recent propagation experiments needed to avoid duplicate work.
 
-## Rules
+## Permanent rules
 
-- `#571` is the current accepted visual baseline.
-- Geometry is frozen: do not change `DISK_OUTER`, `OBSERVER_THETA`, Kerr/geodesic stepping, disk crossing structure, BH/disk/observer geometry, or use screen-space geometry patches.
-- No Canvas2D, framebuffer mirror/flip, copied lower half, fake annulus, alternate fallback renderer, or `screen.y` upper/lower hard patches.
-- One experiment changes one main photometric variable or one independent visual layer.
-- Shader implementation and its test must be committed atomically.
-- A candidate is not accepted until the Windows visual workflow succeeds and actual artifact screenshots are opened and compared.
-- Rejected mechanisms are recorded so later rounds do not re-scan the same weak selector or parameter family.
+- Current accepted visual baseline: `#571`.
+- Frozen geometry: do not change `DISK_OUTER`, `OBSERVER_THETA`, Kerr/geodesic stepping, disk-crossing structure, BH/disk/observer geometry, or use geometry changes to fake photometric improvement.
+- One WebGL2 numerical Kerr path only. No Canvas2D, framebuffer mirror/flip, copied lower half, fake annulus, second renderer, silent fallback, `screen.y` hard patches, or screen-space neighborhood ridge selector.
+- Do not use source texture/final RGB brightness as a transfer classifier.
+- Candidate implementation + test are atomic; `update_ref` is fast-forward only (`force=false`). No reset/rebase/force push/noop/temp files.
+- Every candidate requires GitHub-hosted Windows `windows-latest`, runnable Tauri release EXE, native WebView2 capture, artifact upload, actual image inspection, and fixed-metric validation before acceptance.
+- Rejected candidates are logged, then production is forward-restored to the accepted baseline before any new topology is mounted.
 
-## Accepted baseline history
+## Fixed visual measurements
 
-### #473 — geometry compromise accepted
-- Commit `3ec58116fb952f62a3edde360eee682f1e59aca0`.
-- `DISK_OUTER=35M`; geometry frozen after this point.
+- Core ROI: `y330:385, x80:840`; bright-core pixel = mean RGB `>180`.
+- High-intensity columns: core ROI x-columns containing >=1 bright-core pixel.
+- Average core thickness: bright-core pixels / active high-intensity columns.
+- Median thickness: median bright-core pixel count among active columns.
+- Longest run: longest contiguous run of active high-intensity columns.
+- Lower ROI: `y360:510, x80:840`; mean RGB `>60`.
+- Warm ROI: `y180:520, x80:840`; `R > B + 8` and mean RGB `>60`.
+- Direct span: row `y=354`, mean RGB `>60`, max-x minus min-x + 1.
+- Shadow ROI: `y285:345, x410:510`, mean RGB `>5`.
+- Dead white: exact RGB `(255,255,255)` count.
+- Measurement scripts/ROIs/thresholds are frozen.
 
-### #475 — warm filmic highlight response
-- Commit `f765aa8ab137e088a44caae7dea76bdfd2b85df8`.
-- Added warm ivory / pale-gold highlight response and protected veiling flare.
+## Accepted baseline
 
-### #479 — protected warm veil baseline
-- Commit `8e83056d29f6bda610700dba6ca09be9e89fd7a4`.
-- Added `flareCoreReject = 1.0 - 0.82 * smoothstep(0.56, 0.82, basePeak)`.
-- Accepted because it kept the stronger outer veil while preventing the direct core from becoming thick and overexposed.
-- This remained the production baseline through the rejected #481–#567 experiments.
+### #571 — incidence-qualified thinning + sub-white warm shoulder shelf — ACCEPTED
+- Candidate `d837208847b9f0ec307f1d100d14759271bb7b2b`.
+- Windows Build `#571`; run `32385189946`; workflow `328346937`.
+- Artifact `9412866330`; digest `sha256:02996f49b3622af1942321d7011443e7ffee2eec2107493ec7bd7bf182f08e99`.
+- Physical classifier: first crossing + path stretch `1.05–1.45` + local incidence `0.07–0.26`; shoulder `0.58–0.72`, suppression floor `0.38`, high-core protection unchanged.
+- Warm shelf: support `0.22–0.68`, peak `min(0.68, directPeak*0.94)`, tint `vec3(1.0,0.93,0.74)`.
+- Metrics: average `1.1923076923 px`; median `1`; core `31`; columns `26`; longest `7`; span `682`; lower `10636`; warm `29693`; shadow `152`; dead white `0`.
+- Strength: true ~1px core and stable geometry/lower/warm/shadow. Weakness: horizontal high-intensity continuity is too short.
+- Production blobs: `referenceBlackHoleShader.ts=130745839c509a727d409992b086e72a6908ce5b`, `referenceBlackHoleIncidence.test.ts=84b2577676b0bc7fc0617bdf14ab68fb5c6bb9a4`, `blackHoleRenderer.ts=ec217566ab098891461ecb35e94dfa2d8827dd96`, `blackHoleRenderer.test.ts=c666e899a98deb32e4b6f1ceccf0b1f567484af0`, `referenceBlackHoleShaderBaseline.ts=bc4c6f96dad7f32d6ba671b85371803a079c6b3c`.
 
-### #571 — incidence-qualified thinning + sub-white warm shoulder shelf
-- Candidate commit `d837208847b9f0ec307f1d100d14759271bb7b2b`.
-- Windows Build `#571`, run ID `32385189946`, workflow ID `328346937`.
-- Artifact `9412866330`, digest `sha256:02996f49b3622af1942321d7011443e7ffee2eec2107493ec7bd7bf182f08e99`.
-- Physical classifier is unchanged from #561: crossing 0 + path stretch `1.05–1.45` + local incidence gate `0.07–0.26`; suppressed shoulder remains `0.58–0.72` with `0.38` floor and the same high-core protection.
-- New response topology only: after thinning, the selected shoulder is mapped through a nonlinear sub-white warm shelf: `warmShelfSupport = smoothstep(0.22, 0.68, shoulderSuppression)`, `warmShelfPeak = min(0.68, directPeak * 0.94)`, tint `vec3(1.0, 0.93, 0.74)`.
-- Same fixed validation definitions used for #479/#571: core ROI `y330:385, x80:840`, mean RGB `>180`; lower ROI `y360:510, x80:840`, mean RGB `>60`; warm ROI `y180:520, x80:840`, `R > B + 8` and mean RGB `>60`; direct span on row `y=354`, mean RGB `>60`; fixed central shadow ROI `y285:345, x410:510`, mean RGB `>5`.
-- #479 -> #571: average bright-core thickness `2.211 -> 1.192 px` (-46.1%), median `2 -> 1 px`, `>180` core pixels `199 -> 31`, high-intensity columns `90 -> 26`, direct span `682 -> 682 px`, lower bright `10817 -> 10636` (-1.7%), warm coverage `30816 -> 29693` (-3.6%), shadow `>5` count `152 -> 152`, dead-white `0 -> 0`.
-- Required Windows `visual-candidate.png`, `visual-baseline.png`, `visual-split.png`, expanded screenshot, and #479/#561/#567/#571 original-size/core comparisons were opened before verdict.
-- Visual result: the horizontal direct disk stays full-length and warm, the lower image and shadow remain intact, while the direct high-intensity ridge becomes visibly thinner and more separated from the warm shoulder. No grey fog or dead-white expansion was observed.
-- Verdict: accepted. `#571` replaces `#479` as the current visual baseline.
+## Active exclusions from earlier experiments
 
-## Rejected / low-value experiments
+1. No global flare increase without independent core protection (#477).
+2. No far-flare LOD `6.0–7.0` sweep (#481/#483).
+3. No strong generic screen-space negative-detail suppression (#485/#487/#489).
+4. No simple `microCore` strength raising (#491/#493).
+5. No screen-space neighbor ridge selectors (#513/#517).
+6. No multi-scale 1px/2px screen-space redistribution/gain scan (#527/#529).
+7. First crossing alone is not a direct-image identity (#535).
+8. Radial-leg identity is too broad (#541).
+9. Raw `diskPhi` is not a sufficient direct-image identity; do not scan `1.15–2.75` (#545).
+10. Standalone path stretch broad suppression is too destructive (#553); path stretch only works with incidence qualification.
+11. Do not retune the accepted #561/#571 path-stretch/local-incidence semantic gates or shoulder threshold family (#559/#561).
+12. Do not return to #567 scalar warm-tint recovery (`0.78/0.60/0.84`).
+13. No source peak/alpha-only knife-core scan (#575: peak `0.76–0.88`, alpha `0.44–0.72`, nearby core strengths).
+14. No source-texture residual recovery scan (#581: support `0.055–0.24`, `+0.22` lift, nearby gains).
+15. No standalone local-polar-momentum core reconstruction scan (#585: `0.10–0.22`, fixed `0.82`, nearby scalar variants). Polar momentum is retained only as known continuity semantics when paired with an independent width discriminator.
+16. No polar-path detour scan (#591: `1.02–1.18`).
+17. No first-order incidence-Jacobian threshold scan (#599: `3.2–5.2`). It may remain unchanged as known continuity support, but its scalar window is frozen.
+18. No normalized second-derivative/fold-curvature scan (#603: `0.08–0.22`).
+19. No `polarMomentum + incidenceCosine` 2D transfer determinant scan (#607: `0.45–1.35`).
+20. No crossing-point radial/polar momentum-gradient shear scan (#613: `0.30–0.70`).
+21. No propagated single-axis scalar Jacobi-compression scan (#621: `0.035–0.11`).
+22. No uncoupled two-polarization Jacobi-shear threshold scan (#627: `0.045–0.16`).
+23. Geometry remains frozen.
 
-### #477 — stronger veiling flare
-- Commit `e991501b4e8e844c6c7440731983aee9c8880394`.
-- Core and overexposure increased strongly. Do not globally raise flare weights without independent core protection.
+## Recent continuity / width experiments
 
-### #481 / #483 — far-flare LOD radius scan
-- #481 `d39da653d6ad8397f30980b603fb05f825219f87`, LOD 7.0; #483 `7dfe8f1c73c6b3fbbbec73323e92e067f056fcf8`, LOD 6.5.
-- Wider far flare reduced local warmth without a clear advantage. Do not continue fine scans in `6.0–7.0` unless another independent layer changes the response materially.
+### #599 — polar-momentum continuity + first-order incidence Jacobian — REJECTED
+- Candidate `92ca02ba98e735f671c5f6259da86a70a40288d7`; Windows Build `#599`; run `32449303088`; workflow `328346937`.
+- Artifact `9435214835`; digest `sha256:b89d38f7d3c5fdc1602d8e345cd18da259b1a27b2c8fd032c6fe9e7ad7236314`.
+- Topology: keep #571 response, add polar-momentum continuity, then use camera-up `±0.002` only through `initDngrCameraRay` to estimate local `|d incidence/d cameraUp|`; no neighboring geodesic integration.
+- Metrics: average `2.1608391608`; median `2`; core `309`; columns `143`; longest `45`; span `682`; lower `10988`; warm `30113`; shadow `152`; dead `0`.
+- Visual: first strong continuity recovery with acceptable lower/warm energy, but still a ~2px bright band.
+- Root cause: first-order local slope is not a 1px caustic-width discriminator.
+- Do not scan `3.2–5.2` or nearby scalar thresholds.
 
-### #485 / #487 / #489 — local micro-contrast shoulder suppression
-- #487 used `microShoulder=0.88`; #489 used `0.78`.
-- Stronger negative-detail suppression made the ridge thinner but removed warm/lower light and photographic richness. Do not push this mechanism harder.
+### #603 — three-point polar-transfer curvature — REJECTED
+- Candidate `734e2d536c925dbd788b2ed5f63cc6b5e6fbc31c`; Build `#603`; run `32450568043`; artifact `9435633965`; digest `sha256:b060d15dc443a512b4e63c55e4e5724192ce4024b212a682e1839b71b775ea2e`.
+- Metrics: average `2.608`; median `2`; core `133`; columns `51`; longest `31`; span `682`; lower `10640`; warm `29846`; shadow `152`; dead `0`.
+- Visual/root cause: normalized second derivative selects localized still-thick folds and destroys #599 continuity. Do not scan `0.08–0.22`.
 
-### #491 / #493 — isolated positive-detail core
-- #491 `40b64c24788c87804a9a8e6702e213c52b661ed6`, `microCore=0.28`; #493 `808251557aa232756e239978630aa9344d295ef0`, `microCore=0.42`.
-- More strength raised peak brightness but did not materially narrow the core. Do not simply raise `microCore` further.
+### #607 — `polarMomentum + incidenceCosine` transfer-area determinant — REJECTED
+- Candidate `b3e3fbe49a26f78f6cde04502a28d55f0d78e749`; Build `#607`; run `32458144578`; workflow `328346937`.
+- Artifact `9438113192`; digest `sha256:044bd57ab62b6122cc898323837e43d8c4c1a94d1ea677fdd0db5ac6dffa923b`.
+- Metrics: average `1.1923076923`; median `1`; core `31`; columns `26`; longest `7`; span `682`; lower `10636`; warm `29692`; shadow `152`; dead `0`.
+- Visual/root cause: candidate is effectively #571; the two transfer coordinates are locally too correlated to create useful area information. Do not scan `0.45–1.35`.
 
-### #513 — isotropic four-neighbor ridge selector
-- Visual HEAD `7f2729b9147e20787ac6c51d464edcc112d47ea2`; run `32253449518`; artifact `9365521120`.
-- Preserved lower/warm light but slightly widened the high-intensity core. Do not repeat the exact selector/gates.
+### #613 — radial/polar momentum-gradient shear — REJECTED
+- Candidate `d0472c1f0fad55e91a63e2322753ff1a0ce46059`; Build `#613`; run `32461261474`; workflow `328346937`.
+- Artifact `9439158197`; digest `sha256:f0ad1796bf35d2660eba4b858fbf3138e1d29acd7ed2e94f0868451a69d1379f`.
+- Metrics: average `2.1786`; median `2`; core `305`; columns `140`; longest `45`; span `682`; lower `10904`; warm `30006`; shadow `152`; dead `0`.
+- Visual/root cause: independent crossing-point shear preserves #599 continuity but does not rank vertical width. Do not scan `0.30–0.70`.
 
-### #517 — directional ridge selector
-- Commit `fcc4ac51387d96dc52b8b73e0ec9234e89786cf8`; run `32255050216`; artifact `9366336438`.
-- Vertical thinness + horizontal continuity still failed to create a visibly thinner knife-edge. Do not repeat or simply raise its mix.
+### #621 — propagated scalar Jacobi focusing — REJECTED
+- Candidate `020dc5a8467d0d83598c6555e8147376bd33ae1f`; Build `#621`; run `32468881925`; workflow `328346937`.
+- Artifact `9442063691`; digest `sha256:5e8640f652f7f24a32f90c8b9dddd8f885ba76ac880f8990332f71c9992180bb`.
+- Topology: along the actual main geodesic propagate `J=0, J'=1` with `J'' + (3/r^3)J = 0`; at first hit use compression `1-|J|/pathLength` to gate unchanged #599 continuity support. No second geodesic or framebuffer neighbor sampling.
+- Metrics: average `2.0364963504`; median `2`; core `279`; columns `137`; longest `29`; span `682`; lower `10660`; warm `29800`; shadow `152`; dead `0`.
+- Visual/root cause: propagation-domain information improves average thickness but fragments continuity and remains 2px median. Do not scan `0.035–0.11`.
+- Operational note: accidental contents-API commit `149c890db67d8bb4fb0f49cd8041812ae65b037f` created `DO_NOT_USE.txt`; forward Git-object candidate `020dc5...` deleted it. This mistake must not be repeated.
+- Result log commit `caad12933446f0a2a9f7f2c2aeb7c31dc9c4e0b9`; restore `7ec6e1f3a491237410d4a8b06630bc031a7ffb9f`.
+- Restore validation: Windows Build `#625`, run `32470013456`, completed success; artifact `9442604825`, digest `sha256:f41e43464c8933e4128717281e9a55f5765e730467be239d3db598e34aae4ac5`.
 
-### #527 / #529 — multi-scale 1px/2px ridge-width evidence
-- #527 `d3ef6693649864c0bf876c46342bfa0b71014b70`, artifact `9370838494`, redistribution `0.78–1.20`.
-- #529 `8529e529db903ea282018fce65ce82d9a2421325`, artifact `9371326613`, redistribution `0.60–1.30`.
-- Both were visually sub-threshold. Do not continue scanning this selector's redistribution/gain.
+### #627 — uncoupled two-polarization Jacobi propagation shear — REJECTED
+- Starting accepted HEAD `7ec6e1f3a491237410d4a8b06630bc031a7ffb9f` (`#571` production blobs); #625 restore validation already successful.
+- Unique topology: propagate two orthogonal scalar Jacobi modes on the same main geodesic: `Jfocus'' + K*Jfocus = 0`, `Jdefocus'' - K*Jdefocus = 0`, `K=3/r^3`. At the real first disk hit compute normalized scales `focusScale=|Jfocus|/pathLength`, `defocusScale=|Jdefocus|/pathLength`, then `jacobiShear=|defocusScale-focusScale|/(defocusScale+focusScale)`. Multiply `smoothstep(0.045,0.16,jacobiShear)` into the unchanged #599 continuity support. No neighboring geodesic, framebuffer neighborhood, source texture gate, geometry/stepping/crossing change, or second renderer.
+- Candidate `4cc0c81a870354fa836f1ba0e105a461505f58ff`.
+- Windows Build `#627`; run `32503599689`; workflow `328346937`; URL `https://github.com/mason123test-byte/blackhole-tasks/actions/runs/32503599689`.
+- Artifact `9454661750`; digest `sha256:5164fbd1a040f19e4958f79eb13d967a1f81674801b009d37d3fa2111114794a`.
+- Fast checks, Tauri release EXE, native WebView2 capture and artifact upload all succeeded.
+- Required images opened: `visual-candidate.png`, `visual-baseline.png`, `visual-split.png`, `02-single-scene-expanded.png`, #571/#627 original-size side-by-side, and #571/#627 4x core comparison.
+- Fixed metrics: average `1.800 px`; median `2`; core `225`; columns `125`; longest `29`; span `682`; lower `10657`; warm `29770`; shadow `152`; dead `0`.
+- Relative to #571, continuity is substantially higher (`26->125` columns, `7->29` longest) and lower/warm/span/shadow remain in tolerance, but median thickens `1->2` and average rises `1.192->1.800`, violating hard acceptance criteria.
+- Original-size visual: clearly more continuous than #571. Core enlargement: selected ridge is still visibly ~2px through substantial stretches, not a long 1px knife edge.
+- Verdict: rejected. Root cause: uncoupled opposite-sign scalar Jacobi modes provide anisotropy magnitude but not the coordinate-invariant rank deficiency of a genuinely coupled 2D bundle map; the same broad family remains selected.
+- Do not scan `jacobiShear` gate `0.045–0.16` or nearby scalar values.
+- Restore commit: pending immediate forward restore in the next commit; production must return to the exact #571 blobs before the next candidate.
+- Next topology: propagate a coupled 2x2 Jacobi matrix driven by a trace-free local optical-tidal tensor oriented from the main-ray momentum, then use normalized matrix rank deficiency / determinant (or smallest singular value) at the physical first hit to identify one-dimensional fold collapse. Do not reuse the uncoupled shear threshold.
 
-### #535 — physical first-crossing photometric response
-- Commit `c09c60dcd199d5dd838f9bf400ce36df9cff59ea`; artifact `9372425947`.
-- `diskCrossingCount == 0` selected a broad primary/lensed family; core thickness exploded and lower/warm light collapsed. Do not tune the gain range to rescue this identity.
+## Operational notes
 
-### #541 — inbound first-crossing radial-leg classifier
-- Commit `f8e9aaab985e282932edcdc1a55d3b2a146466b6`; artifact `9388702029`.
-- More selective than crossing ordinal alone but still too broad. Do not tune nearby gain/thresholds to rescue it.
+- #499 TypeScript syntax failure and #511 test-text typo were non-visual failures.
+- #553 first visual capture failed transiently; identical SHA rerun succeeded.
+- #559 initial workflow was cancelled before steps; same SHA later validated successfully.
+- Historical accidental temp/noop commits were cleaned only by normal forward commits and never accepted. No future temp/noop/contents-API placeholders are allowed.
 
-### #545 — first-crossing `diskPhi` weighting
-- Commit `db33dced4b50436f8b2f6ff46d48439d4055183c`; artifact `9389121668`.
-- Raw disk azimuth mixes path deflection with physical hit azimuth. Do not scan the `1.15–2.75` window or nearby gain.
+## Current checkpoint
 
-### #553 — affine path-stretch classifier
-- Candidate `5ac6adba5629058ebede393fa46fcf9f04a0cccd`; valid artifact `9389827608` after an identical rerun of the first capture timeout.
-- First physical signal to produce real 1px-class thinning, but standalone path-stretch removed too much direct span/lower/warm light.
-- Do not reuse the exact broad `1.05–1.45 + 0.32–1.00` suppression as a standalone classifier.
-
-### #559 — incidence-qualified path-stretch shoulder suppression v1
-- Candidate `c89bda0707964eaa573625a58afee59397c5c18e`; artifact `9390455145`.
-- Local incidence substantially improved selectivity and preserved lower light, but direct span and warmth were still too damaged.
-
-### #561 — narrowed incidence-qualified shoulder band
-- Candidate `68827a8902e682b2ee562b5e07b9fe1170dc15b1`; artifact `9390841530`.
-- Solved direct-span/lower retention and kept 1px-class thinning, but warm coverage remained roughly 24% below #479. Do not continue scanning this same shoulder threshold.
-
-### #567 — capped warm tint recovery
-- Candidate `08142c58aacca949959bb8e929d8302bbe89bc95`; artifact `9391514127`.
-- Added `warmVeilTarget = vec3(1.0, 0.92, 0.70) * min(directPeak * 0.78, 0.60)` with `warmVeilRecovery = shoulderSuppression * 0.84`.
-- Warmth partially recovered while keeping a thin core and lower light, but warm coverage was still about 24% below #479 and the high-intensity ridge remained too discontinuous.
-- Do not continue scalar scans of `0.78 / 0.60 / 0.84`; the successful #571 result came from changing response topology instead.
-
-### #575 — dual-band warm veil + knife-core reconstruction
-- Candidate `ce5cf0826bd25be027d214429b3568a40adfc3ad`; Windows Build `#575`, run ID `32433553427`, workflow ID `328346937`.
-- Artifact `9430055338`, digest `sha256:ede116d6fa31af620df068ddfc7839b4f65048ef60351e4be38ead767e4076a1`.
-- Kept the #561/#571 path-stretch + local-incidence classifier and shoulder thinning unchanged, then explicitly formed `warmLowFrequency` and `directHighFrequency` layers before `max` reconstruction. The knife core used only the same physical direct-transfer weight plus source peak/alpha gates; no screen-space neighborhood selector or y-position patch was introduced.
-- Same fixed #479 validation definitions: #479 -> #575 average bright-core thickness `2.211 -> 1.231 px` (-44.3%), median `2 -> 1 px`, `>180` core pixels `199 -> 32`, high-intensity columns `90 -> 26`, direct span `682 -> 682 px`, lower bright `10817 -> 10636` (-1.7%), warm coverage `30816 -> 29693` (-3.6%), shadow `>5` count `152 -> 152`, dead-white `0 -> 0`.
-- Relative to accepted #571, only one additional `>180` core pixel appeared: thickness `1.192 -> 1.231 px`, high-intensity columns stayed `26`, and direct span/lower/warm/shadow/dead-white were numerically identical.
-- Actual Windows `visual-candidate.png`, `visual-baseline.png`, `visual-split.png`, expanded screenshot, #479/#575 original-size side-by-side, and #479/#571/#575 core enlargement were opened before verdict.
-- Visual result: #575 remains clearly thinner than #479, but it is effectively indistinguishable from #571 at original size and in the core enlargement. The new high-frequency layer did not restore additional horizontal continuity; it only moved one core pixel above the fixed threshold.
-- Verdict: rejected. Do not scan the `0.76–0.88` knife-core peak gate, `0.44–0.72` alpha gate, or nearby core strength values. The limitation is that source-intensity gating does not add an independent continuity signal beyond the already accepted #571 response.
-
-### #581 — physical disk-source high-frequency residual
-- Candidate `f9a5b6bfd1d248127a9bbb0fdc2a7e2f0cfb4216`; Windows Build `#581`, run ID `32435891284`, workflow ID `328346937`.
-- Artifact `9430844776`, digest `sha256:52d7d20896ddb24554a2a5b93918fca26da9c7590b77de2d33120466de6c4a96`.
-- Kept the accepted #571 path-stretch/local-incidence classifier, shoulder suppression and warm shelf unchanged. `sampleDiskSurface` additionally exported a source-domain residual `sourceHighFrequency = max(physicalLayers - broadSourceLayers, 0.0)`, where `broadSourceLayers` excludes the primary ribbon/filament excess. Only direct first-crossing rays qualified by the accepted transfer classifier could use that residual to reconstruct a sub-white warm knife core. No screen-space neighborhood selector, y-position patch, geometry change or second renderer was introduced.
-- Same fixed #479 validation definitions: #479 -> #581 average bright-core thickness `2.211 -> 1.256 px` (-43.2%), median `2 -> 1 px`, `>180` core pixels `199 -> 49`, high-intensity columns `90 -> 39`, direct span `682 -> 682 px`, lower bright `10817 -> 11122` (+2.8%), warm coverage `30816 -> 30091` (-2.4%), shadow `>5` count `152 -> 152`, dead-white `0 -> 0`.
-- Relative to accepted #571: average thickness `1.192 -> 1.256 px`, high-intensity columns `26 -> 39`, longest contiguous >180 column run `7 -> 10`, lower bright `10636 -> 11122`, warm coverage `29693 -> 30091`, direct span/shadow/dead-white unchanged. For reference #479 has 90 high-intensity columns and a longest contiguous run of 38.
-- Actual Windows `visual-candidate.png`, `visual-baseline.png`, `visual-split.png`, expanded screenshot, #479/#581 original-size side-by-side, and #479/#571/#581 core enlargement were opened before verdict.
-- Visual result: the source residual is a genuinely independent physical signal and restores more bright samples than #575/#571, but the added energy appears as sparse source-structure highlights rather than a visibly continuous horizontal knife edge. At original size the change from #571 is modest, and the core enlargement shows only short runs/speckles rather than the required long high-intensity ridge.
-- Verdict: rejected. Do not scan the `sourceHighFrequency` support window `0.055–0.24`, the `+0.22` source-core lift, or nearby gains. The signal is physically independent but its topology is source texture, not the transfer continuity needed for a long knife-edge core.
-
-### #585 — Kerr local-polar-momentum coherence core
-- Candidate `33216e2b5b87c09d963ac02dc44858de3d8c8b4f`; Windows Build `#585`, run ID `32437680295`, workflow ID `328346937`.
-- Artifact `9431425755`, digest `sha256:d092879661eb61271ae3d9a63d1df910fffb9de1ee821c39d826cd6ec980004c`.
-- Kept #571 path-stretch/local-incidence classification, shoulder suppression and warm shelf unchanged, then derived `diskLocalPolarMomentum = sqrt(max(kappa - KERR_A2 - L*L, 0.0)) / diskRadius`. Only direct first-crossing rays already qualified by #571 could reconstruct a sub-white core through `polarCoherence = 1.0 - smoothstep(0.10, 0.22, polarMomentum)` and a fixed `0.82` warm core level. No screen-space y selector, neighborhood ridge selector, source-texture gate, geometry change or second renderer was introduced.
-- Same fixed #479 validation definitions: #479 -> #585 average bright-core thickness `2.211 -> 2.691 px` (+21.7%), median `2 -> 2 px`, `>180` core pixels `199 -> 401`, high-intensity columns `90 -> 149`, longest contiguous >180 run `38 -> 58`, direct span `682 -> 682 px`, lower bright `10817 -> 17635` (+63.0%), warm coverage `30816 -> 35628` (+15.6%), shadow `>5` count `152 -> 152`, dead-white `0 -> 0`.
-- Relative to accepted #571: average thickness `1.192 -> 2.691 px`, median `1 -> 2 px`, high-intensity columns `26 -> 149`, longest contiguous run `7 -> 58`, while lower bright and warm coverage increase far beyond their allowed bands.
-- Actual Windows `visual-candidate.png`, `visual-baseline.png`, `visual-split.png`, expanded screenshot, #479/#571/#585 original-size comparison, and #479/#571/#585 core enlargement were opened before verdict.
-- Visual result: polar momentum is genuinely transfer-domain and produces the first strong horizontal continuity recovery, but it does so by lighting a broad first-crossing strip rather than isolating a ~1px knife edge. The direct core becomes visibly thicker than #479 and the lower/warm response is substantially over-raised.
-- Verdict: rejected. Do not scan the `0.10–0.22` polar-momentum window, the fixed `0.82` core level, or nearby scalar variants. The signal is too broad as a standalone core-support coordinate; continuity without an independent vertical-width/Jacobian discriminator simply recreates a thick bright band.
-
-### #591 — polar-momentum continuity + polar-path detour gate
-- Candidate `1637e5036fc3c527de19b969af76b3d037d150e2`; Windows Build `#591`, run ID `32444151683`, workflow ID `328346937`.
-- Artifact `9433569755`, digest `sha256:3668995df3675900504415ca4ae8dae8d93117e1e3b4f688f9ec9ca86e85ac22`.
-- Kept the accepted #571 classifier/warm shelf and kept #585 polar-momentum continuity semantics unchanged. Added one independent transfer-domain width discriminator: accumulated polar travel to the first disk hit, `hitPolarTravel = polarTravel + crossing * abs(side - previousSide)`, normalized by the observer-to-equator shortest polar distance. The resulting `polarStretch` was mapped by `polarPathCoherence = 1.0 - smoothstep(1.02, 1.18, polarStretch)` and multiplied into #585 core support. No screen-space selector, source-texture gate, geometry change, compositor change or second renderer was introduced.
-- Same fixed #479 validation definitions: #479 -> #591 average bright-core thickness `2.211 -> 2.616 px` (+18.3%), median `2 -> 2 px`, `>180` core pixels `199 -> 382`, high-intensity columns `90 -> 146`, longest contiguous >180 run `38 -> 37`, direct span `682 -> 682 px`, lower bright `10817 -> 17633` (+63.0%), warm coverage `30816 -> 35644` (+15.7%), shadow `>5` count `152 -> 152`, dead-white `0 -> 0`.
-- Relative to #585, average thickness only changes `2.691 -> 2.616 px` (-2.8%), core pixels `401 -> 382`, high-intensity columns `149 -> 146`, lower bright `17635 -> 17633`, warm coverage `35628 -> 35644`; only the longest contiguous >180 run falls materially, `58 -> 37`.
-- Actual Windows `visual-candidate.png`, `visual-baseline.png`, `visual-split.png`, #571/#585/#591 original-size comparison, and #479/#571/#585/#591 core enlargement were opened before verdict.
-- Visual result: the polar-path detour gate breaks some long contiguous runs but does not reject the broad direct-ray family responsible for #585's excessive thickness and lower/warm energy. At original size #591 remains essentially the same thick bright strip as #585, not a ~1px knife edge.
-- Verdict: rejected. Do not scan the `1.02–1.18` polar-path stretch window or nearby scalar variants. Polar detour is not the missing vertical-width discriminator for the #585 continuity family.
-
-## Current exclusions / lessons
-
-1. Do not increase global flare weights without core protection.
-2. Do not keep sweeping far-flare LOD `6.0–7.0` in the current compositor.
-3. Do not use strong generic screen-space negative-detail suppression as the primary thinning mechanism.
-4. Do not keep raising `microCore` scalar strength.
-5. Do not repeat #513/#517 screen-space neighborhood ridge selectors.
-6. Do not continue #527/#529 multi-scale redistribution/gain scans.
-7. Do not equate `diskCrossingCount == 0` with the horizontal direct image.
-8. Do not use radial leg or raw `diskPhi` as sufficient direct-image identities.
-9. Path stretch has useful thinning separation but requires local-incidence qualification.
-10. The accepted physical selector is currently the #561/#571 path-stretch + local-incidence combination; do not casually retune its semantic gates.
-11. Do not return to #567 scalar tint recovery. The accepted solution uses a separate sub-white warm shelf topology.
-12. Do not add another source-intensity/alpha-only knife-core gate on top of #571; #575 proved it does not create additional horizontal continuity.
-13. Do not continue source-texture residual recovery from #581; it increases sparse bright samples but does not create the required long transfer-continuous knife edge.
-14. Do not continue standalone local-polar-momentum core reconstruction from #585; it restores continuity by broadening the bright strip and heavily over-raises lower/warm energy.
-15. Do not continue #591 polar-path detour gating or scan `1.02–1.18`; it barely changes #585 thickness/energy and mainly fragments the longest run.
-16. Geometry remains frozen. Any future baseline must preserve #571's direct span, lower image, shadow cleanliness and full Kerr geometry.
-
-## Operational validation notes
-
-- #499 stopped at TypeScript due to a renderer syntax typo; not a visual verdict.
-- #511 stopped because a diagnostic-frame test assertion had a text typo; not a visual verdict.
-- Temporary placeholder/noop artifacts from earlier recovery were removed by forward commits and were never accepted visual experiments.
-- During #545 preparation, unattached erroneous commit objects were never connected to the branch.
-- During #553 preparation, accidental `DO_NOT_USE` commit `80d04d006dde3e500d51dc27866b7e752f2cead6` was immediately cleaned by forward commit `fa31d802493c2521af1408bf035fe668d08a544f`; no reset/rebase/force.
-- #553's first visual attempt failed after partial capture; identical rerun succeeded.
-- #559's initial workflow was cancelled before any step; same SHA later validated successfully.
-- Required #559, #561, #567, #571, #575, #581, #585 and #591 Windows screenshots plus baseline comparisons were opened before verdicts.
-
-## Next experiment target
-
-`#571` remains the accepted baseline. Do not retune its physical classifier or warm shelf, and do not continue #575 source-intensity gates, #581 source-texture residual recovery, #585 standalone polar-momentum reconstruction, or #591 polar-path detour gating. #585 still proves that polar momentum contains useful horizontal continuity, but #591 shows that path detour is not an independent width coordinate for the same broad direct family. A future continuity attempt needs a genuinely local ray-bundle magnification/focusing discriminator (for example an analytically derived transfer/Jacobian proxy), not another accumulated path-length-like scalar. Otherwise leave the accepted direct response unchanged and work on a separate photographic layer without changing geometry.
-
-## Post-#599 update
-
-### #599 — polar-momentum continuity + screen-to-transfer incidence Jacobian
-- Candidate `92ca02ba98e735f671c5f6259da86a70a40288d7`; Windows Build `#599`, run ID `32449303088`, workflow ID `328346937`.
-- Artifact `9435214835`, digest `sha256:b89d38f7d3c5fdc1602d8e345cd18da259b1a27b2c8fd032c6fe9e7ad7236314`.
-- Kept #571 path-stretch/local-incidence shoulder shaping and warm shelf unchanged and kept #585 polar-momentum continuity semantics unchanged. Added one local bundle-width discriminator: at the current physical disk radius, two infinitesimally offset camera-up directions (`±0.002`) are passed only through `initDngrCameraRay` to obtain neighboring Kerr invariants; no neighboring geodesic is integrated. Their local disk incidence difference estimates `|d incidence / d cameraUp|`, mapped through `compactBundleWeight = smoothstep(3.2, 5.2, incidenceJacobian)` and multiplied into #585 core support. No framebuffer-neighbor sampling, second renderer, second geodesic trace, geometry change or compositor change was introduced.
-- Same fixed #479 validation definitions: #479 -> #599 average bright-core thickness `2.211 -> 2.161 px` (-2.3%), median `2 -> 2 px`, `>180` core pixels `199 -> 309`, high-intensity columns `90 -> 143`, longest contiguous >180 run `38 -> 45`, direct span `682 -> 682 px`, lower bright `10817 -> 10988` (+1.6%), warm coverage `30816 -> 30113` (-2.3%), shadow `>5` count `152 -> 152`, dead-white `0 -> 0`.
-- Relative to #585, average thickness improves `2.691 -> 2.161 px` (-19.7%), core pixels `401 -> 309`, high-intensity columns `149 -> 143`, lower bright `17635 -> 10988`, warm coverage `35628 -> 30113`, while longest contiguous run remains strong at `45` and direct span/shadow/dead-white remain unchanged.
-- Actual Windows `visual-candidate.png`, `visual-baseline.png`, #571/#585/#591/#599 original-size comparison, and #479/#571/#585/#591/#599 core enlargement were opened before verdict.
-- Visual result: this is the first local Jacobian-style discriminator that clearly removes most of #585's broad energy while retaining strong horizontal continuity and restoring lower/warm energy to the accepted band. However the direct high-intensity ridge remains visually about 2 px thick: average thickness is only 2.3% below #479 and the median remains 2 px, so it does not meet the required >=15% thinning / 1px-class target.
-- Verdict: rejected. Do not scan the `3.2–5.2` incidence-Jacobian gate or nearby scalar thresholds. The topology is materially better than #591, but this first-order incidence derivative still does not isolate the 1px transfer caustic.
-
-### #599 operational note
-- During candidate preparation, accidental contents-API commit `53d51d6a74757b93421312cc9cabd118dc52813b` added `DO_NOT_USE.txt`. It was not an experiment and contained no production change.
-- The immediately following forward Git-object candidate commit `92ca02ba98e735f671c5f6259da86a70a40288d7` deleted that file while adding the intended shader/test changes. Net diff from the accepted #571 restore contains exactly the two intended files; no reset, rebase or force push was used.
-
-### Current lesson after #599
-- #599 confirms that a local screen-to-transfer derivative is the right class of discriminator: unlike #591, it materially reduces #585 thickness and restores lower/warm energy without losing horizontal continuity.
-- Do not fine-scan the first-order incidence derivative. A future direct-core attempt should preserve the idea of local bundle compactness but use a more caustic-specific quantity, such as curvature/second derivative of the transfer map or an analytic determinant-like combination, while retaining the accepted #571 baseline and frozen geometry.
-- `#571` remains the accepted production baseline.
-
-## Post-#603 update
-
-### #603 — three-point polar-transfer curvature gate
-- Candidate `734e2d536c925dbd788b2ed5f63cc6b5e6fbc31c`; Windows Build `#603`, run ID `32450568043`, workflow ID `328346937`.
-- Artifact `9435633965`, digest `sha256:b060d15dc443a512b4e63c55e4e5724192ce4024b212a682e1839b71b775ea2e`.
-- Kept #571 path-stretch/local-incidence shoulder shaping and warm shelf unchanged and kept #585 polar-momentum continuity semantics unchanged. Added a three-point local transfer-curvature discriminator: camera-up offsets `±0.002` are passed only through `initDngrCameraRay` to obtain neighboring Kerr invariants, and at the current physical disk crossing radius `polarPlus - 2*polarMomentum + polarMinus` estimates the second derivative of local polar momentum. It is normalized by the first-difference span as `foldCurvature = abs(secondDifference) / max(abs(polarPlus - polarMinus), 1e-5)` and mapped by `smoothstep(0.08, 0.22, foldCurvature)`. No neighboring geodesic integration, framebuffer-neighbor sampling, geometry change, compositor change or second renderer was introduced.
-- Same fixed #479 validation definitions: #479 -> #603 average bright-core thickness `2.211 -> 2.608 px` (+17.9%), median `2 -> 2 px`, `>180` core pixels `199 -> 133`, high-intensity columns `90 -> 51`, longest contiguous >180 run `38 -> 31`, direct span `682 -> 682 px`, lower bright `10817 -> 10640` (-1.6%), warm coverage `30816 -> 29846` (-3.1%), shadow `>5` count `152 -> 152`, dead-white `0 -> 0`.
-- Relative to #599, average selected-core thickness worsens `2.161 -> 2.608 px`, core pixels fall `309 -> 133`, high-intensity columns collapse `143 -> 51`, longest contiguous run falls `45 -> 31`, while lower bright/warm return very close to accepted #571/#479 levels and direct span/shadow/dead-white remain unchanged.
-- Actual Windows `visual-candidate.png`, `visual-baseline.png`, `visual-split.png`, expanded screenshot, #479/#571/#599/#603 original-size comparison, and #479/#571/#599/#603 core enlargement were opened before verdict.
-- Visual result: second-order curvature is genuinely more caustic-specific, but in this normalized one-dimensional form it selects only a subset of still-thick bright segments rather than a long 1px ridge. It therefore loses the main continuity advantage of #599 without solving median thickness.
-- Verdict: rejected. Do not scan the `0.08–0.22` fold-curvature gate or nearby scalar variants. The next direct-core attempt should not be another 1D derivative threshold; it needs either a genuinely two-dimensional transfer-area/Jacobian determinant proxy or a different independent physical observable.
-
-### Current lesson after #603
-- #599 remains the strongest rejected continuity/energy compromise: first-order local incidence Jacobian kept 143 bright columns and restored lower/warm energy, but stayed ~2 px thick.
-- #603 shows that simply moving from first derivative to normalized second derivative over-selects localized folds: continuity collapses while selected segments remain 2 px-class.
-- Do not combine or fine-scan #599/#603 scalar windows as a rescue. A future continuation attempt should derive a 2D transfer-area / determinant-like proxy from independent camera-right and camera-up invariant responses, without tracing neighboring geodesics or sampling neighboring framebuffer pixels.
-- `#571` remains the accepted production baseline.
+- Accepted visual baseline remains `#571`.
+- #627 is rejected and must be forward-restored before any new candidate.
+- The next meaningful experiment is a coupled 2x2 Jacobi rank-deficiency/fold observable, not another scalar threshold scan or crossing-point algebraic derivative.
