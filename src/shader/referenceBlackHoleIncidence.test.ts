@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { REFERENCE_BLACK_HOLE_FRAGMENT } from "./referenceBlackHoleShader";
 
-describe("incidence-qualified direct-disk radial-polar shear core", () => {
-  it("keeps the accepted #561/#571 transfer classifier and warm shelf unchanged", () => {
+describe("incidence-qualified direct-disk warm shelf", () => {
+  it("keeps the #561 physical incidence and path-stretch classifier unchanged", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float shortPathWeight = 1.0 - smoothstep(1.05, 1.45, pathStretch);",
     );
@@ -18,36 +18,22 @@ describe("incidence-qualified direct-disk radial-polar shear core", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "diskColor *= mix(1.0, 0.38, shoulderSuppression);",
     );
+  });
+
+  it("uses a nonlinear sub-white warm shelf instead of scanning #567 tint strength", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float warmShelfSupport = smoothstep(0.22, 0.68, shoulderSuppression);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float warmShelfPeak = min(0.68, max(0.0, directPeak * 0.94));",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "vec3 warmShelf = vec3(1.0, 0.93, 0.74) * warmShelfPeak;",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "diskColor = mix(diskColor, max(diskColor, warmShelf), warmShelfSupport);",
     );
-  });
-
-  it("keeps #599 continuity gates and adds independent radial-polar momentum shear", () => {
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float polarMomentumCoherence = 1.0 - smoothstep(0.10, 0.22, polarMomentum);",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float compactBundleWeight = smoothstep(3.2, 5.2, incidenceJacobian);",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float diskRadialPolarMomentumShear(float diskRadius, vec2 cameraPlane)",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float gradientCross = abs(polarGradient.x * radialGradient.y - polarGradient.y * radialGradient.x);",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "return clamp(gradientCross / gradientNorm, 0.0, 1.0);",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float momentumShearWeight = smoothstep(0.30, 0.70, momentumShear);",
-    );
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("transferAreaJacobian");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("foldCurvature");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("polarTravel");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("directPeak * 0.78");
   });
 
   it("keeps geometry and forbidden screen-space paths unchanged", () => {
