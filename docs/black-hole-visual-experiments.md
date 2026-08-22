@@ -7,7 +7,7 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 - Geometry frozen: do not change `DISK_OUTER`, `OBSERVER_THETA`, Kerr/geodesic stepping, disk-crossing structure, BH/disk/observer geometry, or use geometry changes to fake photometric improvement.
 - One WebGL2 numerical Kerr path only. No Canvas2D, framebuffer mirror/flip, copied lower half, fake annulus, second renderer, silent fallback, `screen.y` hard patches, or screen-space neighborhood ridge selector.
 - Do not use source texture/final RGB brightness as a transfer classifier.
-- Candidate implementation + test are atomic. `update_ref(force=false)` only; no reset/rebase/force push/noop/temp files.
+- Candidate implementation + test are atomic. `update_ref(force=false)` only; no reset/rebase/force push/noop/temp files/contents-API placeholders.
 - Every candidate requires GitHub-hosted Windows `windows-latest`, runnable Tauri release EXE, native WebView2 capture, artifact upload, actual image inspection, and fixed-metric validation.
 - Rejected candidates are logged, production is forward-restored to #571, restore production blobs are checked, and a restore Windows run is completed before another candidate is mounted.
 
@@ -56,10 +56,11 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 25. No single-axis full-Kerr tangent-linear radial-transfer-compression threshold/gain scan (#651).
 26. No normalized full-Kerr first-hit 2x2 transfer rank-deficiency threshold/gain/determinant remap (#657): it selects more columns but thickens to median 2px.
 27. No full-Kerr first-hit absolute minimum-singular-transfer threshold/gain/remap (#663): it collapses to #571.
-28. Do not continue static endpoint singular-spectrum scans of the same first-hit 2x2 tangent map; both rank angle and absolute `sigma_min` are now excluded.
-29. Geometry remains frozen.
+28. No static endpoint singular-spectrum scans of the same first-hit 2x2 tangent map; both rank angle and absolute `sigma_min` are excluded.
+29. No cumulative absolute principal-axis twist normalization/gain/threshold scan (#669): it saturates the #599 continuity family and reproduces the 2px ridge.
+30. Geometry remains frozen.
 
-## Recent experiments
+## Recent continuity / propagation experiments
 ### #599 — continuity reference — REJECTED
 - Candidate `92ca02ba98e735f671c5f6259da86a70a40288d7`; Build `#599`; run `32449303088`; artifact `9435214835`.
 - Metrics: avg `2.1608391608`; median `2`; core `309`; cols `143`; longest `45`; span `682`; lower `10988`; warm `30113`; shadow `152`; dead `0`.
@@ -78,7 +79,8 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 
 ### #645 — Kerr azimuthal transport excess — REJECTED
 - Candidate `5efef46ec28ff530bb98b702d3962265873489f1`; Build `#645`; run `32539376836`; artifact `9466591984`; digest `sha256:cef7b99560d6300b1005581a92c8a007564286140c15cb86149e1fd81a198661`.
-- Metrics: avg `1.1923`; median `1`; core `31`; cols `26`; longest `7`; lower `10653`; warm `29709`; restore `dff75c56196cb4b7e8cea58a1efcd1d4a35d8cf5`; restore Build #649 success.
+- Metrics: avg `1.1923`; median `1`; core `31`; cols `26`; longest `7`; lower `10653`; warm `29709`.
+- Restore `dff75c56196cb4b7e8cea58a1efcd1d4a35d8cf5`; restore Build #649 success.
 
 ### #651 — full-Kerr camera-up radial tangent compression — REJECTED
 - Candidate `f4aff8c9ed1332e51600f3b54fa6916e41b2c45d`; Build `#651`; run `32540412278`; artifact `9467001533`; digest `sha256:53bacf11a5ebceaa94d1807a2669fdc02b77f6d5872c4577d9eba3bca6f88937`.
@@ -87,33 +89,35 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 
 ### #657 — full-Kerr first-hit 2x2 transfer rank deficiency — REJECTED
 - Candidate `40bf8b2465b8015c6e27b87329037974505e9e48`; Build `#657`; run `32543508966`; workflow `328346937`; artifact `9467938985`; digest `sha256:ef393fecc3f69269d9305f63df1f63ddaed6c8265a169bfaacf047b18dc00883`.
-- Unique topology: two actual-Kerr tangent directions produce first-hit map `d(diskRadius,diskPhi)/d(cameraRight,cameraUp)`; scale-free rank deficiency multiplies frozen #599 continuity support.
-- Required Windows candidate/baseline/split/expanded and accepted/candidate original/core comparisons opened.
 - Metrics: avg `1.600`; median `2`; core `104`; cols `65`; longest `11`; span `682`; lower `10691`; warm `29792`; shadow `152`; dead `0`.
-- Rejected: meaningful separation exists but it is broad, not 1px. Do not scan rank/determinant remaps.
-- Log `199d78959433a315686191024f95a8f851f9b92c`; restore `fdf7c0f4db5616bd04199e8adede1b8bf7692dce`.
-- Restore Build `#661`; run `32547472046`; success; artifact `9469063725`; digest `sha256:672e8768ed100b40e8bca04f8379e94c6c234b48b3b62e78de87ec7de0256e4e`.
+- Log `199d78959433a315686191024f95a8f851f9b92c`; restore `fdf7c0f4db5616bd04199e8adede1b8bf7692dce`; restore Build `#661`, run `32547472046`, success; artifact `9469063725`; digest `sha256:672e8768ed100b40e8bca04f8379e94c6c234b48b3b62e78de87ec7de0256e4e`.
+
+### #663 — full-Kerr first-hit absolute minimum singular transfer — REJECTED
+- Candidate `24fc054c5e70a2fad93d8fb82d656e70462a39da`; Build `#663`; run `32547882914`; artifact `9469193500`; digest `sha256:5fe307df5b677752a0800b82db37dd1cd0ebe994094129b241588a7d9d68f060`.
+- Metrics: avg `1.1923076923`; median `1`; core `31`; cols `26`; longest `7`; span `682`; lower `10637`; warm `29700`; shadow `152`; dead `0`.
+- Static endpoint `sigma_min` carries no useful ridge separation.
+- Log `a40b1ab97686bfcd2bfa3d4e97900670b03efc56`; restore `bff468984693ebcc46efc5dbb182bd85e79ba036`; restore Build `#667`; run `32548354461`; success; artifact `9469326168`; digest `sha256:b8db6e28858d072560866bb0c2c11540d958a6e66ddbc9bdcf785111d8202a39`.
 - Restored production blobs: shader `130745839c509a727d409992b086e72a6908ce5b`, incidence test `84b2577676b0bc7fc0617bdf14ab68fb5c6bb9a4`.
 
-### #663 — full-Kerr first-hit absolute minimum singular transfer scale — REJECTED
-- Starting accepted production: restore `fdf7c0f4db5616bd04199e8adede1b8bf7692dce`, fully validated by Build #661.
-- Unique topology: reuse the actual-Kerr two-axis first-hit tangent map, but discard #657 determinant/rank angle. Form the 2x2 transfer matrix from normalized radial hit sensitivity and azimuthal hit sensitivity, compute the exact eigenvalues of `M^T M`, derive the absolute smallest singular value `sigma_min`, and use threshold-free `minSingularCompression = 1/(1+sigma_min)` on unchanged #599 continuity support.
-- Candidate `24fc054c5e70a2fad93d8fb82d656e70462a39da`.
-- Windows Build `#663`; run `32547882914`; workflow `328346937`; artifact `9469193500`; digest `sha256:5fe307df5b677752a0800b82db37dd1cd0ebe994094129b241588a7d9d68f060`.
+### #669 — full-Kerr propagation-history principal-axis twist — REJECTED
+- Starting accepted production: restore `bff468984693ebcc46efc5dbb182bd85e79ba036`, fully validated by Build #667.
+- Unique topology: propagate two actual-Kerr tangent-linear camera directions along the same physical main ray. At every accepted step build the 2x2 `(delta r / r, delta theta)` tangent map, extract the principal-axis double-angle from `A*A^T`, and accumulate absolute principal-axis rotation. At first physical disk crossing use only the crossing fraction of the final step. Normalize accumulated twist by a physical 90-degree rotation (`0.5*PI`) and multiply the unchanged #599 continuity support. No endpoint determinant or singular value is used.
+- Candidate `6c1d3efac73ca4a3e27b723e7da8a33503c2ec14`.
+- Windows Build `#669`; run `32561626642`; workflow `328346937`; artifact `9473013092`; digest `sha256:66970c2b3073c5b92044521bf94a3ecf14d54f787cb7980d2111eda4857cbfae`.
 - Frontend typecheck/lint/Vitest, Rust fast checks, Tauri release EXE, native Windows WebView2 capture, and artifact upload all succeeded.
-- Required images opened: `visual-candidate.png`, `visual-baseline.png`, `visual-split.png`, `02-single-scene-expanded.png`, #571/#663 original-size side-by-side, and #571/#663 4x core enlargement.
-- Fixed metrics: avg `1.1923076923`; median `1`; core `31`; cols `26`; longest `7`; span `682`; lower `10637`; warm `29700`; shadow `152`; dead `0`.
-- Visual: indistinguishable from #571 in the high-intensity core. No extra continuous knife edge appears.
+- Required images opened: `visual-candidate.png`, `visual-baseline.png`, `visual-split.png`, `02-single-scene-expanded.png`, #571/#669 original-size side-by-side, and #571/#669 4x core enlargement.
+- Fixed metrics: avg `2.1608391608`; median `2`; core `309`; cols `143`; longest `45`; span `682`; lower `10988`; warm `30103`; shadow `152`; dead `0`.
+- Visual: the direct ridge is substantially longer, but the core enlargement shows a clear ~2px bright band. The core metrics are essentially #599, not a 1px knife edge.
 - Verdict: rejected.
-- Root cause: absolute endpoint `sigma_min` carries essentially no useful direct-ridge separation at the accepted brightness threshold. Together with #657, this excludes the static endpoint singular spectrum: rank angle is broad while absolute minimum scale is inert.
-- Do not rescue by thresholding/gaining `sigma_min`, rescaling the same matrix rows, or blending rank angle with `sigma_min`.
-- Restore commit: pending immediate forward restore after this log commit.
+- Root cause: cumulative absolute principal-axis twist saturates across the entire #599 continuity family, so it carries continuity identity but not vertical-width discrimination.
+- Do not rescue by retuning the 90-degree normalization, adding a twist threshold/gain, or scanning cumulative absolute twist variants.
+- Restore commit: pending immediate normal forward restore after this log commit.
 
 ## Operational notes
-- Historical accidental temp/noop/contents-API commits were cleaned only by normal forward commits and never accepted. No future temp/noop/contents-API placeholders are allowed.
+- Historical accidental contents-API/temp/noop commits were cleaned only by normal forward commits and never accepted. Do not repeat them.
 - #499/#511 were non-visual code/test failures; #553 first visual capture was transient; #559 initial workflow was cancelled before steps and later validated on the same SHA.
 
 ## Current checkpoint
 - Accepted baseline remains #571.
-- #663 is rejected and must be forward-restored before another candidate.
-- Next orthogonal topology: keep two-axis actual-Kerr tangent propagation but move the observable from endpoint singular spectrum into propagation history. Track principal-axis orientation of the tangent map and accumulate physically meaningful orientation rotation/twist before the first disk hit; test whether a fold-family ray exhibits a distinct transfer-axis rotation history. Do not retune #657/#663 endpoint spectrum.
+- #669 is rejected and must be forward-restored before another candidate.
+- Next experiment must be materially orthogonal to cumulative principal-axis twist and to the excluded endpoint singular spectrum. A viable direction is an actual-Kerr finite-time tangent-bundle phase-space stretching observable (Lyapunov/area-growth history) that uses propagated tangent-state growth rather than endpoint rank, singular values, or accumulated orientation rotation.
