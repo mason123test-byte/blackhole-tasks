@@ -9,7 +9,7 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 - Do not use source texture/final RGB brightness as a transfer classifier.
 - Candidate implementation + test are atomic. `update_ref(force=false)` only; no reset/rebase/force push/noop/temp files.
 - Every candidate requires GitHub-hosted Windows `windows-latest`, runnable Tauri release EXE, native WebView2 capture, artifact upload, actual image inspection, and fixed-metric validation.
-- Rejected candidates are logged, then production is forward-restored to #571 before another candidate is mounted.
+- Rejected candidates are logged, production is forward-restored to #571, restore production blobs are checked, and a restore Windows run is completed before another candidate is mounted.
 
 ## Fixed measurements
 - Core ROI `y330:385, x80:840`, bright core = mean RGB `>180`.
@@ -38,29 +38,29 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 7. First crossing alone is not a direct-image identity (#535).
 8. Radial-leg identity is too broad (#541).
 9. No raw `diskPhi` scan `1.15–2.75` (#545).
-10. Standalone path stretch broad suppression is too destructive (#553); keep accepted incidence-qualified semantics frozen.
-11. Do not retune #561/#571 path-stretch/local-incidence or shoulder gates.
-12. No #567 scalar warm-tint recovery scan.
-13. No source peak/alpha knife-core scan (#575).
-14. No source-texture residual recovery (#581).
-15. No standalone local-polar-momentum reconstruction scan (#585); polar momentum may remain only as frozen continuity semantics paired with an independent width observable.
-16. No polar-path detour scan `1.02–1.18` (#591).
-17. No first-order incidence-Jacobian scan `3.2–5.2` (#599).
-18. No second-derivative/fold-curvature scan `0.08–0.22` (#603).
-19. No `polarMomentum + incidenceCosine` endpoint determinant scan `0.45–1.35` (#607).
-20. No crossing-point radial/polar gradient shear scan `0.30–0.70` (#613).
-21. No propagated scalar Jacobi-compression scan `0.035–0.11` (#621).
-22. No uncoupled two-polarization Jacobi-shear scan `0.045–0.16` (#627).
-23. No endpoint-only coupled 2x2 simplified Jacobi rank-deficiency rescue/threshold scan (#633).
-24. No simplified coupled 2x2 Jacobi minimum-rank-ratio/conjugate-history rescue or gain scan (#639).
-25. No Kerr-vs-spinless azimuthal transport fraction threshold/gain/sign/cancellation scan (#645); it adds no core separation.
+10. Standalone path-stretch broad suppression is too destructive (#553); accepted #561/#571 incidence/path semantics stay frozen.
+11. No #567 scalar warm-tint recovery scan.
+12. No source peak/alpha knife-core scan (#575).
+13. No source-texture residual recovery (#581).
+14. No standalone local-polar-momentum reconstruction scan (#585); polar momentum may remain only as frozen continuity semantics paired with an independent width observable.
+15. No polar-path detour scan `1.02–1.18` (#591).
+16. No first-order incidence-Jacobian scan `3.2–5.2` (#599).
+17. No second-derivative/fold-curvature scan `0.08–0.22` (#603).
+18. No `polarMomentum + incidenceCosine` endpoint determinant scan `0.45–1.35` (#607).
+19. No crossing-point radial/polar gradient shear scan `0.30–0.70` (#613).
+20. No propagated scalar Jacobi-compression scan `0.035–0.11` (#621).
+21. No uncoupled two-polarization Jacobi-shear scan `0.045–0.16` (#627).
+22. No endpoint-only coupled 2x2 simplified Jacobi rank-deficiency rescue/threshold scan (#633).
+23. No simplified coupled 2x2 Jacobi minimum-rank/conjugate-history rescue or gain scan (#639).
+24. No Kerr-vs-spinless azimuthal transport fraction threshold/gain/sign/cancellation scan (#645).
+25. No single-axis full-Kerr tangent-linear radial-transfer-compression threshold/gain scan (#651); it collapses to #571.
 26. Geometry remains frozen.
 
 ## Recent continuity / propagation experiments
 ### #599 — continuity reference — REJECTED
 - Candidate `92ca02ba98e735f671c5f6259da86a70a40288d7`; Build `#599`; run `32449303088`; artifact `9435214835`.
 - Metrics: avg `2.1608391608`; median `2`; core `309`; cols `143`; longest `45`; span `682`; lower `10988`; warm `30113`; shadow `152`; dead `0`.
-- Strong continuity, wrong ~2px thickness. Frozen continuity semantics only.
+- Strong continuity, wrong ~2px thickness. Keep only the continuity semantics frozen.
 
 ### #603 — second derivative curvature — REJECTED
 - Candidate `734e2d536c925dbd788b2ed5f63cc6b5e6fbc31c`; Build `#603`; run `32450568043`; artifact `9435633965`.
@@ -93,20 +93,28 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 ### #639 — simplified 2x2 Jacobi propagation-history conjugate proximity — REJECTED
 - Candidate `5127904ebc68fc23519a278dfce1abd206645bee`; Build `#639`; run `32538039894`; artifact `9466167087`; digest `sha256:38cf69635ffeab1b6d80c8671a63ee8a768ece12675606e3ea078335c18cafbb`.
 - Metrics: avg `1.1923076923`; median `1`; core `31`; cols `26`; longest `7`; span `682`; lower `10636`; warm `29715`; shadow `152`; dead `0`.
-- Simplified Jacobi endpoint/history family exhausted. Log `881354702fce1d177a43812b88377db74d525bb8`; restore `a3925065b18db6bb6397e72de7e2a32003c083f5`.
-- Restore Build `#643`, run `32538662043`, completed success.
+- Log `881354702fce1d177a43812b88377db74d525bb8`; restore `a3925065b18db6bb6397e72de7e2a32003c083f5`; restore Build `#643` success.
 
 ### #645 — Kerr azimuthal transport excess history — REJECTED
-- Starting accepted restore `a3925065b18db6bb6397e72de7e2a32003c083f5`; Build `#643` completed success before candidate creation.
-- Unique topology: on the existing main Kerr geodesic, accumulate `|dphi_Kerr - dphi_a=0|` and normalize by accumulated `|dphi_Kerr|`; the analytic spinless reference is evaluated at the same main-ray state and does not trace a second geodesic. At first disk hit use `frameDragFraction = excessTravel / kerrAzimuthTravel` directly as a threshold-free multiplier on unchanged #599 continuity support. This is not raw `diskPhi` and does not alter geometry/stepping.
-- Candidate `5efef46ec28ff530bb98b702d3962265873489f1`.
-- Windows Build `#645`; run `32539376836`; workflow `328346937`; artifact `9466591984`; digest `sha256:cef7b99560d6300b1005581a92c8a007564286140c15cb86149e1fd81a198661`.
-- Frontend typecheck/lint/Vitest, Rust fast checks, runnable Tauri release EXE, native WebView2 capture and artifact upload all succeeded.
-- Required images opened: `visual-candidate.png`, `visual-baseline.png`, `visual-split.png`, `02-single-scene-expanded.png`, #571/#645 original-size side-by-side, and #571/#645 core enlargement.
-- Fixed metrics: avg `1.1923076923`; median `1`; core `31`; cols `26`; longest `7`; span `682`; lower `10653`; warm `29709`; shadow `152`; dead `0`.
-- Visual: no additional horizontal knife-edge continuity at original size or core enlargement. Core statistics are exactly #571; lower/warm changes are small and within tolerance but do not address the target.
+- Candidate `5efef46ec28ff530bb98b702d3962265873489f1`; Build `#645`; run `32539376836`; workflow `328346937`; artifact `9466591984`; digest `sha256:cef7b99560d6300b1005581a92c8a007564286140c15cb86149e1fd81a198661`.
+- Unique topology: accumulate `|dphi_Kerr-dphi_a=0| / |dphi_Kerr|` along the existing main ray and use it threshold-free on unchanged #599 continuity support.
+- Required Windows candidate/baseline/split/expanded and #571/#645 original/core comparisons opened.
+- Metrics: avg `1.1923076923`; median `1`; core `31`; cols `26`; longest `7`; span `682`; lower `10653`; warm `29709`; shadow `152`; dead `0`.
+- Rejected: no additional knife-edge continuity. Do not scan transport fraction variants.
+- Log `f6438285efca3e77e6d8a00c0b1cd4a7f99b95d5`; restore `dff75c56196cb4b7e8cea58a1efcd1d4a35d8cf5`; restore Build `#649`, run `32539933695`, completed success.
+
+### #651 — full-Kerr tangent-linear camera-up radial transfer compression — REJECTED
+- Starting accepted restore `dff75c56196cb4b7e8cea58a1efcd1d4a35d8cf5`, fully validated by Build `#649`.
+- Unique topology: propagate `d(r,theta,pr,ptheta)/d(cameraUp)` along the existing accepted main Kerr geodesic using the actual `kerrDerivatives` directional derivative, with `dL/d(cameraUp)` and `dkappa/d(cameraUp)` from camera initialization. At first physical disk crossing use the implicit crossing derivative `d r_disk / d cameraUp = s_r - (dr/dlambda)*s_theta/(dtheta/dlambda)` and convert it to threshold-free `radialTransferCompression = 1/(1+abs(drDisk/dcameraUp)/rDisk)` on unchanged #599 continuity support. No second geodesic is integrated.
+- Candidate `f4aff8c9ed1332e51600f3b54fa6916e41b2c45d`.
+- Windows Build `#651`; run `32540412278`; workflow `328346937`; artifact `9467001533`; digest `sha256:53bacf11a5ebceaa94d1807a2669fdc02b77f6d5872c4577d9eba3bca6f88937`.
+- Frontend typecheck/lint/Vitest, Rust fast checks, Tauri release EXE, native Windows WebView2 capture, and artifact upload all succeeded.
+- Required images opened: `visual-candidate.png`, `visual-baseline.png`, `visual-split.png`, `02-single-scene-expanded.png`, #571/#651 original-size side-by-side, and #571/#651 core enlargement.
+- Fixed metrics: avg `1.1923076923`; median `1`; core `31`; cols `26`; longest `7`; span `682`; lower `10636`; warm `29705`; shadow `152`; dead `0`.
+- Visual: candidate is effectively #571 at original size and core enlargement; no additional high-intensity ridge continuity.
 - Verdict: rejected.
-- Root cause: integrated frame-dragging azimuthal excess is not a direct-family vertical-width/continuity coordinate. Do not scan thresholds, gains, sign-sensitive or cancellation variants of this same accumulated transport fraction.
+- Root cause: a single camera-up tangent mapped only into radial hit sensitivity is not a sufficient 2D transfer-width observable; it does not separate the desired direct ridge from the accepted #571 family.
+- Do not rescue with a radial-compression threshold or gain scan.
 - Restore commit: pending immediate forward restore after this log commit.
 
 ## Operational notes
@@ -115,5 +123,5 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 
 ## Current checkpoint
 - Accepted baseline remains #571.
-- #645 is rejected and must be forward-restored before another candidate.
-- Next orthogonal topology should leave accumulated scalar transport and simplified Jacobi proxies. Preferred direction: propagate a tangent-linear sensitivity of the actual Kerr ODE along the single accepted main geodesic (full-state variational response to camera-up perturbation), then use the physical first-hit transfer compression derived from that propagated sensitivity. This is not a second geodesic, not a framebuffer neighbor selector, and not the simplified `3/r^3` Jacobi proxy.
+- #651 is rejected and must be forward-restored before another candidate.
+- Next orthogonal topology: retain the actual Kerr tangent-linear architecture but propagate both independent camera-plane tangent directions and build the true 2x2 first-hit transfer Jacobian from `(diskRadius, diskPhi)` versus `(cameraRight, cameraUp)`. Use a scale-free singular-value anisotropy/rank observable rather than the rejected single-axis radial compression. This remains one main geodesic with tangent state, not two neighboring traces, and is materially different from the simplified Jacobi proxy family.
