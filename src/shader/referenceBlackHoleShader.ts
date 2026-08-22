@@ -25,59 +25,10 @@ float diskLocalIncidenceCosine(float diskRadius, float L, float kappa) {
   return localTheta / max(length(vec3(localRadial, localTheta, localPhi)), 1e-4);
 }
 
-float diskLocalPolarMomentum(float diskRadius, float L, float kappa) {
-  float equatorialPtheta = sqrt(max(kappa - KERR_A2 - L * L, 0.0));
-  return equatorialPtheta / max(diskRadius, 1e-4);
-}
-
-float diskIncidenceCameraJacobian(float diskRadius, vec2 cameraPlane) {
-  const float bundleEpsilon = 0.002;
-  float rPlus; float thetaPlus; float phiPlus; float prPlus; float pthetaPlus; float LPlus; float kappaPlus;
-  float rMinus; float thetaMinus; float phiMinus; float prMinus; float pthetaMinus; float LMinus; float kappaMinus;
-  initDngrCameraRay(cameraPlane.x, cameraPlane.y + bundleEpsilon, rPlus, thetaPlus, phiPlus, prPlus, pthetaPlus, LPlus, kappaPlus);
-  initDngrCameraRay(cameraPlane.x, cameraPlane.y - bundleEpsilon, rMinus, thetaMinus, phiMinus, prMinus, pthetaMinus, LMinus, kappaMinus);
-  float incidencePlus = diskLocalIncidenceCosine(diskRadius, LPlus, kappaPlus);
-  float incidenceMinus = diskLocalIncidenceCosine(diskRadius, LMinus, kappaMinus);
-  return abs(incidencePlus - incidenceMinus) / (2.0 * bundleEpsilon);
-}
-
-void kerrTangentDerivative(
-  float r, float theta, float pr, float ptheta, float L, float kappa,
-  float sr, float stheta, float sphi, float spr, float sptheta, float sL, float sKappa,
-  out float dsr, out float dstheta, out float dsphi, out float dspr, out float dsptheta
-) {
-  float sensitivityScale = max(
-    1.0,
-    max(max(abs(sr), abs(stheta)), max(max(abs(spr), abs(sptheta)), max(abs(sL), abs(sKappa))))
-  );
-  float eps = 1e-4 / sensitivityScale;
-  float drPlus; float dthetaPlus; float dphiPlus; float dprPlus; float dpthetaPlus;
-  float drMinus; float dthetaMinus; float dphiMinus; float dprMinus; float dpthetaMinus;
-  kerrDerivatives(
-    r + eps * sr, theta + eps * stheta, pr + eps * spr, ptheta + eps * sptheta,
-    L + eps * sL, kappa + eps * sKappa,
-    drPlus, dthetaPlus, dphiPlus, dprPlus, dpthetaPlus
-  );
-  kerrDerivatives(
-    r - eps * sr, theta - eps * stheta, pr - eps * spr, ptheta - eps * sptheta,
-    L - eps * sL, kappa - eps * sKappa,
-    drMinus, dthetaMinus, dphiMinus, dprMinus, dpthetaMinus
-  );
-  float invSpan = 0.5 / eps;
-  dsr = (drPlus - drMinus) * invSpan;
-  dstheta = (dthetaPlus - dthetaMinus) * invSpan;
-  dsphi = (dphiPlus - dphiMinus) * invSpan;
-  dspr = (dprPlus - dprMinus) * invSpan;
-  dsptheta = (dpthetaPlus - dpthetaMinus) * invSpan;
-}
-
 void shapeIncidenceQualifiedDirectShoulder(
   float candidateWeight,
   float pathStretch,
   float incidenceCosine,
-  float polarMomentum,
-  float incidenceJacobian,
-  float minSingularCompression,
   inout vec3 diskColor,
   float diskAlpha
 ) {
@@ -99,16 +50,6 @@ void shapeIncidenceQualifiedDirectShoulder(
   float warmShelfPeak = min(0.68, max(0.0, directPeak * 0.94));
   vec3 warmShelf = vec3(1.0, 0.93, 0.74) * warmShelfPeak;
   diskColor = mix(diskColor, max(diskColor, warmShelf), warmShelfSupport);
-
-  float polarMomentumCoherence = 1.0 - smoothstep(0.10, 0.22, polarMomentum);
-  float compactBundleWeight = smoothstep(3.2, 5.2, incidenceJacobian);
-  float transferCoreSupport = candidateWeight
-    * directTransferWeight
-    * polarMomentumCoherence
-    * compactBundleWeight
-    * minSingularCompression;
-  vec3 transferKnifeCore = vec3(1.0, 0.965, 0.84) * 0.82;
-  diskColor = max(diskColor, transferKnifeCore * transferCoreSupport);
 }
 `;
 
@@ -120,33 +61,18 @@ fragment = replaceOnce(
 );
 fragment = replaceOnce(
   fragment,
-  "  initDngrCameraRay(cameraPlane.x, cameraPlane.y, r, theta, phi, pr, ptheta, L, kappa);",
-  `  initDngrCameraRay(cameraPlane.x, cameraPlane.y, r, theta, phi, pr, ptheta, L, kappa);\n  const float tangentBundleEpsilon = 0.002;\n  float rrPlus; float rtPlus; float rpPlus; float rprPlus; float rptPlus; float rLPlus; float rkPlus;\n  float rrMinus; float rtMinus; float rpMinus; float rprMinus; float rptMinus; float rLMinus; float rkMinus;\n  initDngrCameraRay(cameraPlane.x + tangentBundleEpsilon, cameraPlane.y, rrPlus, rtPlus, rpPlus, rprPlus, rptPlus, rLPlus, rkPlus);\n  initDngrCameraRay(cameraPlane.x - tangentBundleEpsilon, cameraPlane.y, rrMinus, rtMinus, rpMinus, rprMinus, rptMinus, rLMinus, rkMinus);\n  float urPlus; float utPlus; float upPlus; float uprPlus; float uptPlus; float uLPlus; float ukPlus;\n  float urMinus; float utMinus; float upMinus; float uprMinus; float uptMinus; float uLMinus; float ukMinus;\n  initDngrCameraRay(cameraPlane.x, cameraPlane.y + tangentBundleEpsilon, urPlus, utPlus, upPlus, uprPlus, uptPlus, uLPlus, ukPlus);\n  initDngrCameraRay(cameraPlane.x, cameraPlane.y - tangentBundleEpsilon, urMinus, utMinus, upMinus, uprMinus, uptMinus, uLMinus, ukMinus);\n  float tangentInvSpan = 0.5 / tangentBundleEpsilon;\n  float srR = (rrPlus - rrMinus) * tangentInvSpan; float stR = (rtPlus - rtMinus) * tangentInvSpan;\n  float spR = (rpPlus - rpMinus) * tangentInvSpan; float sprR = (rprPlus - rprMinus) * tangentInvSpan;\n  float sptR = (rptPlus - rptMinus) * tangentInvSpan; float sLR = (rLPlus - rLMinus) * tangentInvSpan; float sKR = (rkPlus - rkMinus) * tangentInvSpan;\n  float srU = (urPlus - urMinus) * tangentInvSpan; float stU = (utPlus - utMinus) * tangentInvSpan;\n  float spU = (upPlus - upMinus) * tangentInvSpan; float sprU = (uprPlus - uprMinus) * tangentInvSpan;\n  float sptU = (uptPlus - uptMinus) * tangentInvSpan; float sLU = (uLPlus - uLMinus) * tangentInvSpan; float sKU = (ukPlus - ukMinus) * tangentInvSpan;`,
-);
-fragment = replaceOnce(
-  fragment,
   "  bool captured = false; int diskCrossingCount = 0; vec3 accumulatedDisk = vec3(0.0); float transmittance = 1.0;",
-  "  bool captured = false; int diskCrossingCount = 0; vec3 accumulatedDisk = vec3(0.0); float transmittance = 1.0; float pathLength = 0.0; float previousSrR = srR; float previousStR = stR; float previousSpR = spR; float previousSrU = srU; float previousStU = stU; float previousSpU = spU;",
-);
-fragment = replaceOnce(
-  fragment,
-  "    previousR = r; previousPhi = phi;",
-  `    float acceptedStepLength = h;\n    previousR = r; previousPhi = phi;\n    previousSrR = srR; previousStR = stR; previousSpR = spR;\n    previousSrU = srU; previousStU = stU; previousSpU = spU;\n    float dsrR; float dstR; float dspR; float dsprR; float dsptR;\n    float dsrU; float dstU; float dspU; float dsprU; float dsptU;\n    kerrTangentDerivative(r, theta, pr, ptheta, L, kappa, srR, stR, spR, sprR, sptR, sLR, sKR, dsrR, dstR, dspR, dsprR, dsptR);\n    kerrTangentDerivative(r, theta, pr, ptheta, L, kappa, srU, stU, spU, sprU, sptU, sLU, sKU, dsrU, dstU, dspU, dsprU, dsptU);\n    float nextSrR = srR + dsrR * acceptedStepLength; float nextStR = stR + dstR * acceptedStepLength; float nextSpR = spR + dspR * acceptedStepLength;\n    float nextSprR = sprR + dsprR * acceptedStepLength; float nextSptR = sptR + dsptR * acceptedStepLength;\n    float nextSrU = srU + dsrU * acceptedStepLength; float nextStU = stU + dstU * acceptedStepLength; float nextSpU = spU + dspU * acceptedStepLength;\n    float nextSprU = sprU + dsprU * acceptedStepLength; float nextSptU = sptU + dsptU * acceptedStepLength;`,
-);
-fragment = replaceOnce(
-  fragment,
-  "    normalizePolarState(theta, phi, ptheta); projectKerrMomenta(r, theta, L, kappa, pr, ptheta);",
-  "    normalizePolarState(theta, phi, ptheta); projectKerrMomenta(r, theta, L, kappa, pr, ptheta);\n    srR = nextSrR; stR = nextStR; spR = nextSpR; sprR = nextSprR; sptR = nextSptR;\n    srU = nextSrU; stU = nextStU; spU = nextSpU; sprU = nextSprU; sptU = nextSptU;",
+  "  bool captured = false; int diskCrossingCount = 0; vec3 accumulatedDisk = vec3(0.0); float transmittance = 1.0; float pathLength = 0.0;",
 );
 fragment = replaceOnce(
   fragment,
   "    h = clamp(h * clamp(0.90 * pow(max(acceptedErrorRatio, 1e-6), -0.20), 0.55, 1.80), KERR_MIN_STEP, KERR_MAX_STEP);",
-  "    h = clamp(h * clamp(0.90 * pow(max(acceptedErrorRatio, 1e-6), -0.20), 0.55, 1.80), KERR_MIN_STEP, KERR_MAX_STEP);",
+  "    float acceptedStepLength = h;\n    h = clamp(h * clamp(0.90 * pow(max(acceptedErrorRatio, 1e-6), -0.20), 0.55, 1.80), KERR_MIN_STEP, KERR_MAX_STEP);",
 );
 fragment = replaceOnce(
   fragment,
   "        sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha);\n        float colorGain = crossingColorGain(diskCrossingCount);",
-  `        sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha);\n        if (diskCrossingCount == 0) {\n          float hitPathLength = pathLength + crossing * acceptedStepLength;\n          float radialDirectDistance = max(OBSERVER_R - diskRadius, 1.0);\n          float pathStretch = hitPathLength / radialDirectDistance;\n          float incidenceCosine = diskLocalIncidenceCosine(diskRadius, L, kappa);\n          float polarMomentum = diskLocalPolarMomentum(diskRadius, L, kappa);\n          float incidenceJacobian = diskIncidenceCameraJacobian(diskRadius, cameraPlane);\n          float hitSrR = mix(previousSrR, srR, crossing); float hitStR = mix(previousStR, stR, crossing); float hitSpR = mix(previousSpR, spR, crossing);\n          float hitSrU = mix(previousSrU, srU, crossing); float hitStU = mix(previousStU, stU, crossing); float hitSpU = mix(previousSpU, spU, crossing);\n          float hitDr; float hitDtheta; float hitDphi; float hitDpr; float hitDptheta;\n          kerrDerivatives(diskRadius, 0.5 * PI, pr, ptheta, L, kappa, hitDr, hitDtheta, hitDphi, hitDpr, hitDptheta);\n          float safeHitDtheta = abs(hitDtheta) < 1e-5 ? (hitDtheta < 0.0 ? -1e-5 : 1e-5) : hitDtheta;\n          float dRadiusRight = hitSrR - hitDr * hitStR / safeHitDtheta;\n          float dRadiusUp = hitSrU - hitDr * hitStU / safeHitDtheta;\n          float dPhiRight = hitSpR - hitDphi * hitStR / safeHitDtheta;\n          float dPhiUp = hitSpU - hitDphi * hitStU / safeHitDtheta;\n          vec2 radialGradient = vec2(dRadiusRight, dRadiusUp) / max(diskRadius, 1.0);\n          vec2 azimuthGradient = vec2(dPhiRight, dPhiUp);\n          float transferTrace = dot(radialGradient, radialGradient) + dot(azimuthGradient, azimuthGradient);\n          float transferDet = radialGradient.x * azimuthGradient.y - radialGradient.y * azimuthGradient.x;\n          float singularDiscriminant = max(transferTrace * transferTrace - 4.0 * transferDet * transferDet, 0.0);\n          float minSingularSquared = 0.5 * max(transferTrace - sqrt(singularDiscriminant), 0.0);\n          float minSingularTransfer = sqrt(minSingularSquared);\n          float minSingularCompression = 1.0 / (1.0 + minSingularTransfer);\n          shapeIncidenceQualifiedDirectShoulder(candidateWeight, pathStretch, incidenceCosine, polarMomentum, incidenceJacobian, minSingularCompression, diskColor, diskAlpha);\n        }\n        float colorGain = crossingColorGain(diskCrossingCount);`,
+  `        sampleDiskSurface(diskRadius, diskPhi, patternTime, diskColor, diskAlpha);\n        if (diskCrossingCount == 0) {\n          float hitPathLength = pathLength + crossing * acceptedStepLength;\n          float radialDirectDistance = max(OBSERVER_R - diskRadius, 1.0);\n          float pathStretch = hitPathLength / radialDirectDistance;\n          float incidenceCosine = diskLocalIncidenceCosine(diskRadius, L, kappa);\n          shapeIncidenceQualifiedDirectShoulder(candidateWeight, pathStretch, incidenceCosine, diskColor, diskAlpha);\n        }\n        float colorGain = crossingColorGain(diskCrossingCount);`,
 );
 fragment = replaceOnce(
   fragment,
