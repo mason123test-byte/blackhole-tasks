@@ -39,7 +39,8 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 10. No full-Kerr first-hit 2x2 rank/determinant remap (#657): it broadens to median 2px.
 11. No full-Kerr first-hit `sigma_min` threshold/gain/remap (#663): it collapses to #571. Static endpoint singular-spectrum family is excluded.
 12. No cumulative absolute principal-axis twist normalization/gain/threshold scan (#669): it saturates and reproduces #599's 2px family.
-13. Geometry remains frozen.
+13. No pooled two-axis pre-hit configuration–momentum focusing-alignment normalization/gain/threshold scan (#677): strongest negative phase-space correlation saturates the #599 continuity family and reproduces its 2px ridge.
+14. Geometry remains frozen.
 
 ## Key continuity reference
 ### #599 — REJECTED
@@ -77,6 +78,21 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 - Restore Build #673; run `32562060526`; completed success; artifact `9473191345`; digest `sha256:9dfea4618aad1ea63ab784747ae53bf3524d75806ae7b26a834f80631cb864c3`.
 - Restored production blobs: shader `130745839c509a727d409992b086e72a6908ce5b`; incidence test `84b2577676b0bc7fc0617bdf14ab68fb5c6bb9a4`.
 
+### #677 — actual-Kerr configuration–momentum focusing alignment history — REJECTED
+- Starting accepted checkpoint `952d99d318f86019edf166f93cbb906abbc84a67`; production blobs exactly #571 before candidate.
+- Candidate `097cc27805d77cb4a494f3dc2ea9540c11d08c8e`.
+- Unique topology: propagate the same two actual-Kerr camera tangents used by #669, form the normalized phase-space bundle vectors `q=(delta r/r, delta theta)` and `p=(delta pr, delta ptheta/r)` for both tangent axes, evaluate threshold-free negative correlation `max(0,-dot(q,p)/(|q||p|))` at each accepted pre-hit state, and retain the strongest focusing alignment before the first disk crossing. No second geodesic, endpoint singular spectrum, spatial-axis twist, framebuffer neighborhood, source texture, RGB, or `screen.y` classifier.
+- Frozen continuity support remains #599 semantics: polar momentum `0.10–0.22` and incidence Jacobian `3.2–5.2`; the only new discriminator is the threshold-free focusing-alignment history scalar.
+- Build #677; run `32567370649`; workflow `328346937`; completed success.
+- Artifact `9474499603`; digest `sha256:95c90f0352922df54d70f45aecf5f8b1c1999cbfb0c86f2e97b232a67de651aa`.
+- Tauri runnable EXE build, native WebView2 capture and artifact upload succeeded. `visual-candidate.png`, `visual-baseline.png`, `visual-split.png`, expanded screenshot, accepted/candidate original-size comparison, and accepted/candidate 4x core comparison were opened.
+- Metrics: avg `2.1608391608`; median `2`; core `309`; cols `143`; longest `45`; span `682`; lower `10988`; warm `30091`; shadow `152`; dead `0`.
+- Visual: the direct ridge becomes long and continuous, but the accepted ~1px core becomes a clearly thicker ~2px band. The 4x core view confirms vertical thickening across the recovered ridge.
+- Verdict: REJECTED. It violates the median=1 and avg<=~1.30 hard gates despite matching the desired #599-style 45-column continuity.
+- Root cause: pooled strongest negative configuration–momentum correlation saturates across the same continuity family as #599 and does not separate the one-pixel fold from its vertically adjacent response. Do not scan correlation normalization, gain, clamp, or threshold.
+- Restore pending from accepted #571 blobs.
+
 ## Current checkpoint
-- Accepted baseline remains #571 and is fully restored/Windows-validated at `9d7816e4be999a3355055cc2bf71da99fd6db969`.
-- Next orthogonal topology: actual-Kerr **configuration–momentum focusing alignment history**. Propagate the same two camera tangents, but measure normalized phase-space correlation between configuration displacement `(delta r/r, delta theta)` and momentum displacement `(delta pr, delta ptheta/r)`. Negative alignment means the separated bundle is dynamically contracting toward a caustic. Track the strongest pre-hit focusing alignment threshold-free; do not reuse endpoint rank/singular values or accumulated spatial-axis twist.
+- Accepted baseline remains #571.
+- #677 is rejected and must be forward-restored before any new candidate.
+- Next orthogonal topology after restore: actual-Kerr **axis-differential phase-space focusing anisotropy history**. Keep the two propagated tangents, compute right-axis and camera-up-axis normalized configuration–momentum contraction separately, and use their pre-hit differential/anisotropy as the single width discriminator instead of pooled correlation. Do not scan the rejected pooled-correlation family.
