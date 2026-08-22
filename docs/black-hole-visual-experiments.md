@@ -42,7 +42,8 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 13. No pooled two-axis pre-hit configuration–momentum focusing-alignment magnitude scan (#677): it saturates the #599 family.
 14. No axis-differential focusing-anisotropy magnitude scan (#685), including gain/clamp/threshold/right-up weighting/simple absolute-difference remaps: it saturates the #599 family.
 15. No first contraction-onset timing/path-fraction asymmetry remap (#691): zero-crossing event timing also saturates the #599 family.
-16. Geometry remains frozen.
+16. No reduced phase-space symplectic cross-coupling signed/absolute cancellation remap (#697): it is inert and reproduces #571 exactly; do not scan cancellation/coherence normalization, gain, clamp, or threshold.
+17. Geometry remains frozen.
 
 ## Key continuity reference
 ### #599 — REJECTED
@@ -105,9 +106,24 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 - Visual: timing-event observable again exposes the full long continuity ridge, but the high-intensity core is visibly ~2px thick. The 4x core comparison confirms vertical broadening.
 - Verdict: REJECTED. Fails median=1 and avg<=~1.30 hard gates.
 - Root cause: the first contraction-onset ordering/timing is nearly common across the desired fold and its vertically adjacent bundle response; relative onset separation therefore saturates on the same #599 continuity family. Do not scan event interpolation, onset normalization, gain, threshold, or simple timing remaps.
+- Restore `743b24611b74e094e29657586635a0340a6909b7`; restored production blobs: shader `130745839c509a727d409992b086e72a6908ce5b`, incidence test `84b2577676b0bc7fc0617bdf14ab68fb5c6bb9a4`.
+- Restore Build #695; run `32572270160`; completed success; artifact `9475694090`; digest `sha256:241594bbb1e9d8def45b985ca1563a0df4c68a4d4ab435d70920246ef81fbe9a`.
+- Restore artifact downloaded/opened; Tauri EXE, native WebView2 capture and artifact upload all succeeded. Fixed metrics returned exactly to #571: avg `1.1923076923`; median `1`; core `31`; cols `26`; longest `7`; span `682`; lower `10636`; warm `29693`; shadow `152`; dead `0`.
+
+### #697 — actual-Kerr reduced phase-space symplectic cancellation history — REJECTED
+- Starting accepted restore `743b24611b74e094e29657586635a0340a6909b7`, validated by Build #695.
+- Candidate `31344ea6acfbe0f4deb4af6807ad968dfa762b72`.
+- Unique topology: propagate the same two actual-Kerr camera tangents, form reduced phase-space axes `qR=(drR/r,dthetaR)`, `pR=(dprR,dpthetaR/r)`, `qU=(drU/r,dthetaU)`, `pU=(dprU,dpthetaU/r)`, evaluate normalized cross-axis symplectic pairing `Omega=(qR·pU-pR·qU)/(|zR||zU|)` at each accepted pre-hit state, integrate both signed `Omega` and `abs(Omega)` over accepted path length, and use cancellation `1-abs(integral Omega)/integral abs(Omega)` as the sole new width discriminator on frozen #599 continuity support. No endpoint spectrum, focusing magnitude/onset, screen-space neighborhood, `screen.y`, source texture or RGB classifier.
+- Build #697; run `32585668147`; completed success.
+- Artifact `9479050456`; digest `sha256:219b24cc7f9d62f18198d5e84b2a089030cedd98d883bd3466b464b7840f5e65`.
+- Frontend/Rust fast checks, Tauri runnable EXE, native WebView2 capture and artifact upload succeeded. `visual-candidate.png`, `visual-baseline.png`, `visual-split.png`, expanded screenshot, accepted/candidate original-size and accepted/candidate 4x core images were opened.
+- Metrics: avg `1.1923076923`; median `1`; core `31`; cols `26`; longest `7`; span `682`; lower `10636`; warm `29693`; shadow `152`; dead `0` — exactly #571.
+- Visual: candidate is indistinguishable from accepted #571 at original size and in the 4x core ROI. No horizontal high-intensity continuity gain is visible.
+- Verdict: REJECTED. It preserves the 1px core but fails the mandatory continuity improvement gate.
+- Root cause: signed-vs-absolute cross-axis symplectic cancellation does not separate any additional frozen #599 continuity pixels; the observable is effectively inert on the target direct core. Do not scan cancellation/coherence normalization, gain, clamp or threshold.
 - Restore pending immediately after this record.
 
 ## Current checkpoint
 - Accepted baseline remains #571.
-- #691 is rejected and logged; production must be forward-restored to the exact #571 shader/test blobs and Windows-validated before another candidate.
-- Next orthogonal topology after restore: actual-Kerr **reduced phase-space symplectic cross-coupling history**. Propagate the same two camera tangents, but discard individual contraction magnitudes and onset times. Measure the normalized cross-axis reduced symplectic pairing `Omega = qRight·pUp - pRight·qUp` along accepted pre-hit states, and use a history feature of its sign/coupling evolution as the sole new discriminator. Do not reuse endpoint determinant/rank/singular values or the rejected focusing magnitude/timing families.
+- #697 is rejected and logged. Production must be forward-restored to the exact #571 shader/test blobs and Windows-validated before another candidate.
+- Next orthogonal topology after restore: actual-Kerr **symplectic coupling zero-crossing / sign-order history**, but it must not be a threshold scan of #697 cancellation. Prefer a discrete propagation-history feature such as first `Omega` sign reversal location relative to first disk crossing or right/up coupling orientation order, provided canonical review confirms it is not equivalent to #691 event timing. If that event topology collapses to #691 semantics, choose a different invariant history rather than proceeding.
