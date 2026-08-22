@@ -90,9 +90,11 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 - Visual: the direct ridge becomes long and continuous, but the accepted ~1px core becomes a clearly thicker ~2px band. The 4x core view confirms vertical thickening across the recovered ridge.
 - Verdict: REJECTED. It violates the median=1 and avg<=~1.30 hard gates despite matching the desired #599-style 45-column continuity.
 - Root cause: pooled strongest negative configuration–momentum correlation saturates across the same continuity family as #599 and does not separate the one-pixel fold from its vertically adjacent response. Do not scan correlation normalization, gain, clamp, or threshold.
-- Restore pending from accepted #571 blobs.
+- Restore `c7c4619988222e10a2af5e85b6bb7dd711a52d57`; restored production blobs: shader `130745839c509a727d409992b086e72a6908ce5b`, incidence test `84b2577676b0bc7fc0617bdf14ab68fb5c6bb9a4`.
+- Restore Build #681; run `32567786955`; completed success; artifact `9474598808`; digest `sha256:ae794d48ef95ae852d0535f3113f675baa59cc3b586e72ba02891ef8b82a1bbc`.
+- Restore artifact downloaded/opened and fixed metrics exactly returned to #571: avg `1.1923076923`; median `1`; core `31`; cols `26`; longest `7`; span `682`; lower `10636`; warm `29693`; shadow `152`; dead `0`.
 
 ## Current checkpoint
 - Accepted baseline remains #571.
-- #677 is rejected and must be forward-restored before any new candidate.
+- #677 is rejected, logged, forward-restored, and Windows-validated at `c7c4619988222e10a2af5e85b6bb7dd711a52d57`.
 - Next orthogonal topology after restore: actual-Kerr **axis-differential phase-space focusing anisotropy history**. Keep the two propagated tangents, compute right-axis and camera-up-axis normalized configuration–momentum contraction separately, and use their pre-hit differential/anisotropy as the single width discriminator instead of pooled correlation. Do not scan the rejected pooled-correlation family.
