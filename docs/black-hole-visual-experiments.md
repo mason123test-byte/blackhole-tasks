@@ -40,7 +40,8 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 11. No full-Kerr first-hit `sigma_min` threshold/gain/remap (#663): it collapses to #571. Static endpoint singular-spectrum family is excluded.
 12. No cumulative absolute principal-axis twist normalization/gain/threshold scan (#669): it saturates and reproduces #599's 2px family.
 13. No pooled two-axis pre-hit configuration–momentum focusing-alignment normalization/gain/threshold scan (#677): strongest negative phase-space correlation saturates the #599 continuity family and reproduces its 2px ridge.
-14. Geometry remains frozen.
+14. No axis-differential phase-space focusing-anisotropy normalization/gain/threshold scan (#685): max right/up contraction difference also saturates the same #599 continuity family and reproduces its 2px ridge.
+15. Geometry remains frozen.
 
 ## Key continuity reference
 ### #599 — REJECTED
@@ -94,7 +95,21 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 - Restore Build #681; run `32567786955`; completed success; artifact `9474598808`; digest `sha256:ae794d48ef95ae852d0535f3113f675baa59cc3b586e72ba02891ef8b82a1bbc`.
 - Restore artifact downloaded/opened and fixed metrics exactly returned to #571: avg `1.1923076923`; median `1`; core `31`; cols `26`; longest `7`; span `682`; lower `10636`; warm `29693`; shadow `152`; dead `0`.
 
+### #685 — actual-Kerr axis-differential phase-space focusing anisotropy history — REJECTED
+- Starting accepted checkpoint `f9be7fd79c9b2529ed35714cb6a14f3bcd4361bc`, with production shader/test still exactly #571 before candidate.
+- Candidate `ea61ad38c3089d2f71bbc1c6eddcca05ff72e57d`.
+- Unique topology: propagate the same two actual-Kerr camera tangents, compute normalized configuration–momentum contraction independently for the camera-right and camera-up tangent axes, use `abs(cameraUpFocusing - cameraRightFocusing)` as a threshold-free per-step anisotropy observable, and retain the strongest pre-hit anisotropy. No pooled phase-space dot product, endpoint singular spectrum, principal-axis twist, second full geodesic, framebuffer neighborhood, source texture/RGB, or `screen.y` classifier.
+- Frozen #599 continuity support remains polar momentum `0.10–0.22` plus incidence Jacobian `3.2–5.2`; the only new discriminator is strongest focusing anisotropy.
+- Build #685; run `32568238898`; workflow `328346937`; completed success.
+- Artifact `9474713487`; digest `sha256:c8dd6276ceb31703bc89f9ab60b321bfb8316a069dd894718c5f68144f5595b5`.
+- Tauri runnable EXE, native WebView2 capture and artifact upload all succeeded. Candidate, baseline, split and expanded Windows screenshots were downloaded and opened.
+- Metrics: avg `2.1608391608`; median `2`; core `309`; cols `143`; longest `45`; span `682`; lower `10988`; warm `30091`; shadow `152`; dead `0`.
+- Visual: the candidate again produces the long #599-style direct ridge, but the high-intensity core is clearly about 2px thick rather than the accepted ~1px. It fails the median and average-thickness hard gates.
+- Verdict: REJECTED.
+- Root cause: the axis-differential contraction observable saturates on the same broad continuity family as pooled focusing and does not isolate the one-pixel fold from the vertically adjacent response. Do not scan anisotropy normalization, gain, clamp, threshold, right/up weighting, or simple absolute-difference remaps.
+- Restore pending immediately after this canonical record.
+
 ## Current checkpoint
 - Accepted baseline remains #571.
-- #677 is rejected, logged, forward-restored, and Windows-validated at `c7c4619988222e10a2af5e85b6bb7dd711a52d57`.
-- Next orthogonal topology after restore: actual-Kerr **axis-differential phase-space focusing anisotropy history**. Keep the two propagated tangents, compute right-axis and camera-up-axis normalized configuration–momentum contraction separately, and use their pre-hit differential/anisotropy as the single width discriminator instead of pooled correlation. Do not scan the rejected pooled-correlation family.
+- #685 is rejected and logged; production must be forward-restored to the exact #571 shader/test blobs before any new candidate.
+- Next orthogonal topology after restore: actual-Kerr **pre-hit focusing zero-crossing / contraction-onset timing asymmetry**. Keep the same two tangent axes but discard strongest-magnitude statistics. For each axis, track the first accepted step where normalized configuration–momentum correlation changes from non-contracting to contracting, expressed as a path-fraction/event-order quantity; use only the right-vs-up onset-timing separation as the single width discriminator. Do not scan #677 pooled magnitude or #685 anisotropy magnitude families.
