@@ -44,7 +44,8 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 15. No first contraction-onset timing/path-fraction asymmetry remap (#691): zero-crossing event timing also saturates the #599 family.
 16. No reduced phase-space symplectic cross-coupling signed/absolute cancellation remap (#697): it is inert and reproduces #571 exactly; do not scan cancellation/coherence normalization, gain, clamp, or threshold.
 17. No configuration-area versus momentum-area log-ratio total-variation/net-drift reversal remap (#703): it is inert on the high-intensity core; do not scan its log clamp, reversal normalization, gain, or threshold.
-18. Geometry remains frozen.
+18. No finite-time right/up growth-order persistence remap (#717): corrected implementation reproduces #571 exactly; do not scan its persistence smoothstep, gain, or threshold.
+19. Geometry remains frozen.
 
 ## Key continuity reference
 ### #599 — REJECTED
@@ -137,11 +138,24 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 - Native WebView2 capture failed before producing any non-empty WebGL2 frame: `Orb did not produce a non-empty WebGL2 frame within 20000ms; lastTitle=''`.
 - Artifact `9486073707`; digest `sha256:872b72487011174d34c3e9ea7964eb0ef487b82b9dd2c25c08725f0de0554ee0`; artifact contains only `visual-baseline-diagnostics.txt` with `build=native-cursor-v5 phase=database-opened`, no screenshots and therefore no valid frozen metrics.
 - Root cause is implementation, not topology: candidate used `predictedR = r + dr * acceptedStepLength`, but the baseline loop's in-scope radial derivative is named `dr0`. The resulting GLSL references an undeclared identifier, preventing shader compilation and any non-empty WebGL2 frame.
-- Verdict: TECHNICALLY INVALID / UNVERIFIED, not a visual rejection. No topology exclusion is added from this run.
-- Required action: forward-restore #571 and Windows-validate the restore before remounting a corrected implementation of the same growth-order topology.
+- Verdict: TECHNICALLY INVALID / UNVERIFIED, not a visual rejection. No topology exclusion was added from #711 itself.
+- Forward restore `84ffc3c06fe50c7e9d04ca8d01082e28ddb9784d` restored exact #571 shader/test blobs.
+- Restore Build #715; run `32613211196`; completed success; artifact `9486194968`; digest `sha256:594a4cdb0101d1f411bb3799251d4d15128d3dc8a764839f00b55460962db41b`.
+- Restore artifact downloaded and `visual-candidate.png` opened. Fixed metrics returned exactly to #571: avg `1.1923076923`; median `1`; core `31`; cols `26`; longest `7`; span `682`; lower `10636`; warm `29693`; shadow `152`; dead `0`.
+
+### #717 — corrected actual-Kerr finite-time relative growth-rate ordering history — REJECTED
+- Starting accepted restore `84ffc3c06fe50c7e9d04ca8d01082e28ddb9784d`, validated by Build #715.
+- Candidate `f74d8a9fffce706fb43d09955a226afebc4ef0bd`; shader blob `31cc2db1726489613b0645fe9719b409277d45f2`; incidence test blob `6ac1bc148cbd3554b468e17166ea77e41288130e`.
+- Topology is the intended #711 growth-order persistence calculation with the implementation-only correction `predictedR = r + dr0 * acceptedStepLength`; no threshold or gain was changed.
+- Build #717; run `32613576408`; completed success.
+- Artifact `9486299155`; digest `sha256:2102444d8cbe95e1d80894cd2cec2d9924cdb735aaee36e56aa5cde30eaeff98`.
+- Candidate/baseline/split/expanded screenshots, accepted-vs-candidate original-size comparison and 4x core comparison were actually opened.
+- Frozen metrics: avg `1.1923076923`; median `1`; core `31`; cols `26`; longest `7`; span `682`; lower `10636`; warm `29693`; shadow `152`; dead `0` — exactly #571.
+- Visual: no visible continuity gain at original size or 4x core; the candidate reproduces accepted #571.
+- Verdict: REJECTED / inert. Do not scan growth-order persistence threshold, smoothstep range, or gain.
+- Required action: forward restore exact #571 production blobs and Windows-validate before infrastructure work.
 
 ## Current checkpoint
 - Accepted baseline remains #571.
-- #711 is technically invalid and has no visual conclusion or frozen metrics.
-- Production must be forward-restored to exact #571 shader/test blobs and Windows-validated before a corrected growth-order candidate is mounted.
-- Corrected candidate may reuse the finite-time relative growth-rate ordering topology only after fixing the GLSL radial-derivative reference; no threshold/gain scan has yet been evaluated for this topology.
+- #717 is rejected and logged; its finite-time growth-order persistence family is now excluded from further serial threshold/gain tuning.
+- Next action is not a new visual topology. Forward-restore #571, Windows-validate it, then refactor Windows visual experiments for single-build batch capture and machine-readable metrics.
