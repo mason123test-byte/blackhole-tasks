@@ -89,15 +89,24 @@ export function BlackHoleCanvas({
     if (!ref.current || visualComparisonMode === null || visualExperiment === null) return;
     if (visualComparisonMode !== "normal" && !expanded) return;
 
-    if (nativeRuntime) reportVisualBootStage("renderer-start");
-    const stopRenderer = startBlackHole(
-      ref.current,
-      () => expandedRef.current,
-      () => sceneRef.current,
-      { quality, lowPowerMode, visualComparisonMode, visualExperiment, onError },
-    );
-    return stopRenderer;
-  }, [expanded, lowPowerMode, nativeRuntime, onError, quality, visualComparisonMode, visualExperiment]);
+    let stopRenderer: () => void = () => undefined;
+    let cancelled = false;
+    if ("__TAURI_INTERNALS__" in window) reportVisualBootStage("renderer-start-yield");
+    const startTimer = window.setTimeout(() => {
+      if (cancelled || !ref.current) return;
+      stopRenderer = startBlackHole(
+        ref.current,
+        () => expandedRef.current,
+        () => sceneRef.current,
+        { quality, lowPowerMode, visualComparisonMode, visualExperiment, onError },
+      );
+    }, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(startTimer);
+      stopRenderer();
+    };
+  }, [expanded, lowPowerMode, onError, quality, visualComparisonMode, visualExperiment]);
 
   return <canvas ref={ref} className="black-hole-canvas" aria-label="黑洞任务悬浮窗" />;
 }
