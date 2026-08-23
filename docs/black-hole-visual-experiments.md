@@ -122,9 +122,13 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 - Against restore #701: core metrics are identical; lower is +7 pixels and warm -3 pixels, both negligible. Original-size and 4x-core inspection show no high-intensity continuity gain.
 - Verdict: REJECTED. It preserves 1px but fails the mandatory columns/longest continuity improvement gate.
 - Root cause: configuration-vs-momentum subspace area reversal history is effectively inert on the desired direct core. Do not scan the log clamp, total-variation/net-drift normalization, gain, threshold, or simple remaps.
-- Restore pending immediately after this record.
+- Rejection log `a347b20c141fcae0d3809c56750948c4b309ea15`.
+- Restore `f9d2e490165ffaefefe276f440e7b1232e60ae62`; restored production blobs: shader `130745839c509a727d409992b086e72a6908ce5b`, incidence test `84b2577676b0bc7fc0617bdf14ab68fb5c6bb9a4`.
+- Restore Build #707; run `32609873530`; completed success; artifact `9485256978`; digest `sha256:b7d3ade9547a630ce9b7d1082147cf8c010b867c2c32fb5d14a3a8b507540fe6`.
+- Restore artifact downloaded and `visual-candidate.png` opened. Fixed metrics returned exactly to #571: avg `1.1923076923`; median `1`; core `31`; cols `26`; longest `7`; span `682`; lower `10636`; warm `29693`; shadow `152`; dead `0`. Restore validated.
 
 ## Current checkpoint
 - Accepted baseline remains #571.
-- #703 is rejected and logged. Production must be forward-restored to exact #571 shader/test blobs and Windows-validated before another candidate.
-- Next orthogonal family after restore must avoid symplectic cancellation (#697), configuration/momentum area reversal (#703), endpoint spectra/rank, focusing magnitude/timing and principal-axis twist. A candidate may investigate an actual-Kerr tangent **finite-time relative growth-rate ordering history** only if it is formulated as a propagation-order invariant rather than an endpoint singular-value proxy; otherwise choose a different invariant history.
+- #703 is rejected, logged, forward-restored, and Windows-validated. Production is exactly the accepted #571 shader/test pair.
+- No rejected or unverified visual candidate remains in production.
+- Next orthogonal family must avoid symplectic cancellation (#697), configuration/momentum area reversal (#703), endpoint spectra/rank, focusing magnitude/timing and principal-axis twist. Candidate direction: actual-Kerr tangent **finite-time relative growth-rate ordering history**, formulated as a propagation-order invariant rather than an endpoint singular-value proxy. If implementation collapses to singular-spectrum or simple gain/threshold semantics, reject the topology before mounting it.
