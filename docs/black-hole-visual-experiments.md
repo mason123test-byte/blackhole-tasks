@@ -43,7 +43,8 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 14. No axis-differential focusing-anisotropy magnitude scan (#685), including gain/clamp/threshold/right-up weighting/simple absolute-difference remaps: it saturates the #599 family.
 15. No first contraction-onset timing/path-fraction asymmetry remap (#691): zero-crossing event timing also saturates the #599 family.
 16. No reduced phase-space symplectic cross-coupling signed/absolute cancellation remap (#697): it is inert and reproduces #571 exactly; do not scan cancellation/coherence normalization, gain, clamp, or threshold.
-17. Geometry remains frozen.
+17. No configuration-area versus momentum-area log-ratio total-variation/net-drift reversal remap (#703): it is inert on the high-intensity core; do not scan its log clamp, reversal normalization, gain, or threshold.
+18. Geometry remains frozen.
 
 ## Key continuity reference
 ### #599 — REJECTED
@@ -88,42 +89,42 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 - Candidate `ea61ad38c3089d2f71bbc1c6eddcca05ff72e57d`.
 - Unique topology: compute normalized configuration–momentum contraction independently for camera-right and camera-up tangents, retain strongest `abs(up-right)` pre-hit anisotropy on frozen #599 continuity support.
 - Build #685; run `32568238898`; artifact `9474713487`; digest `sha256:c8dd6276ceb31703bc89f9ab60b321bfb8316a069dd894718c5f68144f5595b5`.
-- Tauri EXE, native WebView2 capture and artifact upload succeeded; candidate/baseline/split/expanded were opened.
 - Metrics: avg `2.1608391608`; median `2`; core `309`; cols `143`; longest `45`; span `682`; lower `10988`; warm `30091`; shadow `152`; dead `0`.
 - Visual: same long #599 ridge and ~2px core. Axis-differential magnitude does not isolate 1px fold.
-- Log `a847c74483dd4a3a0f57c789de6485f92a75648f`; restore `e1caada63252bac733fa956ea6fb718675d02c44`.
-- Restore Build #689; run `32571452889`; artifact `9475482095`; digest `sha256:646270517a94d1e67dcdf7c4763da3e7e32ceb833631c020d558515d1808c9e8`; completed success.
-- Restore artifact downloaded/opened. Fixed metrics returned exactly to #571: avg `1.1923076923`; median `1`; core `31`; cols `26`; longest `7`; span `682`; lower `10636`; warm `29693`; shadow `152`; dead `0`.
+- Log `a847c74483dd4a3a0f57c789de6485f92a75648f`; restore `e1caada63252bac733fa956ea6fb718675d02c44`; Restore Build #689 run `32571452889` success; artifact `9475482095`; digest `sha256:646270517a94d1e67dcdf7c4763da3e7e32ceb833631c020d558515d1808c9e8`; restore metrics exactly #571.
 
 ### #691 — actual-Kerr contraction-onset timing asymmetry — REJECTED
-- Starting accepted restore `e1caada63252bac733fa956ea6fb718675d02c44`, validated by Build #689.
-- Candidate `9d9a4f3f91f6e0523640cad916b6af8ef53171ff`.
-- Unique topology: propagate the same two actual-Kerr tangent directions, retain signed normalized reduced phase-space configuration–momentum correlation for each axis, detect only the first accepted-step zero crossing from non-contracting (`>=0`) to contracting (`<0`) with linear sub-step interpolation, and use the relative right-vs-up onset-path separation `abs(tR-tU)/max(tR,tU)` as the single width discriminator. Strongest magnitude statistics from #677/#685 are not used.
-- Build #691; run `32571853791`; completed success.
-- Artifact `9475579143`; digest `sha256:5ca8660860db9d9a0f53fc640879ae742a79953147868fb56bec82f91fb95d29`.
-- Tauri runnable EXE, native WebView2 capture and artifact upload succeeded. `visual-candidate.png`, `visual-split.png`, expanded screenshot, accepted/candidate original-size comparison and accepted/candidate 4x core comparison were opened.
+- Candidate `9d9a4f3f91f6e0523640cad916b6af8ef53171ff`; Build #691; run `32571853791`; artifact `9475579143`; digest `sha256:5ca8660860db9d9a0f53fc640879ae742a79953147868fb56bec82f91fb95d29`.
+- Unique topology: detect each actual-Kerr tangent's first non-contracting-to-contracting zero crossing and use relative right/up onset-path separation.
 - Metrics: avg `2.1608391608`; median `2`; core `309`; cols `143`; longest `45`; span `682`; lower `10973`; warm `30097`; shadow `152`; dead `0`.
-- Visual: timing-event observable again exposes the full long continuity ridge, but the high-intensity core is visibly ~2px thick. The 4x core comparison confirms vertical broadening.
-- Verdict: REJECTED. Fails median=1 and avg<=~1.30 hard gates.
-- Root cause: the first contraction-onset ordering/timing is nearly common across the desired fold and its vertically adjacent bundle response; relative onset separation therefore saturates on the same #599 continuity family. Do not scan event interpolation, onset normalization, gain, threshold, or simple timing remaps.
-- Restore `743b24611b74e094e29657586635a0340a6909b7`; restored production blobs: shader `130745839c509a727d409992b086e72a6908ce5b`, incidence test `84b2577676b0bc7fc0617bdf14ab68fb5c6bb9a4`.
-- Restore Build #695; run `32572270160`; completed success; artifact `9475694090`; digest `sha256:241594bbb1e9d8def45b985ca1563a0df4c68a4d4ab435d70920246ef81fbe9a`.
-- Restore artifact downloaded/opened; Tauri EXE, native WebView2 capture and artifact upload all succeeded. Fixed metrics returned exactly to #571: avg `1.1923076923`; median `1`; core `31`; cols `26`; longest `7`; span `682`; lower `10636`; warm `29693`; shadow `152`; dead `0`.
+- Visual: full long ridge but visibly ~2px. Event timing saturates the #599 family.
+- Restore `743b24611b74e094e29657586635a0340a6909b7`; Restore Build #695 run `32572270160` success; artifact `9475694090`; digest `sha256:241594bbb1e9d8def45b985ca1563a0df4c68a4d4ab435d70920246ef81fbe9a`; restore metrics exactly #571.
 
 ### #697 — actual-Kerr reduced phase-space symplectic cancellation history — REJECTED
-- Starting accepted restore `743b24611b74e094e29657586635a0340a6909b7`, validated by Build #695.
-- Candidate `31344ea6acfbe0f4deb4af6807ad968dfa762b72`.
-- Unique topology: propagate the same two actual-Kerr camera tangents, form reduced phase-space axes `qR=(drR/r,dthetaR)`, `pR=(dprR,dpthetaR/r)`, `qU=(drU/r,dthetaU)`, `pU=(dprU,dpthetaU/r)`, evaluate normalized cross-axis symplectic pairing `Omega=(qR·pU-pR·qU)/(|zR||zU|)` at each accepted pre-hit state, integrate both signed `Omega` and `abs(Omega)` over accepted path length, and use cancellation `1-abs(integral Omega)/integral abs(Omega)` as the sole new width discriminator on frozen #599 continuity support. No endpoint spectrum, focusing magnitude/onset, screen-space neighborhood, `screen.y`, source texture or RGB classifier.
-- Build #697; run `32585668147`; completed success.
-- Artifact `9479050456`; digest `sha256:219b24cc7f9d62f18198d5e84b2a089030cedd98d883bd3466b464b7840f5e65`.
-- Frontend/Rust fast checks, Tauri runnable EXE, native WebView2 capture and artifact upload succeeded. `visual-candidate.png`, `visual-baseline.png`, `visual-split.png`, expanded screenshot, accepted/candidate original-size and accepted/candidate 4x core images were opened.
+- Candidate `31344ea6acfbe0f4deb4af6807ad968dfa762b72`; Build #697; run `32585668147`; artifact `9479050456`; digest `sha256:219b24cc7f9d62f18198d5e84b2a089030cedd98d883bd3466b464b7840f5e65`.
+- Unique topology: propagate the same two actual-Kerr camera tangents, form reduced phase-space axes, integrate normalized cross-axis symplectic pairing `Omega` both signed and absolute, and use signed/absolute cancellation as the sole new discriminator on frozen #599 continuity support.
 - Metrics: avg `1.1923076923`; median `1`; core `31`; cols `26`; longest `7`; span `682`; lower `10636`; warm `29693`; shadow `152`; dead `0` — exactly #571.
-- Visual: candidate is indistinguishable from accepted #571 at original size and in the 4x core ROI. No horizontal high-intensity continuity gain is visible.
-- Verdict: REJECTED. It preserves the 1px core but fails the mandatory continuity improvement gate.
-- Root cause: signed-vs-absolute cross-axis symplectic cancellation does not separate any additional frozen #599 continuity pixels; the observable is effectively inert on the target direct core. Do not scan cancellation/coherence normalization, gain, clamp or threshold.
+- Visual: indistinguishable from #571 at original size and 4x core ROI. REJECTED as inert.
+- Root cause: symplectic cancellation does not separate any additional frozen #599 continuity pixels. No normalization/gain/clamp/threshold scan.
+- Restore `9a04d709a8e12977b1aa71bb466e1dff56fd36c8`; restored exact #571 shader/test blobs.
+- Restore Build #701; run `32586138666`; completed success; artifact `9479227489`; digest `sha256:a9ba35a383dfcf8e29d34532d1ca8ac27091b4a4f9f437616b1011544833ec06`.
+- Restore artifact downloaded and `visual-candidate.png` opened. Metrics: avg `1.1923076923`; median `1`; core `31`; cols `26`; longest `7`; span `682`; lower `10636`; warm `29715` (only +22 / 0.07% versus canonical #571, within 5% stability gate); shadow `152`; dead `0`. Restore validated.
+
+### #703 — actual-Kerr configuration/momentum subspace area-exchange reversal history — REJECTED
+- Starting accepted restore `9a04d709a8e12977b1aa71bb466e1dff56fd36c8`, validated by Build #701.
+- Candidate `0d0ca1e9b76c6f0a15a9665f544e6471027e1136`.
+- Production candidate blobs: shader `de027da0ab7320327c4fed4258bab900efef499d`; incidence test `9fbb8b911f634f3f30f792fc3dd08a5f471ea38e`.
+- Unique topology: propagate the same two actual-Kerr camera tangents; separately form oriented configuration-plane area `|det(qR,qU)|` and momentum-plane area `|det(pR,pU)|`; use their bounded log ratio along accepted pre-hit states; accumulate total variation of that ratio and compare it with net drift from the initial ratio. The sole new discriminator is the reversal fraction `(totalVariation-netDrift)/totalVariation`. It does not use the #697 symplectic pairing, endpoint determinant/rank/singular values, focusing magnitude/onset, `screen.y`, source texture, RGB, or framebuffer neighborhoods.
+- Build #703; run `32609463943`; completed success.
+- Artifact `9485156919`; digest `sha256:fba9d46fd5018540f0644c7da0cf38a4edaea4ab607e8234bf9201e3350edc5b`.
+- Frontend/Rust fast checks, Tauri runnable EXE, native WebView2 capture and artifact upload succeeded. `visual-candidate.png`, `visual-baseline.png`, `visual-split.png`, expanded screenshot, accepted/candidate original-size comparison and accepted/candidate 4x core comparison were opened.
+- Metrics: avg `1.1923076923`; median `1`; core `31`; cols `26`; longest `7`; span `682`; lower `10643`; warm `29712`; shadow `152`; dead `0`.
+- Against restore #701: core metrics are identical; lower is +7 pixels and warm -3 pixels, both negligible. Original-size and 4x-core inspection show no high-intensity continuity gain.
+- Verdict: REJECTED. It preserves 1px but fails the mandatory columns/longest continuity improvement gate.
+- Root cause: configuration-vs-momentum subspace area reversal history is effectively inert on the desired direct core. Do not scan the log clamp, total-variation/net-drift normalization, gain, threshold, or simple remaps.
 - Restore pending immediately after this record.
 
 ## Current checkpoint
 - Accepted baseline remains #571.
-- #697 is rejected and logged. Production must be forward-restored to the exact #571 shader/test blobs and Windows-validated before another candidate.
-- Next orthogonal topology after restore: actual-Kerr **symplectic coupling zero-crossing / sign-order history**, but it must not be a threshold scan of #697 cancellation. Prefer a discrete propagation-history feature such as first `Omega` sign reversal location relative to first disk crossing or right/up coupling orientation order, provided canonical review confirms it is not equivalent to #691 event timing. If that event topology collapses to #691 semantics, choose a different invariant history rather than proceeding.
+- #703 is rejected and logged. Production must be forward-restored to exact #571 shader/test blobs and Windows-validated before another candidate.
+- Next orthogonal family after restore must avoid symplectic cancellation (#697), configuration/momentum area reversal (#703), endpoint spectra/rank, focusing magnitude/timing and principal-axis twist. A candidate may investigate an actual-Kerr tangent **finite-time relative growth-rate ordering history** only if it is formulated as a propagation-order invariant rather than an endpoint singular-value proxy; otherwise choose a different invariant history.
