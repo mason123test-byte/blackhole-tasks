@@ -41,7 +41,11 @@ fn normalize_visual_experiment_config(value: Option<&str>) -> String {
     let allowed_parameters = parameters.keys().all(|key| key == "FILM_DISK_EXPOSURE");
     let valid_exposure = parameters
         .get("FILM_DISK_EXPOSURE")
-        .map(|value| value.as_f64().is_some_and(|exposure| exposure.is_finite() && exposure > 0.0))
+        .map(|value| {
+            value
+                .as_f64()
+                .is_some_and(|exposure| exposure.is_finite() && exposure > 0.0)
+        })
         .unwrap_or(true);
     if !valid_id || !allowed_parameters || !valid_exposure {
         return String::new();

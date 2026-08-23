@@ -59,7 +59,18 @@ describe("black-hole render profiles", () => {
     expect(blackHoleCanvasSource).toContain('if (mode !== "normal") {');
     expect(blackHoleCanvasSource).toContain('await invoke("set_scene_expanded", { expanded: true });');
     expect(blackHoleCanvasSource).toContain('if (visualComparisonMode !== "normal" && !expanded) return;');
-    expect(blackHoleCanvasSource).toContain('[expanded, lowPowerMode, onError, quality, visualComparisonMode]');
+    expect(blackHoleCanvasSource).toContain(
+      '[expanded, lowPowerMode, onError, quality, visualComparisonMode, visualExperiment]',
+    );
+  });
+
+  it("keeps visual experiment configuration on the explicit diagnostic path", () => {
+    expect(blackHoleCanvasSource).toContain('invoke<string>("get_visual_experiment_config")');
+    expect(rendererSource).toContain('gl.getUniformLocation(program, "u_visual_experiment_enabled")');
+    expect(rendererSource).toContain('gl.getUniformLocation(program, "u_experiment_film_disk_exposure")');
+    expect(rendererSource).toContain(
+      "gl.uniform1f(uniforms.visualExperimentEnabled, visualExperiment.enabled ? 1 : 0);",
+    );
   });
 
   it("keeps the validated diagnostic frame alive instead of destroying GL resources before Windows composition", () => {
