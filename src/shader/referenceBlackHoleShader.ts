@@ -12,6 +12,13 @@ function replaceOnce(source: string, needle: string, replacement: string) {
 }
 
 const incidenceHelpers = String.raw`
+uniform float u_visual_experiment_enabled;
+uniform float u_experiment_film_disk_exposure;
+
+float visualExperimentFilmDiskExposure() {
+  return u_visual_experiment_enabled > 0.5 ? u_experiment_film_disk_exposure : FILM_DISK_EXPOSURE;
+}
+
 float diskLocalIncidenceCosine(float diskRadius, float L, float kappa) {
   float r2 = diskRadius * diskRadius;
   float delta = max(r2 - 2.0 * diskRadius + KERR_A2, 1e-5);
@@ -58,6 +65,11 @@ fragment = replaceOnce(
   fragment,
   "\nvoid rayTracedReference() {",
   `${incidenceHelpers}\nvoid rayTracedReference() {`,
+);
+fragment = replaceOnce(
+  fragment,
+  "  brightness *= physicalLayers;\n  brightness *= mix(1.10, 0.62, smoothstep(0.04, 0.90, radialProgress)); brightness *= FILM_DISK_EXPOSURE;",
+  "  brightness *= physicalLayers;\n  brightness *= mix(1.10, 0.62, smoothstep(0.04, 0.90, radialProgress)); brightness *= visualExperimentFilmDiskExposure();",
 );
 fragment = replaceOnce(
   fragment,

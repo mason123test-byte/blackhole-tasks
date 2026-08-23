@@ -6,6 +6,10 @@ import {
 } from "./referenceBlackHoleShader";
 import type { RenderQuality } from "../types/settings";
 import {
+  DEFAULT_VISUAL_EXPERIMENT,
+  type NormalizedVisualExperiment,
+} from "./visualExperiment";
+import {
   buildSceneTextureSignature,
   createSceneTextureBitmap,
   type SceneTextureState,
@@ -137,6 +141,7 @@ interface RendererOptions {
   quality?: RenderQuality;
   lowPowerMode?: boolean;
   visualComparisonMode?: VisualComparisonMode;
+  visualExperiment?: NormalizedVisualExperiment;
   onError?(message: string): void;
 }
 
@@ -152,6 +157,7 @@ function startBlackHoleSession(
 ) {
   const profile = getRenderProfile(options.quality ?? "balanced", options.lowPowerMode);
   const visualComparison = getVisualComparisonSettings(options.visualComparisonMode ?? "normal");
+  const visualExperiment = options.visualExperiment ?? DEFAULT_VISUAL_EXPERIMENT;
   const freezeAfterValidatedFrame = visualComparison.fixedTime !== null;
   const gl = canvas.getContext("webgl2", {
     alpha: true,
@@ -226,9 +232,13 @@ function startBlackHoleSession(
       sceneTexture: gl.getUniformLocation(program, "u_scene_texture"),
       sceneReady: gl.getUniformLocation(program, "u_scene_ready"),
       visualCompare: gl.getUniformLocation(program, "u_visual_compare"),
+      visualExperimentEnabled: gl.getUniformLocation(program, "u_visual_experiment_enabled"),
+      experimentFilmDiskExposure: gl.getUniformLocation(program, "u_experiment_film_disk_exposure"),
     };
     gl.uniform1i(uniforms.sceneTexture, 0);
     gl.uniform1f(uniforms.visualCompare, visualComparison.shaderMode);
+    gl.uniform1f(uniforms.visualExperimentEnabled, visualExperiment.enabled ? 1 : 0);
+    gl.uniform1f(uniforms.experimentFilmDiskExposure, visualExperiment.filmDiskExposure);
     const compositorUniforms = {
       resolution: gl.getUniformLocation(compositorProgram, "u_resolution"),
       frameTexture: gl.getUniformLocation(compositorProgram, "u_frame_texture"),
@@ -272,6 +282,7 @@ function startBlackHoleSession(
     canvas.dataset.renderer = "webgl2";
     canvas.dataset.model = BLACK_HOLE_RENDERER_INFO.model;
     canvas.dataset.quality = options.lowPowerMode ? "low-power" : (options.quality ?? "balanced");
+    canvas.dataset.experimentId = visualExperiment.experimentId;
     let animationFrame = 0;
     let disposed = false;
     let lastFrameAt = 0;

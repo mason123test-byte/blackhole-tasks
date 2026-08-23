@@ -20,10 +20,45 @@ fn normalize_visual_comparison_mode(value: Option<&str>) -> &'static str {
     }
 }
 
+fn normalize_visual_experiment_config(value: Option<&str>) -> String {
+    let Some(raw) = value else {
+        return String::new();
+    };
+    let Ok(parsed) = serde_json::from_str::<Value>(raw) else {
+        return String::new();
+    };
+    let Some(object) = parsed.as_object() else {
+        return String::new();
+    };
+    let valid_id = object
+        .get("experimentId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .is_some_and(|id| !id.is_empty());
+    let Some(parameters) = object.get("parameters").and_then(Value::as_object) else {
+        return String::new();
+    };
+    let allowed_parameters = parameters.keys().all(|key| key == "FILM_DISK_EXPOSURE");
+    let valid_exposure = parameters
+        .get("FILM_DISK_EXPOSURE")
+        .map(|value| value.as_f64().is_some_and(|exposure| exposure.is_finite() && exposure > 0.0))
+        .unwrap_or(true);
+    if !valid_id || !allowed_parameters || !valid_exposure {
+        return String::new();
+    }
+    raw.to_owned()
+}
+
 #[tauri::command]
 fn get_visual_comparison_mode() -> String {
     let value = std::env::var("BLACKHOLE_VISUAL_COMPARE").ok();
     normalize_visual_comparison_mode(value.as_deref()).to_owned()
+}
+
+#[tauri::command]
+fn get_visual_experiment_config() -> String {
+    let value = std::env::var("BLACKHOLE_VISUAL_EXPERIMENT").ok();
+    normalize_visual_experiment_config(value.as_deref())
 }
 
 #[tauri::command]
@@ -276,8 +311,6 @@ fn save_orb_position(
     let compact_width = (COMPACT_SCENE_SIZE.0 as f64 * scale).round() as i32;
     let compact_height = (COMPACT_SCENE_SIZE.1 as f64 * scale).round() as i32;
     let mut settings = db.get_settings()?;
-    // Persist the compact-window origin even when the expanded scene is moved,
-    // so the black-hole center returns to exactly the same desktop anchor.
     settings.orb_position_x = x + size.width as i32 / 2 - compact_width / 2;
     settings.orb_position_y = y + size.height as i32 / 2 - compact_height / 2;
     db.save_settings(&settings)?;
@@ -635,6 +668,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_visual_comparison_mode,
+            get_visual_experiment_config,
             list_tasks,
             get_task,
             create_task,
@@ -682,8 +716,8 @@ pub fn run() {
 #[cfg(test)]
 mod smoke_command_tests {
     use super::{
-        normalize_visual_comparison_mode, parse_smoke_command, pending_smoke_command_paths,
-        SmokeCommand,
+        normalize_visual_comparison_mode, normalize_visual_experiment_config, parse_smoke_command,
+        pending_smoke_command_paths, SmokeCommand,
     };
 
     #[test]
@@ -699,6 +733,26 @@ mod smoke_command_tests {
         assert_eq!(normalize_visual_comparison_mode(Some("split")), "split");
         assert_eq!(normalize_visual_comparison_mode(Some("invalid")), "normal");
         assert_eq!(normalize_visual_comparison_mode(None), "normal");
+    }
+
+    #[test]
+    fn validates_visual_experiment_environment_payload() {
+        let valid = r#"{"experimentId":"batch-a","parameters":{"FILM_DISK_EXPOSURE":1.6}}"#;
+        assert_eq!(normalize_visual_experiment_config(Some(valid)), valid);
+        assert_eq!(normalize_visual_experiment_config(None), "");
+        assert_eq!(normalize_visual_experiment_config(Some("not-json")), "");
+        assert_eq!(
+            normalize_visual_experiment_config(Some(
+                r#"{"experimentId":"bad","parameters":{"FILM_DISK_EXPOSURE":0.0}}"#
+            )),
+            ""
+        );
+        assert_eq!(
+            normalize_visual_experiment_config(Some(
+                r#"{"experimentId":"bad","parameters":{"OBSERVER_THETA":1.5}}"#
+            )),
+            ""
+        );
     }
 
     #[test]
