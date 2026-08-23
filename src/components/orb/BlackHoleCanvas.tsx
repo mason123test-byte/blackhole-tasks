@@ -22,6 +22,10 @@ interface BlackHoleCanvasProps {
   onError?(message: string): void;
 }
 
+function reportVisualBootStage(stage: string) {
+  document.title = `黑洞任务|renderer=diagnostic|frame=boot|energy=0|size=0x0|diag=${stage}`;
+}
+
 export function BlackHoleCanvas({
   expanded,
   quality,
@@ -44,10 +48,16 @@ export function BlackHoleCanvas({
   useEffect(() => {
     if (!nativeRuntime) return;
     let active = true;
-    void Promise.all([
-      invoke<string>("get_visual_comparison_mode"),
-      invoke<string>("get_visual_experiment_config"),
-    ])
+    reportVisualBootStage("visual-config-start");
+    const comparisonRequest = invoke<string>("get_visual_comparison_mode").then((rawMode) => {
+      reportVisualBootStage("comparison-config-ok");
+      return rawMode;
+    });
+    const experimentRequest = invoke<string>("get_visual_experiment_config").then((rawExperiment) => {
+      reportVisualBootStage("experiment-config-ok");
+      return rawExperiment;
+    });
+    void Promise.all([comparisonRequest, experimentRequest])
       .then(async ([rawMode, rawExperiment]) => {
         const mode = normalizeVisualComparisonMode(rawMode);
         const experiment = parseVisualExperimentConfig(rawExperiment);
@@ -60,6 +70,7 @@ export function BlackHoleCanvas({
         }
       })
       .catch((error) => {
+        reportVisualBootStage("visual-config-error");
         console.error("无法读取视觉诊断配置：", error);
         if (active) {
           setVisualComparisonMode("normal");
@@ -78,6 +89,7 @@ export function BlackHoleCanvas({
     if (!ref.current || visualComparisonMode === null || visualExperiment === null) return;
     if (visualComparisonMode !== "normal" && !expanded) return;
 
+    if (nativeRuntime) reportVisualBootStage("renderer-start");
     const stopRenderer = startBlackHole(
       ref.current,
       () => expandedRef.current,
@@ -85,7 +97,7 @@ export function BlackHoleCanvas({
       { quality, lowPowerMode, visualComparisonMode, visualExperiment, onError },
     );
     return stopRenderer;
-  }, [expanded, lowPowerMode, onError, quality, visualComparisonMode, visualExperiment]);
+  }, [expanded, lowPowerMode, nativeRuntime, onError, quality, visualComparisonMode, visualExperiment]);
 
   return <canvas ref={ref} className="black-hole-canvas" aria-label="黑洞任务悬浮窗" />;
 }
