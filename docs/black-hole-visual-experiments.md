@@ -127,8 +127,21 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 - Restore Build #707; run `32609873530`; completed success; artifact `9485256978`; digest `sha256:b7d3ade9547a630ce9b7d1082147cf8c010b867c2c32fb5d14a3a8b507540fe6`.
 - Restore artifact downloaded and `visual-candidate.png` opened. Fixed metrics returned exactly to #571: avg `1.1923076923`; median `1`; core `31`; cols `26`; longest `7`; span `682`; lower `10636`; warm `29693`; shadow `152`; dead `0`. Restore validated.
 
+### #711 — actual-Kerr finite-time relative growth-rate ordering history — TECHNICALLY INVALID
+- Starting accepted checkpoint `517ff50997723e9bcb914adeff6adbf06a39cb7a`, with #703 restore already validated by Build #707.
+- Candidate `42695e368321ed936bdf5db34d09c992cadf7329`.
+- Candidate blobs: shader `15ae8c854f7073bc3b2a5d51d5d22538e3107043`; incidence test `6ac1bc148cbd3554b468e17166ea77e41288130e`.
+- Intended topology: propagate right/up actual-Kerr tangents, compute each reduced phase-space tangent's finite-time logarithmic growth rate per accepted step, retain the longest contiguous path interval on which the right-vs-up growth-rate ordering is unchanged, and use longest-run/path persistence as the sole new width discriminator on frozen #599 continuity support.
+- Build #711; run `32612657993`.
+- Frontend and Rust fast checks succeeded. Tauri runnable EXE built successfully.
+- Native WebView2 capture failed before producing any non-empty WebGL2 frame: `Orb did not produce a non-empty WebGL2 frame within 20000ms; lastTitle=''`.
+- Artifact `9486073707`; digest `sha256:872b72487011174d34c3e9ea7964eb0ef487b82b9dd2c25c08725f0de0554ee0`; artifact contains only `visual-baseline-diagnostics.txt` with `build=native-cursor-v5 phase=database-opened`, no screenshots and therefore no valid frozen metrics.
+- Root cause is implementation, not topology: candidate used `predictedR = r + dr * acceptedStepLength`, but the baseline loop's in-scope radial derivative is named `dr0`. The resulting GLSL references an undeclared identifier, preventing shader compilation and any non-empty WebGL2 frame.
+- Verdict: TECHNICALLY INVALID / UNVERIFIED, not a visual rejection. No topology exclusion is added from this run.
+- Required action: forward-restore #571 and Windows-validate the restore before remounting a corrected implementation of the same growth-order topology.
+
 ## Current checkpoint
 - Accepted baseline remains #571.
-- #703 is rejected, logged, forward-restored, and Windows-validated. Production is exactly the accepted #571 shader/test pair.
-- No rejected or unverified visual candidate remains in production.
-- Next orthogonal family must avoid symplectic cancellation (#697), configuration/momentum area reversal (#703), endpoint spectra/rank, focusing magnitude/timing and principal-axis twist. Candidate direction: actual-Kerr tangent **finite-time relative growth-rate ordering history**, formulated as a propagation-order invariant rather than an endpoint singular-value proxy. If implementation collapses to singular-spectrum or simple gain/threshold semantics, reject the topology before mounting it.
+- #711 is technically invalid and has no visual conclusion or frozen metrics.
+- Production must be forward-restored to exact #571 shader/test blobs and Windows-validated before a corrected growth-order candidate is mounted.
+- Corrected candidate may reuse the finite-time relative growth-rate ordering topology only after fixing the GLSL radial-derivative reference; no threshold/gain scan has yet been evaluated for this topology.
