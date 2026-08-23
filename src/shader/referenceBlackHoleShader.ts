@@ -11,6 +11,17 @@ function replaceOnce(source: string, needle: string, replacement: string) {
   return source.replace(needle, replacement);
 }
 
+const experimentUniforms = String.raw`
+uniform float u_visual_experiment_enabled;
+uniform float u_experiment_film_disk_exposure;
+`;
+
+const experimentHelpers = String.raw`
+float visualExperimentFilmDiskExposure() {
+  return u_visual_experiment_enabled > 0.5 ? u_experiment_film_disk_exposure : FILM_DISK_EXPOSURE;
+}
+`;
+
 const incidenceHelpers = String.raw`
 float diskLocalIncidenceCosine(float diskRadius, float L, float kappa) {
   float r2 = diskRadius * diskRadius;
@@ -56,8 +67,23 @@ void shapeIncidenceQualifiedDirectShoulder(
 let fragment = BASE_REFERENCE_BLACK_HOLE_FRAGMENT;
 fragment = replaceOnce(
   fragment,
+  "uniform float u_visual_compare;\n",
+  `uniform float u_visual_compare;\n${experimentUniforms}`,
+);
+fragment = replaceOnce(
+  fragment,
+  "const float DISK_SOURCE_DIAGNOSTIC = 0.0;\n",
+  `const float DISK_SOURCE_DIAGNOSTIC = 0.0;\n\n${experimentHelpers}`,
+);
+fragment = replaceOnce(
+  fragment,
   "\nvoid rayTracedReference() {",
   `${incidenceHelpers}\nvoid rayTracedReference() {`,
+);
+fragment = replaceOnce(
+  fragment,
+  "  brightness *= physicalLayers;\n  brightness *= mix(1.10, 0.62, smoothstep(0.04, 0.90, radialProgress)); brightness *= FILM_DISK_EXPOSURE;",
+  "  brightness *= physicalLayers;\n  brightness *= mix(1.10, 0.62, smoothstep(0.04, 0.90, radialProgress)); brightness *= visualExperimentFilmDiskExposure();",
 );
 fragment = replaceOnce(
   fragment,

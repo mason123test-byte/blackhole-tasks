@@ -18,6 +18,28 @@ describe("diagnostic-only visual experiment uniforms", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("const float FILM_DISK_EXPOSURE = 1.55;");
   });
 
+  it("declares the exposure helper before its first GLSL call", () => {
+    const enabledUniformIndex = REFERENCE_BLACK_HOLE_FRAGMENT.indexOf(
+      "uniform float u_visual_experiment_enabled;",
+    );
+    const exposureConstantIndex = REFERENCE_BLACK_HOLE_FRAGMENT.indexOf(
+      "const float FILM_DISK_EXPOSURE = 1.55;",
+    );
+    const helperIndex = REFERENCE_BLACK_HOLE_FRAGMENT.indexOf(
+      "float visualExperimentFilmDiskExposure() {",
+    );
+    const sampleDiskIndex = REFERENCE_BLACK_HOLE_FRAGMENT.indexOf("void sampleDiskSurface(");
+    const callIndex = REFERENCE_BLACK_HOLE_FRAGMENT.indexOf(
+      "brightness *= visualExperimentFilmDiskExposure();",
+    );
+
+    expect(enabledUniformIndex).toBeGreaterThan(-1);
+    expect(exposureConstantIndex).toBeGreaterThan(enabledUniformIndex);
+    expect(helperIndex).toBeGreaterThan(exposureConstantIndex);
+    expect(sampleDiskIndex).toBeGreaterThan(helperIndex);
+    expect(callIndex).toBeGreaterThan(helperIndex);
+  });
+
   it("does not expose frozen geometry through experiment uniforms", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("u_experiment_disk_outer");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("u_experiment_observer_theta");

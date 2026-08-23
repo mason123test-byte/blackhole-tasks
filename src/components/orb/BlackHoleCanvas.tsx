@@ -22,10 +22,6 @@ interface BlackHoleCanvasProps {
   onError?(message: string): void;
 }
 
-function reportVisualBootStage(stage: string) {
-  document.title = `黑洞任务|renderer=diagnostic|frame=boot|energy=0|size=0x0|diag=${stage}`;
-}
-
 export function BlackHoleCanvas({
   expanded,
   quality,
@@ -48,16 +44,10 @@ export function BlackHoleCanvas({
   useEffect(() => {
     if (!nativeRuntime) return;
     let active = true;
-    reportVisualBootStage("visual-config-start");
-    const comparisonRequest = invoke<string>("get_visual_comparison_mode").then((rawMode) => {
-      reportVisualBootStage("comparison-config-ok");
-      return rawMode;
-    });
-    const experimentRequest = invoke<string>("get_visual_experiment_config").then((rawExperiment) => {
-      reportVisualBootStage("experiment-config-ok");
-      return rawExperiment;
-    });
-    void Promise.all([comparisonRequest, experimentRequest])
+    void Promise.all([
+      invoke<string>("get_visual_comparison_mode"),
+      invoke<string>("get_visual_experiment_config"),
+    ])
       .then(async ([rawMode, rawExperiment]) => {
         const mode = normalizeVisualComparisonMode(rawMode);
         const experiment = parseVisualExperimentConfig(rawExperiment);
@@ -70,7 +60,6 @@ export function BlackHoleCanvas({
         }
       })
       .catch((error) => {
-        reportVisualBootStage("visual-config-error");
         console.error("无法读取视觉诊断配置：", error);
         if (active) {
           setVisualComparisonMode("normal");
@@ -89,23 +78,36 @@ export function BlackHoleCanvas({
     if (!ref.current || visualComparisonMode === null || visualExperiment === null) return;
     if (visualComparisonMode !== "normal" && !expanded) return;
 
-    let stopRenderer: () => void = () => undefined;
-    let cancelled = false;
-    if ("__TAURI_INTERNALS__" in window) reportVisualBootStage("renderer-start-yield");
-    const startTimer = window.setTimeout(() => {
-      if (cancelled || !ref.current) return;
-      stopRenderer = startBlackHole(
-        ref.current,
-        () => expandedRef.current,
-        () => sceneRef.current,
-        { quality, lowPowerMode, visualComparisonMode, visualExperiment, onError },
-      );
-    }, 0);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(startTimer);
-      stopRenderer();
-    };
+    const stopRenderer = startBlackHole(
+      ref.current,
+      () => expandedRef.current,
+      () => sceneRef.current,
+      {
+        quality,
+        lowPowerMode,
+        visualComparisonMode,
+        visualExperiment,
+        onError: (message) => {
+          if ("__TAURI_INTERNALS__" in window && ref.current?.dataset.renderer === "shader-error") {
+            const diagnostic = `shader-error:${message.replace(/\s+/g, " ").trim()}`;
+            const width = ref.current.width;
+            const height = ref.current.height;
+            document.title = `黑洞任务|renderer=webgl2|frame=ready|energy=0|size=${width}x${height}|diag=${diagnostic}`;
+            void invoke("report_orb_render", {
+              renderer: "webgl2",
+              energy: 0,
+              width,
+              height,
+              diagnostic,
+            }).catch((error) => {
+              console.error("无法上报黑洞 Shader 错误：", error);
+            });
+          }
+          onError?.(message);
+        },
+      },
+    );
+    return stopRenderer;
   }, [expanded, lowPowerMode, onError, quality, visualComparisonMode, visualExperiment]);
 
   return <canvas ref={ref} className="black-hole-canvas" aria-label="黑洞任务悬浮窗" />;

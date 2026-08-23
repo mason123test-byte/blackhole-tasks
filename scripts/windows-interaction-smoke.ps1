@@ -27,7 +27,15 @@ if ($boundaryIndex -lt 0) {
 
 $visualSource = $fullSource.Substring(0, $boundaryIndex)
 $visualBlock = [ScriptBlock]::Create($visualSource)
-& $visualBlock -ExePath $ExePath -OutputDirectory $OutputDirectory
+try {
+  & $visualBlock -ExePath $ExePath -OutputDirectory $OutputDirectory
+} catch {
+  @(
+    "WINDOWS_VISUAL_CAPTURE_FAILED"
+    "error=$($_.Exception.Message)"
+  ) | Set-Content -LiteralPath (Join-Path $OutputDirectory "visual-bootstrap-diagnostics.txt")
+  throw
+}
 
 $requiredEvidence = @(
   "visual-baseline.png",
