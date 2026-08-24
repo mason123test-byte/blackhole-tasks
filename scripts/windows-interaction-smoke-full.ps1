@@ -1,11 +1,15 @@
 param(
   [Parameter(Mandatory = $true)]
   [string]$ExePath,
-  [string]$OutputDirectory = "output/windows-smoke"
+  [string]$OutputDirectory = "output/windows-smoke",
+  [switch]$CandidateOnly
 )
 
 $ErrorActionPreference = "Stop"
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
+if (-not (Get-Command Get-FrozenRoiMetrics -ErrorAction SilentlyContinue)) {
+  . (Join-Path $PSScriptRoot "windows-fixed-roi-metrics.ps1")
+}
 
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.Windows.Forms
@@ -623,10 +627,16 @@ $visualCandidatePath = Join-Path $OutputDirectory "visual-candidate.png"
 $visualSplitPath = Join-Path $OutputDirectory "visual-split.png"
 $visualDifferencePath = Join-Path $OutputDirectory "visual-difference.png"
 $visualMetricsPath = Join-Path $OutputDirectory "visual-comparison-metrics.txt"
-Capture-VisualComparisonFrame $resolvedExePath "baseline" $visualBaselinePath
-Capture-VisualComparisonFrame $resolvedExePath "candidate" $visualCandidatePath
-Capture-VisualComparisonFrame $resolvedExePath "split" $visualSplitPath
-Write-VisualComparisonEvidence $visualBaselinePath $visualCandidatePath $visualDifferencePath $visualMetricsPath
+if ($CandidateOnly) {
+  Capture-VisualComparisonFrame $resolvedExePath "candidate" $visualCandidatePath
+} else {
+  Capture-VisualComparisonFrame $resolvedExePath "baseline" $visualBaselinePath
+  Capture-VisualComparisonFrame $resolvedExePath "candidate" $visualCandidatePath
+  Capture-VisualComparisonFrame $resolvedExePath "split" $visualSplitPath
+  Write-VisualComparisonEvidence $visualBaselinePath $visualCandidatePath $visualDifferencePath $visualMetricsPath
+  $fixedRoiMetrics = Get-FrozenRoiMetrics $visualCandidatePath
+  "fixedRoiMetrics=$($fixedRoiMetrics | ConvertTo-Json -Compress)" | Add-Content -LiteralPath $visualMetricsPath
+}
 
 $diagnosticMarkerPath = [System.IO.Path]::ChangeExtension($resolvedExePath, ".smoke-diagnostics")
 Set-Content -LiteralPath $diagnosticMarkerPath -Value $diagnosticPath -NoNewline
