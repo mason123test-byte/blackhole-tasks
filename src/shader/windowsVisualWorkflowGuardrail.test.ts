@@ -114,14 +114,10 @@ describe("Windows Gargantua visual workflow guardrail", () => {
     const visualUploadStart = workflowSource.indexOf(
       "- name: Upload Windows visual artifact",
     );
-    const nextJobStarts = [
-      workflowSource.indexOf("windows-batch:", visualUploadStart),
-      workflowSource.indexOf("windows-full:", visualUploadStart),
-    ].filter((index) => index > visualUploadStart);
-    const visualJobEnd = Math.min(...nextJobStarts);
+    const fullStart = workflowSource.indexOf("windows-full:");
     expect(visualUploadStart).toBeGreaterThan(-1);
-    expect(visualJobEnd).toBeGreaterThan(visualUploadStart);
-    const visualUpload = workflowSource.slice(visualUploadStart, visualJobEnd);
+    expect(fullStart).toBeGreaterThan(visualUploadStart);
+    const visualUpload = workflowSource.slice(visualUploadStart, fullStart);
     expect(visualUpload).toContain("path: output/windows-visual/*");
     expect(visualUpload).not.toContain("blackhole-tasks.exe");
   });

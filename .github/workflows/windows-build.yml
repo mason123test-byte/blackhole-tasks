@@ -14,7 +14,6 @@ on:
         options:
           - visual
           - full
-          - batch
 
 permissions:
   contents: read
@@ -207,93 +206,6 @@ jobs:
           name: blackhole-tasks-windows-visual-${{ github.run_number }}
           path: output/windows-visual/*
           if-no-files-found: warn
-          retention-days: 14
-
-  windows-batch:
-    name: Windows sequential visual batch
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_mode == 'batch' }}
-    needs: [frontend-fast, rust-fast]
-    runs-on: windows-latest
-    timeout-minutes: 55
-
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v5
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Select pinned Rust toolchain
-        shell: pwsh
-        run: |
-          $expectedVersion = '1.97.1'
-          $stableVersion = (& rustc +stable --version 2>$null | Out-String).Trim()
-          if ($stableVersion -match '^rustc 1\.97\.1 ') {
-            $env:RUSTUP_TOOLCHAIN = 'stable'
-            "RUSTUP_TOOLCHAIN=stable" >> $env:GITHUB_ENV
-            "Using hosted stable toolchain because it matches pinned ${expectedVersion}: $stableVersion"
-          } else {
-            $exact = '1.97.1-x86_64-pc-windows-msvc'
-            if (-not (rustup toolchain list | Select-String -SimpleMatch $exact)) {
-              rustup toolchain install 1.97.1 --profile minimal
-            }
-            $env:RUSTUP_TOOLCHAIN = '1.97.1'
-            "RUSTUP_TOOLCHAIN=1.97.1" >> $env:GITHUB_ENV
-          }
-          rustc --version
-          cargo --version
-
-      - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-          cache-on-failure: true
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Verify locked Tauri CLI supports no-bundle
-        shell: pwsh
-        run: |
-          $help = npm run tauri -- build --help 2>&1 | Out-String
-          if ($help -notmatch '--no-bundle') {
-            throw "The project-locked Tauri CLI does not advertise --no-bundle."
-          }
-          $help | Select-String -- '--no-bundle'
-
-      - name: Build runnable Tauri EXE once for sequential batch
-        run: npm run tauri build -- --no-bundle
-
-      - name: Capture control and eight visual experiment configs sequentially
-        shell: pwsh
-        run: |
-          ./scripts/windows-visual-batch.ps1 `
-            -ExePath "src-tauri/target/release/blackhole-tasks.exe" `
-            -OutputDirectory "output/windows-visual-batch"
-
-      - name: Upload Windows batch artifact
-        if: always()
-        uses: actions/upload-artifact@v5
-        with:
-          name: blackhole-tasks-windows-batch-${{ github.run_number }}
-          path: |
-            output/windows-visual-batch/control.png
-            output/windows-visual-batch/smoke-01.png
-            output/windows-visual-batch/smoke-02.png
-            output/windows-visual-batch/smoke-03.png
-            output/windows-visual-batch/smoke-04.png
-            output/windows-visual-batch/smoke-05.png
-            output/windows-visual-batch/smoke-06.png
-            output/windows-visual-batch/smoke-07.png
-            output/windows-visual-batch/smoke-08.png
-            output/windows-visual-batch/metrics.jsonl
-            output/windows-visual-batch/batch-summary.json
-            output/windows-visual-batch/contact-sheet.png
-            output/windows-visual-batch/batch.log
-          if-no-files-found: error
           retention-days: 14
 
   windows-full:
