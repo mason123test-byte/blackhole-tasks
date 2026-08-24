@@ -30,8 +30,9 @@ describe("Windows visual batch infrastructure", () => {
 
   it("adds an explicit workflow_dispatch batch mode with one dependency install and one EXE build", () => {
     expect(workflow).toMatch(/options:\s*[\s\S]*- visual\s*[\s\S]*- full\s*[\s\S]*- batch/);
-    const batchJob = workflow.split("  windows-batch:")[1];
-    expect(batchJob).toBeTruthy();
+    const afterBatch = workflow.split("  windows-batch:")[1];
+    expect(afterBatch).toBeTruthy();
+    const batchJob = afterBatch.split("\n  windows-full:")[0];
     expect(batchJob.match(/npm ci/g)).toHaveLength(1);
     expect(batchJob.match(/npm run tauri build -- --no-bundle/g)).toHaveLength(1);
     expect(batchJob).toContain("./scripts/windows-visual-batch.ps1");
