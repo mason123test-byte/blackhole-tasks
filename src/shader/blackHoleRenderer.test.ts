@@ -64,19 +64,18 @@ describe("black-hole render profiles", () => {
     );
   });
 
-  it("keeps visual experiment configuration on the explicit diagnostic path", () => {
+  it("keeps visual experiment configuration on the explicit GPU diagnostic path", () => {
     expect(blackHoleCanvasSource).toContain('invoke<string>("get_visual_experiment_config")');
     expect(rendererSource).toContain('gl.getUniformLocation(program, "u_visual_experiment_enabled")');
     expect(rendererSource).toContain('gl.getUniformLocation(program, "u_experiment_film_disk_exposure")');
     expect(rendererSource).toContain('gl.getUniformLocation(program, "u_experiment_disk_outer")');
-    expect(rendererSource).toContain(
-      "gl.uniform1f(uniforms.visualExperimentEnabled, visualExperiment.enabled ? 1 : 0);",
-    );
-    expect(rendererSource).toContain("gl.uniform1f(uniforms.experimentDiskOuter, visualExperiment.diskOuter);");
-    expect(blackHoleCanvasSource).toContain("effectiveDiskOuter=${visualExperiment.diskOuter.toFixed(6)}");
+    expect(rendererSource).toContain("requireVisualExperimentUniformLocations");
+    expect(rendererSource).toContain("readVisualExperimentUniformReceipt");
+    expect(rendererSource).toContain("encodeEffectiveVisualExperimentReceipt");
+    expect(blackHoleCanvasSource).not.toContain("effectiveDiskOuter=${visualExperiment.diskOuter.toFixed(6)}");
   });
 
-  it("keeps the validated diagnostic frame alive while publishing the effective receipt", () => {
+  it("keeps the validated diagnostic frame alive while publishing the GPU receipt", () => {
     expect(rendererSource).toContain("const freezeAfterValidatedFrame = visualComparison.fixedTime !== null;");
     expect(rendererSource).toContain("let resizedFrame = false;");
     expect(rendererSource).toContain("rendererReady = false;");
@@ -90,11 +89,11 @@ describe("black-hole render profiles", () => {
     expect(compositorDrawIndex).toBeGreaterThan(-1);
     expect(composedFinishIndex).toBeGreaterThan(compositorDrawIndex);
     expect(readyReportIndex).toBeGreaterThan(composedFinishIndex);
+    expect(rendererSource).toContain("effectiveReceiptDiagnostic");
     expect(rendererSource).toContain("if (!freezeAfterValidatedFrame || !rendererReady) {");
-    expect(blackHoleCanvasSource).not.toContain("freezeTimer");
+    expect(blackHoleCanvasSource).not.toContain("receiptFrame");
     expect(blackHoleCanvasSource).not.toContain("stopVisualRenderer");
-    expect(blackHoleCanvasSource).toContain("window.cancelAnimationFrame(receiptFrame);");
-    expect(blackHoleCanvasSource).toContain("stopRenderer();");
+    expect(blackHoleCanvasSource).toContain("return stopRenderer;");
   });
 
   it("rejects flare energy from the direct bright core while preserving the stronger outer veil", () => {
