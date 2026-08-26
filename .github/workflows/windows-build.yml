@@ -60,9 +60,12 @@ jobs:
         run: |
           $changed = @()
           if ('${{ github.event_name }}' -eq 'pull_request') {
+            # Rust validation follows the complete current PR delta. A later
+            # docs/test-only commit must not hide an earlier Rust change in the
+            # same PR from the validation gate.
+            $base = '${{ github.event.pull_request.base.sha }}'
             $head = '${{ github.event.pull_request.head.sha }}'
-            $parent = (git rev-parse "$head^").Trim()
-            $changed = @(git diff --name-only $parent $head)
+            $changed = @(git diff --name-only $base $head)
           } elseif ('${{ github.event_name }}' -eq 'push' -and '${{ github.event.before }}' -and '${{ github.event.before }}' -ne '0000000000000000000000000000000000000000') {
             $changed = @(git diff --name-only '${{ github.event.before }}' '${{ github.sha }}')
           } else {
