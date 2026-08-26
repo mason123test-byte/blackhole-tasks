@@ -25,25 +25,33 @@ export const DEFAULT_VISUAL_EXPERIMENT: NormalizedVisualExperiment = {
   diskOuter: VISUAL_EXPERIMENT_PARAMETER_DEFAULTS.DISK_OUTER,
 };
 
+const ALLOWED_VISUAL_EXPERIMENT_PARAMETERS = new Set(["FILM_DISK_EXPOSURE", "DISK_OUTER"]);
+
 export function normalizeVisualExperimentConfig(value: unknown): NormalizedVisualExperiment {
-  if (!value || typeof value !== "object") return DEFAULT_VISUAL_EXPERIMENT;
+  if (!value || typeof value !== "object") {
+    throw new Error("visual experiment config must be an object");
+  }
   const config = value as Partial<VisualExperimentConfig>;
   if (typeof config.experimentId !== "string" || !config.experimentId.trim()) {
-    return DEFAULT_VISUAL_EXPERIMENT;
+    throw new Error("visual experiment experimentId is required");
   }
-  if (!config.parameters || typeof config.parameters !== "object") {
-    return DEFAULT_VISUAL_EXPERIMENT;
+  if (!config.parameters || typeof config.parameters !== "object" || Array.isArray(config.parameters)) {
+    throw new Error("visual experiment parameters object is required");
+  }
+  const parameterKeys = Object.keys(config.parameters);
+  if (parameterKeys.some((key) => !ALLOWED_VISUAL_EXPERIMENT_PARAMETERS.has(key))) {
+    throw new Error("visual experiment contains an unknown parameter");
   }
   const exposure = config.parameters.FILM_DISK_EXPOSURE;
   if (exposure !== undefined && (typeof exposure !== "number" || !Number.isFinite(exposure) || exposure <= 0)) {
-    return DEFAULT_VISUAL_EXPERIMENT;
+    throw new Error("FILM_DISK_EXPOSURE must be a finite positive number");
   }
   const diskOuter = config.parameters.DISK_OUTER;
   if (
     diskOuter !== undefined &&
     (typeof diskOuter !== "number" || !Number.isFinite(diskOuter) || diskOuter <= 4.2 || diskOuter > 45.0)
   ) {
-    return DEFAULT_VISUAL_EXPERIMENT;
+    throw new Error("DISK_OUTER must satisfy 4.2 < value <= 45");
   }
   return {
     enabled: true,
@@ -55,9 +63,11 @@ export function normalizeVisualExperimentConfig(value: unknown): NormalizedVisua
 
 export function parseVisualExperimentConfig(raw: string): NormalizedVisualExperiment {
   if (!raw) return DEFAULT_VISUAL_EXPERIMENT;
+  let parsed: unknown;
   try {
-    return normalizeVisualExperimentConfig(JSON.parse(raw));
+    parsed = JSON.parse(raw);
   } catch {
-    return DEFAULT_VISUAL_EXPERIMENT;
+    throw new Error("visual experiment config is not valid JSON");
   }
+  return normalizeVisualExperimentConfig(parsed);
 }
