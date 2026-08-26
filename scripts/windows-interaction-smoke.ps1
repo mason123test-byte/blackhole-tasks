@@ -44,6 +44,17 @@ if (-not $visualSource.Contains($hardcodedCandidateCapture)) {
 }
 $visualSource = $visualSource.Replace($hardcodedCandidateCapture, $selectedCandidateCapture)
 
+# A crossing-isolation frame may correctly contain almost no bright disk pixels.
+# In that diagnostic-only case the GPU receipt plus a valid WebGL framebuffer is
+# the readiness proof; ordinary visual modes still require the established
+# energy > 100 condition.
+$readinessAnchor = '[int]$Matches[1] -gt 100 -and [int]$Matches[2] -ge 240 -and [int]$Matches[3] -ge 180'
+$readinessReplacement = '([int]$Matches[1] -gt 100 -or $lastTitle -match ''crossingSource=gpu-uniform-readback;requestedVisualMode=crossing-[^;|]+;effectiveVisualCompare=[0-9.]+;effectiveCrossingOrder=(first|second|third-plus)'') -and [int]$Matches[2] -ge 240 -and [int]$Matches[3] -ge 180'
+if (-not $visualSource.Contains($readinessAnchor)) {
+  throw "Crossing diagnostic readiness anchor was not found in windows-interaction-smoke-full.ps1."
+}
+$visualSource = $visualSource.Replace($readinessAnchor, $readinessReplacement)
+
 $receiptAnchor = '$orbWindow = Wait-OrbRenderReady $visualProcess.Id'
 $receiptBlock = @'
 $orbWindow = Wait-OrbRenderReady $visualProcess.Id
