@@ -45,6 +45,16 @@ export function getVisualComparisonSettings(mode: VisualComparisonMode): VisualC
   return { shaderMode: 1, fixedTime: null, crossingOrder: "normal" };
 }
 
+export function includesCrossingOrder(mode: CrossingOrderDiagnosticMode, crossingIndex: number) {
+  if (!Number.isInteger(crossingIndex) || crossingIndex < 0) {
+    throw new Error("crossingIndex must be a non-negative integer");
+  }
+  if (mode === "normal") return true;
+  if (mode === "first") return crossingIndex === 0;
+  if (mode === "second") return crossingIndex === 1;
+  return crossingIndex >= 2;
+}
+
 function crossingOrderFromShaderMode(shaderMode: number): CrossingOrderDiagnosticMode {
   if (Math.abs(shaderMode - 3) <= 0.00001) return "first";
   if (Math.abs(shaderMode - 4) <= 0.00001) return "second";
