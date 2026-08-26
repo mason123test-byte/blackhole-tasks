@@ -6,6 +6,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $resolvedExePath = (Resolve-Path -LiteralPath $ExePath).Path
+$exeSha256 = (Get-FileHash -LiteralPath $resolvedExePath -Algorithm SHA256).Hash.ToLowerInvariant()
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 
 function Read-EffectiveReceipt([string]$Path) {
@@ -13,21 +14,28 @@ function Read-EffectiveReceipt([string]$Path) {
     throw "Missing effective visual experiment receipt: $Path"
   }
   $title = Get-Content -LiteralPath $Path -Raw
-  if ($title -notmatch 'effectiveExperimentId=([^;|]+);effectiveEnabled=([01]);effectiveFilmDiskExposure=([0-9.]+);effectiveDiskOuter=([0-9.]+)') {
-    throw "Malformed effective visual experiment receipt: $title"
+  if ($title -notmatch 'effectiveSource=(gpu-uniform-readback);effectiveExperimentId=([^;|]+);effectiveEnabled=([01]);effectiveFilmDiskExposure=([0-9.]+);effectiveDiskOuter=([0-9.]+)') {
+    throw "Malformed or non-GPU effective visual experiment receipt: $title"
   }
   return [pscustomobject]@{
-    experimentId = [uri]::UnescapeDataString($Matches[1])
-    enabled = $Matches[2] -eq '1'
-    filmDiskExposure = [double]::Parse($Matches[3], [System.Globalization.CultureInfo]::InvariantCulture)
-    diskOuter = [double]::Parse($Matches[4], [System.Globalization.CultureInfo]::InvariantCulture)
+    source = $Matches[1]
+    experimentId = [uri]::UnescapeDataString($Matches[2])
+    enabled = $Matches[3] -eq '1'
+    filmDiskExposure = [double]::Parse($Matches[4], [System.Globalization.CultureInfo]::InvariantCulture)
+    diskOuter = [double]::Parse($Matches[5], [System.Globalization.CultureInfo]::InvariantCulture)
     rawTitle = $title
   }
 }
 
 function Assert-Close([double]$Actual, [double]$Expected, [string]$Name) {
-  if ([Math]::Abs($Actual - $Expected) -gt 0.000001) {
+  if (-not [double]::IsFinite($Actual) -or [Math]::Abs($Actual - $Expected) -gt 0.000001) {
     throw "$Name mismatch: expected=$Expected actual=$Actual"
+  }
+}
+
+function Assert-RequiredImage([string]$Path) {
+  if (-not (Test-Path -LiteralPath $Path) -or (Get-Item -LiteralPath $Path).Length -eq 0) {
+    throw "Missing required preflight image: $Path"
   }
 }
 
@@ -54,6 +62,9 @@ try {
         -VisualOnly `
         -CandidateOnly
       $receipt = Read-EffectiveReceipt (Join-Path $caseDirectory "visual-candidate-effective.txt")
+      if ($receipt.source -ne "gpu-uniform-readback") {
+        throw "effective source mismatch for $($case.id): $($receipt.source)"
+      }
       if ($receipt.enabled -ne $case.enabled) {
         throw "enabled mismatch for $($case.id): requested=$($case.enabled) effective=$($receipt.enabled)"
       }
@@ -65,6 +76,14 @@ try {
       }
       Assert-Close $receipt.filmDiskExposure 1.55 "$($case.id) filmDiskExposure"
       Assert-Close $receipt.diskOuter $case.diskOuter "$($case.id) diskOuter"
+
+      $temporaryImagePath = Join-Path $caseDirectory "visual-candidate.png"
+      Assert-RequiredImage $temporaryImagePath
+      $persistedImagePath = Join-Path $OutputDirectory "$($case.id).png"
+      Copy-Item -LiteralPath $temporaryImagePath -Destination $persistedImagePath -Force
+      Assert-RequiredImage $persistedImagePath
+      $imageSha256 = (Get-FileHash -LiteralPath $persistedImagePath -Algorithm SHA256).Hash.ToLowerInvariant()
+
       $receipts.Add([pscustomobject]@{
         requested = [ordered]@{
           experimentId = if ($case.enabled) { $case.id } else { "accepted-571" }
@@ -73,13 +92,22 @@ try {
           diskOuter = [double]$case.diskOuter
         }
         effective = [ordered]@{
+          source = $receipt.source
           experimentId = $receipt.experimentId
           enabled = [bool]$receipt.enabled
           filmDiskExposure = [double]$receipt.filmDiskExposure
           diskOuter = [double]$receipt.diskOuter
         }
+        executable = [ordered]@{
+          path = $resolvedExePath
+          sha256 = $exeSha256
+        }
+        image = [ordered]@{
+          path = $persistedImagePath
+          sha256 = $imageSha256
+        }
       })
-      "VISUAL_EXPERIMENT_PREFLIGHT_CASE_OK id=$($case.id) requestedOuter=$($case.diskOuter) effectiveOuter=$($receipt.diskOuter) enabled=$($receipt.enabled)"
+      "VISUAL_EXPERIMENT_PREFLIGHT_CASE_OK id=$($case.id) source=$($receipt.source) requestedOuter=$($case.diskOuter) effectiveOuter=$($receipt.diskOuter) image=$persistedImagePath imageSha256=$imageSha256 exeSha256=$exeSha256"
     } finally {
       Remove-Item -LiteralPath $caseDirectory -Recurse -Force -ErrorAction SilentlyContinue
     }
@@ -96,13 +124,23 @@ Assert-Close $receipts[1].effective.diskOuter 14.0 "candidate effective diskOute
 if ($receipts[0].effective.diskOuter -eq $receipts[1].effective.diskOuter) {
   throw "Visual experiment preflight did not prove distinct effective DISK_OUTER values."
 }
+foreach ($case in $receipts) {
+  if ($case.effective.source -ne "gpu-uniform-readback") {
+    throw "Visual experiment preflight accepted a non-GPU receipt source."
+  }
+  Assert-RequiredImage $case.image.path
+  if ($case.executable.sha256 -ne $exeSha256) {
+    throw "Visual experiment preflight did not use one identical executable."
+  }
+}
 
 $summary = [ordered]@{
-  schemaVersion = "1.0"
-  sameExeSha256 = (Get-FileHash -LiteralPath $resolvedExePath -Algorithm SHA256).Hash.ToLowerInvariant()
+  schemaVersion = "2.0"
+  sameExeSha256 = $exeSha256
   cases = @($receipts)
   verified = $true
+  visualAcceptance = $false
 }
 $summaryPath = Join-Path $OutputDirectory "visual-experiment-preflight.json"
 $summary | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $summaryPath
-"VISUAL_EXPERIMENT_PREFLIGHT_OK controlEffectiveOuter=35 candidateEffectiveOuter=14 summary=$summaryPath"
+"VISUAL_EXPERIMENT_PREFLIGHT_OK source=gpu-uniform-readback controlEffectiveOuter=35 candidateEffectiveOuter=14 summary=$summaryPath"
