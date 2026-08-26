@@ -68,12 +68,15 @@ describe("black-hole render profiles", () => {
     expect(blackHoleCanvasSource).toContain('invoke<string>("get_visual_experiment_config")');
     expect(rendererSource).toContain('gl.getUniformLocation(program, "u_visual_experiment_enabled")');
     expect(rendererSource).toContain('gl.getUniformLocation(program, "u_experiment_film_disk_exposure")');
+    expect(rendererSource).toContain('gl.getUniformLocation(program, "u_experiment_disk_outer")');
     expect(rendererSource).toContain(
       "gl.uniform1f(uniforms.visualExperimentEnabled, visualExperiment.enabled ? 1 : 0);",
     );
+    expect(rendererSource).toContain("gl.uniform1f(uniforms.experimentDiskOuter, visualExperiment.diskOuter);");
+    expect(blackHoleCanvasSource).toContain("effectiveDiskOuter=${visualExperiment.diskOuter.toFixed(6)}");
   });
 
-  it("keeps the validated diagnostic frame alive instead of destroying GL resources before Windows composition", () => {
+  it("keeps the validated diagnostic frame alive while publishing the effective receipt", () => {
     expect(rendererSource).toContain("const freezeAfterValidatedFrame = visualComparison.fixedTime !== null;");
     expect(rendererSource).toContain("let resizedFrame = false;");
     expect(rendererSource).toContain("rendererReady = false;");
@@ -90,7 +93,8 @@ describe("black-hole render profiles", () => {
     expect(rendererSource).toContain("if (!freezeAfterValidatedFrame || !rendererReady) {");
     expect(blackHoleCanvasSource).not.toContain("freezeTimer");
     expect(blackHoleCanvasSource).not.toContain("stopVisualRenderer");
-    expect(blackHoleCanvasSource).toContain("return stopRenderer;");
+    expect(blackHoleCanvasSource).toContain("window.cancelAnimationFrame(receiptFrame);");
+    expect(blackHoleCanvasSource).toContain("stopRenderer();");
   });
 
   it("rejects flare energy from the direct bright core while preserving the stronger outer veil", () => {
