@@ -37,19 +37,21 @@ if ($boundaryIndex -lt 0) {
 }
 
 $visualSource = $fullSource.Substring(0, $boundaryIndex)
+
+# Crossing diagnostics are selected by BLACKHOLE_VISUAL_EXPERIMENT experimentId
+# and therefore still use the existing valid candidate comparison mode. No
+# unknown comparison value is allowed to fall back to normal rendering.
 $hardcodedCandidateCapture = '  Capture-VisualComparisonFrame $resolvedExePath "candidate" $visualCandidatePath'
-$selectedCandidateCapture = '  Capture-VisualComparisonFrame $resolvedExePath $env:BLACKHOLE_VISUAL_CAPTURE_MODE $visualCandidatePath'
 if (-not $visualSource.Contains($hardcodedCandidateCapture)) {
-  throw "VisualMode candidate capture anchor was not found in windows-interaction-smoke-full.ps1."
+  throw "Candidate capture anchor was not found in windows-interaction-smoke-full.ps1."
 }
-$visualSource = $visualSource.Replace($hardcodedCandidateCapture, $selectedCandidateCapture)
 
 # A crossing-isolation frame may correctly contain almost no bright disk pixels.
 # In that diagnostic-only case the GPU receipt plus a valid WebGL framebuffer is
 # the readiness proof; ordinary visual modes still require the established
 # energy > 100 condition.
 $readinessAnchor = '[int]$Matches[1] -gt 100 -and [int]$Matches[2] -ge 240 -and [int]$Matches[3] -ge 180'
-$readinessReplacement = '([int]$Matches[1] -gt 100 -or $lastTitle -match ''crossingSource=gpu-uniform-readback;requestedVisualMode=crossing-[^;|]+;effectiveVisualCompare=[0-9.]+;effectiveCrossingOrder=(first|second|third-plus)'') -and [int]$Matches[2] -ge 240 -and [int]$Matches[3] -ge 180'
+$readinessReplacement = '([int]$Matches[1] -gt 100 -or $lastTitle -match ''crossingSource=gpu-uniform-readback;requestedCrossingOrder=(first|second|third-plus);effectiveVisualCompare=[0-9.]+;effectiveCrossingOrder=(first|second|third-plus)'') -and [int]$Matches[2] -ge 240 -and [int]$Matches[3] -ge 180'
 if (-not $visualSource.Contains($readinessAnchor)) {
   throw "Crossing diagnostic readiness anchor was not found in windows-interaction-smoke-full.ps1."
 }
@@ -58,13 +60,13 @@ $visualSource = $visualSource.Replace($readinessAnchor, $readinessReplacement)
 $receiptAnchor = '$orbWindow = Wait-OrbRenderReady $visualProcess.Id'
 $receiptBlock = @'
 $orbWindow = Wait-OrbRenderReady $visualProcess.Id
-if ($Mode -in @("candidate", "crossing-first", "crossing-second", "crossing-third-plus")) {
+if ($Mode -eq "candidate") {
   $receiptDeadline = [DateTime]::UtcNow.AddSeconds(8)
   $receiptWindow = $null
   do {
     $receiptMatch = @(Get-AppWindows $visualProcess.Id | Where-Object {
       $_.Title.StartsWith("黑洞任务|renderer=webgl2|frame=ready|") -and
-      $_.Title -match 'effectiveSource=gpu-uniform-readback;effectiveExperimentId=[^;|]+;effectiveEnabled=[01];effectiveFilmDiskExposure=[0-9.]+;effectiveDiskOuter=[0-9.]+;crossingSource=gpu-uniform-readback;requestedVisualMode=[^;|]+;effectiveVisualCompare=[0-9.]+;effectiveCrossingOrder=[^;|]+'
+      $_.Title -match 'effectiveSource=gpu-uniform-readback;effectiveExperimentId=[^;|]+;effectiveEnabled=[01];effectiveFilmDiskExposure=[0-9.]+;effectiveDiskOuter=[0-9.]+;crossingSource=gpu-uniform-readback;requestedCrossingOrder=[^;|]+;effectiveVisualCompare=[0-9.]+;effectiveCrossingOrder=[^;|]+'
     })
     if ($receiptMatch.Count -gt 0) {
       $receiptWindow = $receiptMatch[0]
@@ -84,7 +86,6 @@ if (-not $visualSource.Contains($receiptAnchor)) {
 }
 $visualSource = $visualSource.Replace($receiptAnchor, $receiptBlock)
 $visualBlock = [ScriptBlock]::Create($visualSource)
-$env:BLACKHOLE_VISUAL_CAPTURE_MODE = $VisualMode
 try {
   & $visualBlock -ExePath $ExePath -OutputDirectory $OutputDirectory -CandidateOnly:$CandidateOnly
 } catch {
@@ -93,8 +94,6 @@ try {
     "error=$($_.Exception.Message)"
   ) | Set-Content -LiteralPath (Join-Path $OutputDirectory "visual-bootstrap-diagnostics.txt")
   throw
-} finally {
-  Remove-Item Env:BLACKHOLE_VISUAL_CAPTURE_MODE -ErrorAction SilentlyContinue
 }
 
 $requiredEvidence = if ($CandidateOnly) {
