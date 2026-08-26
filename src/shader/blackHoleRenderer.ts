@@ -15,6 +15,13 @@ import {
   requireVisualExperimentUniformLocations,
 } from "./visualExperimentGpuReceipt";
 import {
+  encodeCrossingDiagnosticReceipt,
+  getVisualComparisonSettings,
+  normalizeVisualComparisonMode,
+  readCrossingDiagnosticUniformReceipt,
+  type VisualComparisonMode,
+} from "./crossingOrderDiagnostic";
+import {
   buildSceneTextureSignature,
   createSceneTextureBitmap,
   type SceneTextureState,
@@ -22,6 +29,7 @@ import {
 } from "./sceneTexture";
 
 export const BLACK_HOLE_RENDERER_INFO = REFERENCE_BLACK_HOLE_INFO;
+export { normalizeVisualComparisonMode, type VisualComparisonMode };
 
 export const MIRROR_COMPOSITOR_FRAGMENT = `#version 300 es
 precision highp float;
@@ -101,19 +109,6 @@ export interface RenderProfile {
   pixelRatioCap: number;
 }
 
-export type VisualComparisonMode = "normal" | "baseline" | "candidate" | "split";
-
-export function normalizeVisualComparisonMode(value: unknown): VisualComparisonMode {
-  return value === "baseline" || value === "candidate" || value === "split" ? value : "normal";
-}
-
-export function getVisualComparisonSettings(mode: VisualComparisonMode) {
-  if (mode === "baseline") return { shaderMode: 0, fixedTime: 12 };
-  if (mode === "split") return { shaderMode: 2, fixedTime: 12 };
-  if (mode === "candidate") return { shaderMode: 1, fixedTime: 12 };
-  return { shaderMode: 1, fixedTime: null };
-}
-
 export function getRenderProfile(quality: RenderQuality, lowPowerMode = false): RenderProfile {
   if (lowPowerMode || quality === "low") {
     return { fps: 12, pixelRatioCap: 1 };
@@ -160,8 +155,9 @@ function startBlackHoleSession(
   getScene: () => SceneTextureState,
   options: RendererSessionOptions = {},
 ) {
+  const requestedVisualMode = options.visualComparisonMode ?? "normal";
   const profile = getRenderProfile(options.quality ?? "balanced", options.lowPowerMode);
-  const visualComparison = getVisualComparisonSettings(options.visualComparisonMode ?? "normal");
+  const visualComparison = getVisualComparisonSettings(requestedVisualMode);
   const visualExperiment = options.visualExperiment ?? DEFAULT_VISUAL_EXPERIMENT;
   const freezeAfterValidatedFrame = visualComparison.fixedTime !== null;
   const gl = canvas.getContext("webgl2", {
@@ -257,15 +253,23 @@ function startBlackHoleSession(
       visualExperimentUniforms,
       visualExperiment,
     );
-    const effectiveReceiptDiagnostic = encodeEffectiveVisualExperimentReceipt(effectiveVisualExperiment);
+    const effectiveCrossingDiagnostic = readCrossingDiagnosticUniformReceipt(
+      gl,
+      program,
+      uniforms.visualCompare,
+      requestedVisualMode,
+      visualComparison.shaderMode,
+    );
+    const effectiveReceiptDiagnostic = [
+      encodeEffectiveVisualExperimentReceipt(effectiveVisualExperiment),
+      encodeCrossingDiagnosticReceipt(effectiveCrossingDiagnostic),
+    ].join(";");
     const compositorUniforms = {
       resolution: gl.getUniformLocation(compositorProgram, "u_resolution"),
       frameTexture: gl.getUniformLocation(compositorProgram, "u_frame_texture"),
-      visualCompare: gl.getUniformLocation(compositorProgram, "u_visual_compare"),
     };
     gl.useProgram(compositorProgram);
     gl.uniform1i(compositorUniforms.frameTexture, 1);
-    gl.uniform1f(compositorUniforms.visualCompare, visualComparison.shaderMode);
     gl.useProgram(program);
 
     const sceneTexture = gl.createTexture();
@@ -302,6 +306,7 @@ function startBlackHoleSession(
     canvas.dataset.model = BLACK_HOLE_RENDERER_INFO.model;
     canvas.dataset.quality = options.lowPowerMode ? "low-power" : (options.quality ?? "balanced");
     canvas.dataset.experimentId = visualExperiment.experimentId;
+    canvas.dataset.crossingOrder = visualComparison.crossingOrder;
     let animationFrame = 0;
     let disposed = false;
     let lastFrameAt = 0;
@@ -466,7 +471,12 @@ function startBlackHoleSession(
         validatedDiagnostic = `a${alphaEnergy}-m${maxChannel}-am${maxAlpha}-sr${expandedSceneReady ? 1 : 0}-e${glError}-f${framebufferStatus}`;
         canvas.dataset.energy = String(validatedEnergy);
         canvas.dataset.diagnostic = validatedDiagnostic;
-        rendererReady = validatedEnergy > 100;
+        const crossingDiagnosticReady = visualComparison.crossingOrder !== "normal" &&
+          expandedSceneReady &&
+          glError === gl.NO_ERROR &&
+          framebufferStatus === gl.FRAMEBUFFER_COMPLETE &&
+          alphaEnergy > 100;
+        rendererReady = crossingDiagnosticReady || validatedEnergy > 100;
       }
 
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
