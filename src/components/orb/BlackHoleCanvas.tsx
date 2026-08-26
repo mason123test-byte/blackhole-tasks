@@ -44,30 +44,34 @@ export function BlackHoleCanvas({
   useEffect(() => {
     if (!nativeRuntime) return;
     let active = true;
-    void Promise.all([
-      invoke<string>("get_visual_comparison_mode"),
-      invoke<string>("get_visual_experiment_config"),
-    ])
-      .then(async ([rawMode, rawExperiment]) => {
+
+    void invoke<string>("get_visual_comparison_mode")
+      .then(async (rawMode) => {
         const mode = normalizeVisualComparisonMode(rawMode);
-        const experiment = parseVisualExperimentConfig(rawExperiment);
         if (mode !== "normal") {
           await invoke("set_scene_expanded", { expanded: true });
         }
-        if (active) {
-          setVisualComparisonMode(mode);
-          setVisualExperiment(experiment);
-        }
+        if (active) setVisualComparisonMode(mode);
       })
       .catch((error) => {
         const message = error instanceof Error ? error.message : String(error);
-        console.error("无法读取视觉诊断配置：", error);
-        onError?.(`视觉实验配置无效：${message}`);
-        if (active) {
-          setVisualComparisonMode(null);
-          setVisualExperiment(null);
-        }
+        console.error("无法读取视觉比较配置：", error);
+        onError?.(`视觉比较配置读取失败：${message}`);
+        if (active) setVisualComparisonMode(null);
       });
+
+    void invoke<string>("get_visual_experiment_config")
+      .then((rawExperiment) => {
+        const experiment = parseVisualExperimentConfig(rawExperiment);
+        if (active) setVisualExperiment(experiment);
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error("无法读取视觉实验配置：", error);
+        onError?.(`视觉实验配置无效：${message}`);
+        if (active) setVisualExperiment(null);
+      });
+
     return () => { active = false; };
   }, [nativeRuntime, onError]);
 
@@ -111,36 +115,7 @@ export function BlackHoleCanvas({
       },
     );
 
-    let receiptFrame = 0;
-    const reportEffectiveExperiment = () => {
-      const energy = Number(canvas.dataset.energy ?? "0");
-      if (canvas.dataset.renderer !== "webgl2" || !Number.isFinite(energy) || energy <= 100) {
-        receiptFrame = window.requestAnimationFrame(reportEffectiveExperiment);
-        return;
-      }
-      const receipt = [
-        `effectiveExperimentId=${encodeURIComponent(visualExperiment.experimentId)}`,
-        `effectiveEnabled=${visualExperiment.enabled ? 1 : 0}`,
-        `effectiveFilmDiskExposure=${visualExperiment.filmDiskExposure.toFixed(6)}`,
-        `effectiveDiskOuter=${visualExperiment.diskOuter.toFixed(6)}`,
-      ].join(";");
-      const diagnostic = `${canvas.dataset.diagnostic ?? ""};${receipt}`.replace(/^;/, "");
-      void invoke("report_orb_render", {
-        renderer: "webgl2",
-        energy: Math.round(energy),
-        width: canvas.width,
-        height: canvas.height,
-        diagnostic,
-      }).catch((error) => {
-        console.error("无法上报视觉实验实际生效值：", error);
-      });
-    };
-    receiptFrame = window.requestAnimationFrame(reportEffectiveExperiment);
-
-    return () => {
-      window.cancelAnimationFrame(receiptFrame);
-      stopRenderer();
-    };
+    return stopRenderer;
   }, [expanded, lowPowerMode, onError, quality, visualComparisonMode, visualExperiment]);
 
   return <canvas ref={ref} className="black-hole-canvas" aria-label="黑洞任务悬浮窗" />;
