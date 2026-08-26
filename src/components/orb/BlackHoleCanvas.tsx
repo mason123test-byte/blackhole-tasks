@@ -60,14 +60,16 @@ export function BlackHoleCanvas({
         }
       })
       .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
         console.error("无法读取视觉诊断配置：", error);
+        onError?.(`视觉实验配置无效：${message}`);
         if (active) {
-          setVisualComparisonMode("normal");
-          setVisualExperiment(DEFAULT_VISUAL_EXPERIMENT);
+          setVisualComparisonMode(null);
+          setVisualExperiment(null);
         }
       });
     return () => { active = false; };
-  }, [nativeRuntime]);
+  }, [nativeRuntime, onError]);
 
   useEffect(() => {
     expandedRef.current = expanded ? 1 : 0;
@@ -78,8 +80,9 @@ export function BlackHoleCanvas({
     if (!ref.current || visualComparisonMode === null || visualExperiment === null) return;
     if (visualComparisonMode !== "normal" && !expanded) return;
 
+    const canvas = ref.current;
     const stopRenderer = startBlackHole(
-      ref.current,
+      canvas,
       () => expandedRef.current,
       () => sceneRef.current,
       {
@@ -88,10 +91,10 @@ export function BlackHoleCanvas({
         visualComparisonMode,
         visualExperiment,
         onError: (message) => {
-          if ("__TAURI_INTERNALS__" in window && ref.current?.dataset.renderer === "shader-error") {
+          if ("__TAURI_INTERNALS__" in window && canvas.dataset.renderer === "shader-error") {
             const diagnostic = `shader-error:${message.replace(/\s+/g, " ").trim()}`;
-            const width = ref.current.width;
-            const height = ref.current.height;
+            const width = canvas.width;
+            const height = canvas.height;
             document.title = `黑洞任务|renderer=webgl2|frame=ready|energy=0|size=${width}x${height}|diag=${diagnostic}`;
             void invoke("report_orb_render", {
               renderer: "webgl2",
@@ -107,7 +110,37 @@ export function BlackHoleCanvas({
         },
       },
     );
-    return stopRenderer;
+
+    let receiptFrame = 0;
+    const reportEffectiveExperiment = () => {
+      const energy = Number(canvas.dataset.energy ?? "0");
+      if (canvas.dataset.renderer !== "webgl2" || !Number.isFinite(energy) || energy <= 100) {
+        receiptFrame = window.requestAnimationFrame(reportEffectiveExperiment);
+        return;
+      }
+      const receipt = [
+        `effectiveExperimentId=${encodeURIComponent(visualExperiment.experimentId)}`,
+        `effectiveEnabled=${visualExperiment.enabled ? 1 : 0}`,
+        `effectiveFilmDiskExposure=${visualExperiment.filmDiskExposure.toFixed(6)}`,
+        `effectiveDiskOuter=${visualExperiment.diskOuter.toFixed(6)}`,
+      ].join(";");
+      const diagnostic = `${canvas.dataset.diagnostic ?? ""};${receipt}`.replace(/^;/, "");
+      void invoke("report_orb_render", {
+        renderer: "webgl2",
+        energy: Math.round(energy),
+        width: canvas.width,
+        height: canvas.height,
+        diagnostic,
+      }).catch((error) => {
+        console.error("无法上报视觉实验实际生效值：", error);
+      });
+    };
+    receiptFrame = window.requestAnimationFrame(reportEffectiveExperiment);
+
+    return () => {
+      window.cancelAnimationFrame(receiptFrame);
+      stopRenderer();
+    };
   }, [expanded, lowPowerMode, onError, quality, visualComparisonMode, visualExperiment]);
 
   return <canvas ref={ref} className="black-hole-canvas" aria-label="黑洞任务悬浮窗" />;
