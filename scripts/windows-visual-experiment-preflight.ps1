@@ -5,39 +5,10 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "windows-visual-experiment-preflight-contract.ps1")
 $resolvedExePath = (Resolve-Path -LiteralPath $ExePath).Path
 $exeSha256 = (Get-FileHash -LiteralPath $resolvedExePath -Algorithm SHA256).Hash.ToLowerInvariant()
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
-
-function Read-EffectiveReceipt([string]$Path) {
-  if (-not (Test-Path -LiteralPath $Path)) {
-    throw "Missing effective visual experiment receipt: $Path"
-  }
-  $title = Get-Content -LiteralPath $Path -Raw
-  if ($title -notmatch 'effectiveSource=(gpu-uniform-readback);effectiveExperimentId=([^;|]+);effectiveEnabled=([01]);effectiveFilmDiskExposure=([0-9.]+);effectiveDiskOuter=([0-9.]+)') {
-    throw "Malformed or non-GPU effective visual experiment receipt: $title"
-  }
-  return [pscustomobject]@{
-    source = $Matches[1]
-    experimentId = [uri]::UnescapeDataString($Matches[2])
-    enabled = $Matches[3] -eq '1'
-    filmDiskExposure = [double]::Parse($Matches[4], [System.Globalization.CultureInfo]::InvariantCulture)
-    diskOuter = [double]::Parse($Matches[5], [System.Globalization.CultureInfo]::InvariantCulture)
-    rawTitle = $title
-  }
-}
-
-function Assert-Close([double]$Actual, [double]$Expected, [string]$Name) {
-  if (-not [double]::IsFinite($Actual) -or [Math]::Abs($Actual - $Expected) -gt 0.000001) {
-    throw "$Name mismatch: expected=$Expected actual=$Actual"
-  }
-}
-
-function Assert-RequiredImage([string]$Path) {
-  if (-not (Test-Path -LiteralPath $Path) -or (Get-Item -LiteralPath $Path).Length -eq 0) {
-    throw "Missing required preflight image: $Path"
-  }
-}
 
 $cases = @(
   [pscustomobject]@{ id = "preflight-control"; enabled = $false; diskOuter = 35.0 },
