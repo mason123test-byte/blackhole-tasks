@@ -39,8 +39,14 @@ export function normalizeVisualExperimentConfig(value: unknown): NormalizedVisua
     throw new Error("visual experiment parameters object is required");
   }
   const parameterKeys = Object.keys(config.parameters);
+  if (parameterKeys.length === 0) {
+    throw new Error("visual experiment parameters must not be empty");
+  }
   if (parameterKeys.some((key) => !ALLOWED_VISUAL_EXPERIMENT_PARAMETERS.has(key))) {
     throw new Error("visual experiment contains an unknown parameter");
+  }
+  if (parameterKeys.includes("DISK_OUTER") && (parameterKeys.length !== 1 || parameterKeys[0] !== "DISK_OUTER")) {
+    throw new Error("DISK_OUTER sweep requires exactly one DISK_OUTER parameter");
   }
   const exposure = config.parameters.FILM_DISK_EXPOSURE;
   if (exposure !== undefined && (typeof exposure !== "number" || !Number.isFinite(exposure) || exposure <= 0)) {
