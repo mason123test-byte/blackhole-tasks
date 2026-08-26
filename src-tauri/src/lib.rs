@@ -41,11 +41,21 @@ fn normalize_visual_experiment_config(value: Option<&str>) -> Result<String, Str
         .get("parameters")
         .and_then(Value::as_object)
         .ok_or_else(|| "BLACKHOLE_VISUAL_EXPERIMENT requires a parameters object".to_owned())?;
+    if parameters.is_empty() {
+        return Err("BLACKHOLE_VISUAL_EXPERIMENT parameters must not be empty".to_owned());
+    }
     if parameters
         .keys()
         .any(|key| key != "FILM_DISK_EXPOSURE" && key != "DISK_OUTER")
     {
         return Err("BLACKHOLE_VISUAL_EXPERIMENT contains an unknown parameter".to_owned());
+    }
+    if parameters.contains_key("DISK_OUTER")
+        && (parameters.len() != 1 || !parameters.contains_key("DISK_OUTER"))
+    {
+        return Err(
+            "DISK_OUTER sweep requires exactly one DISK_OUTER parameter".to_owned(),
+        );
     }
     if let Some(value) = parameters.get("FILM_DISK_EXPOSURE") {
         let exposure = value
@@ -765,11 +775,14 @@ mod smoke_command_tests {
             normalize_visual_experiment_config(Some(disk_outer)),
             Ok(disk_outer.to_owned())
         );
-        let combined = r#"{"experimentId":"batch-combined","parameters":{"FILM_DISK_EXPOSURE":1.4,"DISK_OUTER":20.0}}"#;
-        assert_eq!(
-            normalize_visual_experiment_config(Some(combined)),
-            Ok(combined.to_owned())
-        );
+        assert!(normalize_visual_experiment_config(Some(
+            r#"{"experimentId":"empty","parameters":{}}"#
+        ))
+        .is_err());
+        assert!(normalize_visual_experiment_config(Some(
+            r#"{"experimentId":"batch-combined","parameters":{"FILM_DISK_EXPOSURE":1.4,"DISK_OUTER":20.0}}"#
+        ))
+        .is_err());
         assert_eq!(normalize_visual_experiment_config(None), Ok(String::new()));
         assert!(normalize_visual_experiment_config(Some("not-json")).is_err());
         assert!(normalize_visual_experiment_config(Some(
