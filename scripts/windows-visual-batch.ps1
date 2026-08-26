@@ -38,21 +38,6 @@ function Get-MetricDelta($Metrics, $Control) {
   }
 }
 
-function Test-155Stability($Metrics, $Control) {
-  return (
-    [Math]::Abs([double]$Metrics.avg - [double]$Control.avg) -le 0.10 -and
-    [double]$Metrics.median -eq [double]$Control.median -and
-    [Math]::Abs([int]$Metrics.core - [int]$Control.core) -le 2 -and
-    [Math]::Abs([int]$Metrics.columns - [int]$Control.columns) -le 2 -and
-    [Math]::Abs([int]$Metrics.longest - [int]$Control.longest) -le 1 -and
-    [Math]::Abs([int]$Metrics.span - [int]$Control.span) -le [Math]::Max(1, [Math]::Ceiling([double]$Control.span * 0.03)) -and
-    [Math]::Abs([int]$Metrics.lower - [int]$Control.lower) -le [Math]::Max(1, [Math]::Ceiling([double]$Control.lower * 0.03)) -and
-    [Math]::Abs([int]$Metrics.warm - [int]$Control.warm) -le [Math]::Max(1, [Math]::Ceiling([double]$Control.warm * 0.05)) -and
-    [Math]::Abs([int]$Metrics.shadow - [int]$Control.shadow) -le 2 -and
-    [int]$Metrics.dead -eq 0
-  )
-}
-
 function New-ContactSheet($Cases, $Rows) {
   Add-Type -AssemblyName System.Drawing
   $thumbWidth = 460
@@ -73,8 +58,8 @@ function New-ContactSheet($Cases, $Rows) {
         $left = $column * $thumbWidth
         $top = $gridRow * ($thumbHeight + $labelHeight)
         $graphics.DrawImage($source, [System.Drawing.Rectangle]::new($left, $top, $thumbWidth, $thumbHeight))
-        $exposureLabel = if ($null -eq $case.exposure) { "default" } else { "{0:N2}" -f [double]$case.exposure }
-        $graphics.DrawString("$($case.id)  exposure=$exposureLabel", $font, [System.Drawing.Brushes]::White, [single]($left + 8), [single]($top + $thumbHeight + 8))
+        $outerLabel = if ($null -eq $case.diskOuter) { "default" } else { "{0:N1}" -f [double]$case.diskOuter }
+        $graphics.DrawString("$($case.id)  DISK_OUTER=$outerLabel", $font, [System.Drawing.Brushes]::White, [single]($left + 8), [single]($top + $thumbHeight + 8))
       } finally {
         $source.Dispose()
       }
@@ -87,16 +72,20 @@ function New-ContactSheet($Cases, $Rows) {
   }
 }
 
+# Single-factor geometry sweep. Current renderer uses Kerr coordinates with M=1;
+# the upstream Gargantua reference uses Schwarzschild-radius units (r_s=2M).
+# Its DISK_OUTER=7 r_s therefore maps to about 14 M in this coordinate scale.
+# Values walk from the accepted 35 M source extent toward that evidence-derived target.
 $cases = @(
-  [pscustomobject]@{ id = "control"; exposure = $null },
-  [pscustomobject]@{ id = "smoke-01"; exposure = 1.55 },
-  [pscustomobject]@{ id = "smoke-02"; exposure = 1.55 },
-  [pscustomobject]@{ id = "smoke-03"; exposure = 1.55 },
-  [pscustomobject]@{ id = "smoke-04"; exposure = 1.55 },
-  [pscustomobject]@{ id = "smoke-05"; exposure = 1.45 },
-  [pscustomobject]@{ id = "smoke-06"; exposure = 1.50 },
-  [pscustomobject]@{ id = "smoke-07"; exposure = 1.60 },
-  [pscustomobject]@{ id = "smoke-08"; exposure = 1.65 }
+  [pscustomobject]@{ id = "control"; diskOuter = $null },
+  [pscustomobject]@{ id = "smoke-01"; diskOuter = 32.0 },
+  [pscustomobject]@{ id = "smoke-02"; diskOuter = 29.0 },
+  [pscustomobject]@{ id = "smoke-03"; diskOuter = 26.0 },
+  [pscustomobject]@{ id = "smoke-04"; diskOuter = 23.0 },
+  [pscustomobject]@{ id = "smoke-05"; diskOuter = 20.0 },
+  [pscustomobject]@{ id = "smoke-06"; diskOuter = 18.0 },
+  [pscustomobject]@{ id = "smoke-07"; diskOuter = 16.0 },
+  [pscustomobject]@{ id = "smoke-08"; diskOuter = 14.0 }
 )
 
 $headSha = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else { "local" }
@@ -105,7 +94,7 @@ $rows = [System.Collections.Generic.List[object]]::new()
 $controlMetrics = $null
 $exeDigest = (Get-FileHash -LiteralPath $resolvedExePath -Algorithm SHA256).Hash.ToLowerInvariant()
 
-Write-BatchLog "BATCH_START headSha=$headSha runId=$runId exe=$resolvedExePath exeSha256=$exeDigest cases=$($cases.Count)"
+Write-BatchLog "BATCH_START headSha=$headSha runId=$runId exe=$resolvedExePath exeSha256=$exeDigest cases=$($cases.Count) sweep=DISK_OUTER"
 Write-BatchLog "BUILD_EVIDENCE batchJobNpmCiCount=$env:BLACKHOLE_BATCH_NPM_CI_COUNT tauriNoBundleReleaseExeBuildCount=$env:BLACKHOLE_BATCH_EXE_BUILD_COUNT"
 if ($env:BLACKHOLE_BATCH_NPM_CI_COUNT -ne "1" -or $env:BLACKHOLE_BATCH_EXE_BUILD_COUNT -ne "1") {
   throw "Batch build evidence markers must both equal one."
@@ -119,16 +108,16 @@ foreach ($case in $cases) {
   $outputImagePath = Join-Path $OutputDirectory $outputImageName
   try {
     Remove-Item Env:BLACKHOLE_VISUAL_EXPERIMENT -ErrorAction SilentlyContinue
-    if ($null -ne $case.exposure) {
+    if ($null -ne $case.diskOuter) {
       $experiment = [ordered]@{
         experimentId = $case.id
-        parameters = [ordered]@{ FILM_DISK_EXPOSURE = [double]$case.exposure }
+        parameters = [ordered]@{ DISK_OUTER = [double]$case.diskOuter }
       }
       $env:BLACKHOLE_VISUAL_EXPERIMENT = ($experiment | ConvertTo-Json -Compress)
     }
 
-    $experimentState = if ($null -eq $case.exposure) { "unset" } else { $env:BLACKHOLE_VISUAL_EXPERIMENT }
-    Write-BatchLog "CAPTURE_START id=$($case.id) exposure=$($case.exposure) experiment=$experimentState temp=$caseDirectory exeSha256=$exeDigest"
+    $experimentState = if ($null -eq $case.diskOuter) { "unset" } else { $env:BLACKHOLE_VISUAL_EXPERIMENT }
+    Write-BatchLog "CAPTURE_START id=$($case.id) diskOuter=$($case.diskOuter) experiment=$experimentState temp=$caseDirectory exeSha256=$exeDigest"
     & (Join-Path $PSScriptRoot "windows-interaction-smoke.ps1") `
       -ExePath $resolvedExePath `
       -OutputDirectory $caseDirectory `
@@ -145,11 +134,12 @@ foreach ($case in $cases) {
     if ($null -eq $controlMetrics) { $controlMetrics = $metrics }
     $delta = Get-MetricDelta $metrics $controlMetrics
     $row = [ordered]@{
-      schemaVersion = "1.0"
+      schemaVersion = "2.0"
       headSha = $headSha
       runId = $runId
       experimentId = $case.id
-      exposure = $case.exposure
+      diskOuter = $case.diskOuter
+      filmDiskExposure = 1.55
       captureStatus = "success"
       imagePath = $outputImageName
       fixedRoiMetrics = $metrics
@@ -170,9 +160,7 @@ foreach ($case in $cases) {
 
 New-ContactSheet $cases $rows
 
-$stableRows = @($rows | Where-Object { $_.experimentId -match '^smoke-0[1-4]$' })
-$stable155 = ($stableRows.Count -eq 4) -and (@($stableRows | Where-Object { -not (Test-155Stability $_.fixedRoiMetrics $controlMetrics) }).Count -eq 0)
-$variedRows = @($rows | Where-Object { $_.experimentId -match '^smoke-0[5-8]$' })
+$variedRows = @($rows | Where-Object { $_.experimentId -ne 'control' })
 $parameterSensitivity = @($variedRows | Where-Object {
   $delta = $_.deltaFromControl
   [Math]::Abs([double]$delta.avg) -gt 0.0000001 -or
@@ -190,24 +178,24 @@ $expectedFiles = @(
   "metrics.jsonl", "batch-summary.json", "contact-sheet.png", "batch.log"
 )
 $summary = [ordered]@{
-  schemaVersion = "1.0"
+  schemaVersion = "2.0"
   headSha = $headSha
   runId = $runId
   totalGroups = 9
   successfulGroups = $rows.Count
-  repeated155 = [ordered]@{
-    count = $stableRows.Count
-    stableWithinScreenshotTolerance = $stable155
-  }
-  parameterSensitivity = [ordered]@{
-    detected = $parameterSensitivity
-    experiments = @($variedRows | ForEach-Object {
+  geometrySweep = [ordered]@{
+    parameter = "DISK_OUTER"
+    control = 35.0
+    candidates = @($variedRows | ForEach-Object {
       [ordered]@{
         experimentId = $_.experimentId
-        exposure = $_.exposure
+        diskOuter = $_.diskOuter
         deltaFromControl = $_.deltaFromControl
       }
     })
+  }
+  parameterSensitivity = [ordered]@{
+    detected = $parameterSensitivity
   }
   files = $expectedFiles
   notAVisualAcceptance = $true
@@ -222,6 +210,5 @@ if ($rows.Count -ne 9 -or $metricLineCount -ne 9 -or $missingFiles.Count -ne 0 -
   throw "Batch output validation failed: groups=$($rows.Count) metricLines=$metricLineCount missing=$($missingFiles -join ',') unexpected=$($unexpectedFiles -join ',')."
 }
 
-Write-BatchLog "BATCH_SUMMARY successfulGroups=$($rows.Count) metricLines=$metricLineCount stable155=$stable155 parameterSensitivity=$parameterSensitivity"
+Write-BatchLog "BATCH_SUMMARY successfulGroups=$($rows.Count) metricLines=$metricLineCount sweep=DISK_OUTER parameterSensitivity=$parameterSensitivity notAVisualAcceptance=true"
 Write-BatchLog "BATCH_OK processRuns=9 exeSha256=$exeDigest"
-

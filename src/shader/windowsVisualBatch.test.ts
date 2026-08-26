@@ -10,6 +10,8 @@ const batchScript = read("scripts/windows-visual-batch.ps1");
 const smokeEntry = read("scripts/windows-interaction-smoke.ps1");
 const fullSmoke = read("scripts/windows-interaction-smoke-full.ps1");
 const roiHelper = read("scripts/windows-fixed-roi-metrics.ps1");
+const shader = read("src/shader/referenceBlackHoleShader.ts");
+const experimentConfig = read("src/shader/visualExperiment.ts");
 
 const jobBody = (name: string, nextName: string) => {
   const start = workflow.indexOf(`  ${name}:`);
@@ -20,34 +22,21 @@ const jobBody = (name: string, nextName: string) => {
 };
 
 describe("Windows visual batch infrastructure", () => {
-  it("declares one control and the required eight experiment exposures", () => {
-    expect(batchScript).toContain(
-      '[pscustomobject]@{ id = "control"; exposure = $null }',
-    );
-    for (const id of ["01", "02", "03", "04"]) {
-      expect(batchScript).toContain(
-        `[pscustomobject]@{ id = "smoke-${id}"; exposure = 1.55 }`,
-      );
-    }
-    for (const [id, exposure] of [
-      ["05", "1.45"],
-      ["06", "1.50"],
-      ["07", "1.60"],
-      ["08", "1.65"],
+  it("declares one control and eight evidence-derived DISK_OUTER geometry candidates", () => {
+    expect(batchScript).toContain('[pscustomobject]@{ id = "control"; diskOuter = $null }');
+    for (const [id, diskOuter] of [
+      ["01", "32.0"], ["02", "29.0"], ["03", "26.0"], ["04", "23.0"],
+      ["05", "20.0"], ["06", "18.0"], ["07", "16.0"], ["08", "14.0"],
     ]) {
       expect(batchScript).toContain(
-        `[pscustomobject]@{ id = "smoke-${id}"; exposure = ${exposure} }`,
+        `[pscustomobject]@{ id = "smoke-${id}"; diskOuter = ${diskOuter} }`,
       );
     }
-    expect(batchScript).toContain(
-      'if ($null -ne $case.exposure)',
-    );
-    expect(batchScript).toContain(
-      'experimentId = $case.id',
-    );
-    expect(batchScript).toContain(
-      'Remove-Item Env:BLACKHOLE_VISUAL_EXPERIMENT',
-    );
+    expect(batchScript).toContain('parameters = [ordered]@{ DISK_OUTER = [double]$case.diskOuter }');
+    expect(batchScript).not.toContain('FILM_DISK_EXPOSURE = [double]$case');
+    expect(experimentConfig).toContain("DISK_OUTER?: number");
+    expect(shader).toContain("visualExperimentDiskOuter()");
+    expect(shader).toContain("diskRadius < experimentDiskOuter");
   });
 
   it("isolates every process capture and publishes only exact batch evidence", () => {
@@ -139,16 +128,15 @@ describe("Windows visual batch infrastructure", () => {
     expect(fullJob).not.toContain("windows-visual-batch.ps1");
   });
 
-  it("records nine strict metrics rows and a non-acceptance summary", () => {
+  it("records nine strict rows while preserving non-acceptance semantics", () => {
     expect(batchScript).toContain('captureStatus = "success"');
     expect(batchScript).toContain("fixedRoiMetrics = $metrics");
     expect(batchScript).toContain("deltaFromControl = $delta");
     expect(batchScript).toContain("$metricLineCount -ne 9");
     expect(batchScript).toContain("successfulGroups = $rows.Count");
-    expect(batchScript).toContain("stableWithinScreenshotTolerance = $stable155");
-    expect(batchScript).toContain("detected = $parameterSensitivity");
+    expect(batchScript).toContain('parameter = "DISK_OUTER"');
     expect(batchScript).toContain("notAVisualAcceptance = $true");
+    expect(batchScript).not.toContain("stable155");
     expect(batchScript).not.toContain("infrastructureVerdict");
   });
 });
-

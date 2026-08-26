@@ -234,11 +234,13 @@ function startBlackHoleSession(
       visualCompare: gl.getUniformLocation(program, "u_visual_compare"),
       visualExperimentEnabled: gl.getUniformLocation(program, "u_visual_experiment_enabled"),
       experimentFilmDiskExposure: gl.getUniformLocation(program, "u_experiment_film_disk_exposure"),
+      experimentDiskOuter: gl.getUniformLocation(program, "u_experiment_disk_outer"),
     };
     gl.uniform1i(uniforms.sceneTexture, 0);
     gl.uniform1f(uniforms.visualCompare, visualComparison.shaderMode);
     gl.uniform1f(uniforms.visualExperimentEnabled, visualExperiment.enabled ? 1 : 0);
     gl.uniform1f(uniforms.experimentFilmDiskExposure, visualExperiment.filmDiskExposure);
+    gl.uniform1f(uniforms.experimentDiskOuter, visualExperiment.diskOuter);
     const compositorUniforms = {
       resolution: gl.getUniformLocation(compositorProgram, "u_resolution"),
       frameTexture: gl.getUniformLocation(compositorProgram, "u_frame_texture"),

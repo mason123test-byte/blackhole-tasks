@@ -14,11 +14,16 @@ function replaceOnce(source: string, needle: string, replacement: string) {
 const experimentUniforms = String.raw`
 uniform float u_visual_experiment_enabled;
 uniform float u_experiment_film_disk_exposure;
+uniform float u_experiment_disk_outer;
 `;
 
 const experimentHelpers = String.raw`
 float visualExperimentFilmDiskExposure() {
   return u_visual_experiment_enabled > 0.5 ? u_experiment_film_disk_exposure : FILM_DISK_EXPOSURE;
+}
+
+float visualExperimentDiskOuter() {
+  return u_visual_experiment_enabled > 0.5 ? u_experiment_disk_outer : DISK_OUTER;
 }
 `;
 
@@ -79,6 +84,26 @@ fragment = replaceOnce(
   fragment,
   "\nvoid rayTracedReference() {",
   `${incidenceHelpers}\nvoid rayTracedReference() {`,
+);
+fragment = replaceOnce(
+  fragment,
+  "  float outerEdge = 1.0 - smoothstep(DISK_OUTER * 0.74, DISK_OUTER * 0.995, hitRadius);",
+  "  float experimentDiskOuter = visualExperimentDiskOuter();\n  float outerEdge = 1.0 - smoothstep(experimentDiskOuter * 0.74, experimentDiskOuter * 0.995, hitRadius);",
+);
+fragment = replaceOnce(
+  fragment,
+  "  float radialProgress = clamp((hitRadius - DISK_INNER) / (DISK_OUTER - DISK_INNER), 0.0, 1.0);",
+  "  float radialProgress = clamp((hitRadius - DISK_INNER) / (experimentDiskOuter - DISK_INNER), 0.0, 1.0);",
+);
+fragment = replaceOnce(
+  fragment,
+  "  float cameraImpact = OBSERVER_R * length(cameraPlane);\n  if (cameraImpact > DISK_OUTER + 10.0) { outColor = sceneSample; return; }",
+  "  float experimentDiskOuter = visualExperimentDiskOuter();\n  float cameraImpact = OBSERVER_R * length(cameraPlane);\n  if (cameraImpact > experimentDiskOuter + 10.0) { outColor = sceneSample; return; }",
+);
+fragment = replaceOnce(
+  fragment,
+  "      if (diskRadius > DISK_INNER && diskRadius < DISK_OUTER) {",
+  "      if (diskRadius > DISK_INNER && diskRadius < experimentDiskOuter) {",
 );
 fragment = replaceOnce(
   fragment,
