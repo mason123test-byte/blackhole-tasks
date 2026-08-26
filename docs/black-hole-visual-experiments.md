@@ -159,3 +159,57 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 - Accepted baseline remains #571.
 - #717 is rejected and logged; its finite-time growth-order persistence family is now excluded from further serial threshold/gain tuning.
 - Next action is not a new visual topology. Forward-restore #571, Windows-validate it, then refactor Windows visual experiments for single-build batch capture and machine-readable metrics.
+
+## Batch infrastructure checkpoint — Run #746
+- Head `2bff0d4b7c9669191365f3df10517e0388f57e9e`; workflow run `32865832422`; event `workflow_dispatch`; `validation_mode=batch`; Windows batch job `97860751082` completed success.
+- Scope of the conclusion is **batch infrastructure only**. Run #746 is not visual acceptance, installer acceptance, or full interaction acceptance; `Full Windows validation` was skipped.
+- The Windows visual batch job itself performed one `npm ci` and one `tauri build -- --no-bundle`; the overall workflow also had the independent frontend job and therefore must not be described as one `npm ci` for the whole run.
+- One release EXE SHA256 `3d600a575c0effd5a907da87a1c76c17a10099c29a7fc782f1858ac06818eafa` was reused for nine isolated native WebView2 candidate captures. Artifact contained exactly 13 required files and `metrics.jsonl` contained nine parseable rows.
+- Four 1.55 repetitions were stable only inside this one runner under the current custom screenshot tolerance. This is not cross-run, cross-GPU, or cross-WebView2 statistical stability and does not imply that 1.55 is closest to the upstream visual.
+- Exposure 1.45–1.65 mainly changed brightness/coverage while the lower-half topology remained the same; `batch-summary.json` explicitly had `notAVisualAcceptance=true`.
+
+## Reference-driven lower-geometry experiment — prepared after #746
+### Code evidence
+- Current production geometry lives in `src/shader/referenceBlackHoleShaderBaseline.ts`.
+- `initDngrCameraRay()` initializes one Kerr null ray from `OBSERVER_R`, `OBSERVER_THETA` and the camera plane.
+- `rayTracedReference()` advances that ray with the adaptive Kerr integrator. Disk images are generated only when `theta - PI/2` changes sign; the crossing radius must lie between `DISK_INNER` and `DISK_OUTER`. Multiple crossings are accumulated rather than mirrored/copied.
+- Upstream `s0xDk/ghostty-blackhole/blackhole.glsl` uses the corresponding physical mechanism: an explicitly inclined thin-disk normal `n=vec3(0,sin(incl),cos(incl))`, Schwarzschild geodesic integration, and repeated `dot(x,n)` sign changes to collect far-side and higher-order disk images.
+- Upstream Gargantua preset in `tuner/Sources/BlackHoleTuner/ParamSpec.swift` uses `DISK_INCL=1.52`, `DISK_INNER=2.2 r_s`, `DISK_OUTER=7.0 r_s`. Current observer inclination `1.515` and current inner edge `4.2M` are already close after the Schwarzschild conversion `r_s=2M` (`2.2 r_s≈4.4M`). The strongest scale mismatch is current `DISK_OUTER=35M` versus upstream-equivalent `≈14M`.
+
+### Geometry loss contract
+The upstream reference image is the real `s0xDk/ghostty-blackhole/presets-grid.png`, Gargantua panel (top-middle third). Final ranking must apply the same contour extraction to that crop and to full-size Windows originals; brightness/count metrics remain auxiliary only.
+
+Primary geometry vector, normalized so image scale alone cannot win:
+1. `lowerReach`: lowest connected lower-disk point minus direct-disk center row, divided by shadow diameter.
+2. `upperLowerHeightRatio`: lower vertical reach divided by upper vertical reach; target is the Gargantua panel value, not an assumed value of 1.
+3. `lowerHorizontalSpan`: first-to-last connected lower-band x extent divided by shadow diameter.
+4. `centralNotchDepth`: distance from the direct-disk center row to the first connected lower-band pixel in a narrow center column window, divided by lower vertical reach.
+5. `lowerBandThickness`: median connected lower-band vertical thickness divided by shadow diameter.
+6. `lowerContinuity`: fraction of x columns between lower-band endpoints that contain connected lower-band support, plus longest contiguous-column fraction as a tie-breaker.
+
+The geometry loss is the mean absolute normalized error of those six components against the real Gargantua crop. Frozen ROI brightness metrics (`avg/core/lower/warm/...`) remain diagnostics and must not dominate selection.
+
+Anti-cheat/failure rule: reducing the upper arch alone is not improvement. A candidate is rejected if `lowerReach` falls by more than 5% from control, if lower continuity breaks, or if fewer than three of the six primary geometry components move toward the reference even when the total bright/warm pixel count improves.
+
+### Single-factor matrix
+Only `DISK_OUTER` changes. `FILM_DISK_EXPOSURE` remains 1.55 for every candidate. Values are derived from the accepted `35M` scale and the upstream Gargantua target `7 r_s≈14M`, not arbitrary brightness tuning:
+
+| id | DISK_OUTER | hypothesis | expected geometry direction | failure criterion |
+| --- | ---: | --- | --- | --- |
+| control | 35 | accepted #571 geometry | baseline | n/a |
+| smoke-01 | 32 | weak contraction tests sensitivity | slightly reduce oversized far-source contribution without losing lower reach | geometry vector effectively unchanged or lower reach decreases |
+| smoke-02 | 29 | continue source-radius contraction | lower span/notch starts moving toward reference | only brightness/counts change |
+| smoke-03 | 26 | mid-range source contraction | upper/lower proportions converge while lower band remains continuous | upper shrinks but lower shape stays narrow/circular |
+| smoke-04 | 23 | stronger contraction | lower-band span/thickness moves toward reference | lower continuity or reach regresses >5% |
+| smoke-05 | 20 | enter reference-scale neighborhood | center notch and lower span improve together | only direct disk shortens |
+| smoke-06 | 18 | near-reference source extent | lower geometry loss drops without topology break | lower ring fragments or collapses |
+| smoke-07 | 16 | bracket upstream-equivalent target | test whether optimum lies just above 14M | lower reach/span overshoot or collapse |
+| smoke-08 | 14 | upstream Gargantua-equivalent outer radius | closest source-radius scale match | no primary geometry advantage over control |
+
+If this sweep fails the anti-cheat rule, stop scanning `DISK_OUTER`; the next mechanism to investigate is camera/projection or disk-plane orientation/intersection, not exposure and not another outer-radius micro-scan.
+
+## Prepared checkpoint after #746
+- Accepted visual baseline remains #571; no new candidate has been visually accepted.
+- Run #746 establishes only the batch infrastructure boundary described above.
+- Geometry sweep implementation is prepared on the working branch but has not run until a new real Windows batch Run ID and artifact exist.
+- Required gate before batch dispatch: ordinary PR Windows visual CI must succeed at the new head.
