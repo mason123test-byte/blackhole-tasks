@@ -25,6 +25,18 @@ float visualExperimentFilmDiskExposure() {
 float visualExperimentDiskOuter() {
   return u_visual_experiment_enabled > 0.5 ? u_experiment_disk_outer : DISK_OUTER;
 }
+
+float crossingOrderDiagnosticMode() {
+  if (u_visual_compare < 2.5) return 0.0;
+  return u_visual_compare - 2.0;
+}
+
+bool includeCrossingInDiagnostic(float diagnosticMode, int crossingIndex) {
+  if (diagnosticMode < 0.5) return true;
+  if (diagnosticMode < 1.5) return crossingIndex == 0;
+  if (diagnosticMode < 2.5) return crossingIndex == 1;
+  return crossingIndex >= 2;
+}
 `;
 
 const incidenceHelpers = String.raw`
@@ -87,6 +99,11 @@ fragment = replaceOnce(
 );
 fragment = replaceOnce(
   fragment,
+  "  float candidateWeight = u_visual_compare < 0.5 ? 0.0 : (u_visual_compare > 1.5 ? step(0.0, screen.x) : 1.0);",
+  "  float splitWeight = 1.0 - step(0.5, abs(u_visual_compare - 2.0));\n  float candidateWeight = u_visual_compare < 0.5 ? 0.0 : mix(1.0, step(0.0, screen.x), splitWeight);\n  float crossingDiagnosticMode = crossingOrderDiagnosticMode();",
+);
+fragment = replaceOnce(
+  fragment,
   "  float outerEdge = 1.0 - smoothstep(DISK_OUTER * 0.74, DISK_OUTER * 0.995, hitRadius);",
   "  float experimentDiskOuter = visualExperimentDiskOuter();\n  float outerEdge = 1.0 - smoothstep(experimentDiskOuter * 0.74, experimentDiskOuter * 0.995, hitRadius);",
 );
@@ -98,7 +115,7 @@ fragment = replaceOnce(
 fragment = replaceOnce(
   fragment,
   "  float cameraImpact = OBSERVER_R * length(cameraPlane);\n  if (cameraImpact > DISK_OUTER + 10.0) { outColor = sceneSample; return; }",
-  "  float experimentDiskOuter = visualExperimentDiskOuter();\n  float cameraImpact = OBSERVER_R * length(cameraPlane);\n  if (cameraImpact > experimentDiskOuter + 10.0) { outColor = sceneSample; return; }",
+  "  float experimentDiskOuter = visualExperimentDiskOuter();\n  float cameraImpact = OBSERVER_R * length(cameraPlane);\n  if (cameraImpact > experimentDiskOuter + 10.0) {\n    outColor = crossingDiagnosticMode > 0.5 ? vec4(0.0, 0.0, 0.0, 1.0) : sceneSample;\n    return;\n  }",
 );
 fragment = replaceOnce(
   fragment,
@@ -113,7 +130,7 @@ fragment = replaceOnce(
 fragment = replaceOnce(
   fragment,
   "  bool captured = false; int diskCrossingCount = 0; vec3 accumulatedDisk = vec3(0.0); float transmittance = 1.0;",
-  "  bool captured = false; int diskCrossingCount = 0; vec3 accumulatedDisk = vec3(0.0); float transmittance = 1.0; float pathLength = 0.0;",
+  "  bool captured = false; int diskCrossingCount = 0; vec3 accumulatedDisk = vec3(0.0); float transmittance = 1.0; float pathLength = 0.0; float diagnosticCoverage = 0.0;",
 );
 fragment = replaceOnce(
   fragment,
@@ -127,8 +144,18 @@ fragment = replaceOnce(
 );
 fragment = replaceOnce(
   fragment,
+  "        float effectiveAlpha = clamp(diskAlpha * alphaGain, 0.0, 0.90);\n        accumulatedDisk += transmittance * (diskColor * colorGain) * effectiveAlpha;\n        transmittance *= 1.0 - effectiveAlpha;",
+  "        float effectiveAlpha = clamp(diskAlpha * alphaGain, 0.0, 0.90);\n        float incomingTransmittance = transmittance;\n        if (includeCrossingInDiagnostic(crossingDiagnosticMode, diskCrossingCount)) {\n          accumulatedDisk += incomingTransmittance * (diskColor * colorGain) * effectiveAlpha;\n          diagnosticCoverage += incomingTransmittance * effectiveAlpha;\n        }\n        transmittance *= 1.0 - effectiveAlpha;",
+);
+fragment = replaceOnce(
+  fragment,
   "    previousSide = side;",
   "    pathLength += acceptedStepLength;\n    previousSide = side;",
+);
+fragment = replaceOnce(
+  fragment,
+  "  if (diskCrossingCount > 0) {",
+  "  if (crossingDiagnosticMode > 0.5) {\n    outColor = vec4(accumulatedDisk, 1.0);\n    return;\n  }\n  if (diskCrossingCount > 0) {",
 );
 
 export const REFERENCE_BLACK_HOLE_FRAGMENT = fragment;
