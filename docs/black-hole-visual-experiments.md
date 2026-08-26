@@ -4,7 +4,7 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 
 ## Permanent rules
 - Accepted visual baseline: `#571`.
-- Geometry frozen: `DISK_OUTER`, `OBSERVER_THETA`, Kerr geometry, adaptive stepping and disk-crossing geometry must not be tuned to fake lighting.
+- Geometry is frozen by default: `OBSERVER_THETA`, Kerr geometry, adaptive stepping and disk-crossing geometry remain frozen. `DISK_OUTER` is temporarily unfrozen only for the controlled, reference-motivated single-variable experiment recorded below; production default remains `35`, exposure remains `1.55`, and no production default may change before a real batch result passes the stated anti-cheat rules.
 - One WebGL2 Kerr renderer only. No Canvas2D, fallback renderer, framebuffer mirror/flip, copied lower half, fake annulus, `screen.y` repair, or screen-space neighborhood ridge selector.
 - No source texture/final RGB classifier. DOM Pointer Events dragging remains unchanged.
 - Candidate implementation + test are atomic. Git writes use blobs/trees/commits and `update_ref(force=false)` only. No reset/rebase/force push/noop/temp files/contents-API placeholders.
@@ -45,7 +45,7 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 16. No reduced phase-space symplectic cross-coupling signed/absolute cancellation remap (#697): it is inert and reproduces #571 exactly; do not scan cancellation/coherence normalization, gain, clamp, or threshold.
 17. No configuration-area versus momentum-area log-ratio total-variation/net-drift reversal remap (#703): it is inert on the high-intensity core; do not scan its log clamp, reversal normalization, gain, or threshold.
 18. No finite-time right/up growth-order persistence remap (#717): corrected implementation reproduces #571 exactly; do not scan its persistence smoothstep, gain, or threshold.
-19. Geometry remains frozen.
+19. Historical geometry-freeze rule remains authoritative except for the explicitly documented temporary `DISK_OUTER` single-variable experiment below. That exception does not unfreeze observer angle, camera/projection, Kerr integration, disk-plane crossing geometry, or any screen-space remap. If the anti-cheat rule fails, `DISK_OUTER` is immediately frozen again and the next mechanism moves to camera/projection or disk-plane orientation/intersection.
 
 ## Key continuity reference
 ### #599 — REJECTED
@@ -174,25 +174,22 @@ Canonical registry for `agent/initial-blackhole-tasks`.
 - `initDngrCameraRay()` initializes one Kerr null ray from `OBSERVER_R`, `OBSERVER_THETA` and the camera plane.
 - `rayTracedReference()` advances that ray with the adaptive Kerr integrator. Disk images are generated only when `theta - PI/2` changes sign; the crossing radius must lie between `DISK_INNER` and `DISK_OUTER`. Multiple crossings are accumulated rather than mirrored/copied.
 - Upstream `s0xDk/ghostty-blackhole/blackhole.glsl` uses the corresponding physical mechanism: an explicitly inclined thin-disk normal `n=vec3(0,sin(incl),cos(incl))`, Schwarzschild geodesic integration, and repeated `dot(x,n)` sign changes to collect far-side and higher-order disk images.
-- Upstream Gargantua preset in `tuner/Sources/BlackHoleTuner/ParamSpec.swift` uses `DISK_INCL=1.52`, `DISK_INNER=2.2 r_s`, `DISK_OUTER=7.0 r_s`. Current observer inclination `1.515` and current inner edge `4.2M` are already close after the Schwarzschild conversion `r_s=2M` (`2.2 r_s≈4.4M`). The strongest scale mismatch is current `DISK_OUTER=35M` versus upstream-equivalent `≈14M`.
+- Upstream commit for this experiment is pinned to `b49fa0ab2eaf0644a690f4cb386d70c21eb9f969`. Its Gargantua preset in `tuner/Sources/BlackHoleTuner/ParamSpec.swift` uses `DISK_INCL=1.52`, `DISK_INNER=2.2 r_s`, `DISK_OUTER=7.0 r_s`. Current observer inclination `1.515` and current inner edge `4.2M` are already close after the Schwarzschild conversion `r_s=2M` (`2.2 r_s≈4.4M`). The strongest scale mismatch is current `DISK_OUTER=35M` versus upstream-equivalent `≈14M`.
 
-### Geometry loss contract
-The upstream reference image is the real `s0xDk/ghostty-blackhole/presets-grid.png`, Gargantua panel (top-middle third). Final ranking must apply the same contour extraction to that crop and to full-size Windows originals; brightness/count metrics remain auxiliary only.
+### Geometry measurement status
+The intended reference is upstream `presets-grid.png`, Gargantua panel (top-middle preset). The six target metrics remain `lowerReach`, `upperLowerHeightRatio`, `lowerHorizontalSpan`, `centralNotchDepth`, `lowerBandThickness`, and `lowerContinuity`, with the anti-cheat rule below.
 
-Primary geometry vector, normalized so image scale alone cannot win:
-1. `lowerReach`: lowest connected lower-disk point minus direct-disk center row, divided by shadow diameter.
-2. `upperLowerHeightRatio`: lower vertical reach divided by upper vertical reach; target is the Gargantua panel value, not an assumed value of 1.
-3. `lowerHorizontalSpan`: first-to-last connected lower-band x extent divided by shadow diameter.
-4. `centralNotchDepth`: distance from the direct-disk center row to the first connected lower-band pixel in a narrow center column window, divided by lower vertical reach.
-5. `lowerBandThickness`: median connected lower-band vertical thickness divided by shadow diameter.
-6. `lowerContinuity`: fraction of x columns between lower-band endpoints that contain connected lower-band support, plus longest contiguous-column fraction as a tie-breaker.
+However, the current connected GitHub file reader rejects `presets-grid.png` because it only exposes UTF-8 text; therefore the reference PNG bytes, an exact crop, and its SHA256 have **not** been verified in this repository workflow yet. Until those three facts are pinned and the same tested contour implementation is run on both the pinned reference crop and Windows originals, this sweep is explicitly **manual exploration only**. It must not claim automated `geometryLoss`, reference-normalized errors, or visual acceptance. Old `avg/core/lower/warm/...` metrics remain auxiliary diagnostics only.
 
-The geometry loss is the mean absolute normalized error of those six components against the real Gargantua crop. Frozen ROI brightness metrics (`avg/core/lower/warm/...`) remain diagnostics and must not dominate selection.
-
-Anti-cheat/failure rule: reducing the upper arch alone is not improvement. A candidate is rejected if `lowerReach` falls by more than 5% from control, if lower continuity breaks, or if fewer than three of the six primary geometry components move toward the reference even when the total bright/warm pixel count improves.
+Required future automation gate before any `geometryLoss` claim:
+1. pin upstream commit `b49fa0ab2eaf0644a690f4cb386d70c21eb9f969`, file path `presets-grid.png`, exact pixel crop and SHA256;
+2. implement and unit-test contour extraction/normalization for all six metrics on synthetic fixtures;
+3. run the same implementation on the pinned reference crop and full-size Windows originals;
+4. output reference value, candidate value, normalized error and total `geometryLoss`;
+5. enforce: lower reach may not regress >5%, lower continuity may not break, and at least 3/6 metrics must move toward reference.
 
 ### Single-factor matrix
-Only `DISK_OUTER` changes. `FILM_DISK_EXPOSURE` remains 1.55 for every candidate. Values are derived from the accepted `35M` scale and the upstream Gargantua target `7 r_s≈14M`, not arbitrary brightness tuning:
+Only `DISK_OUTER` changes. `FILM_DISK_EXPOSURE` remains 1.55 for every candidate. Production default stays `35` until a real batch result is evaluated. `7 r_s≈14M` is an evidence-derived exploration endpoint, not a claim of visual optimality.
 
 | id | DISK_OUTER | hypothesis | expected geometry direction | failure criterion |
 | --- | ---: | --- | --- | --- |
@@ -204,12 +201,21 @@ Only `DISK_OUTER` changes. `FILM_DISK_EXPOSURE` remains 1.55 for every candidate
 | smoke-05 | 20 | enter reference-scale neighborhood | center notch and lower span improve together | only direct disk shortens |
 | smoke-06 | 18 | near-reference source extent | lower geometry loss drops without topology break | lower ring fragments or collapses |
 | smoke-07 | 16 | bracket upstream-equivalent target | test whether optimum lies just above 14M | lower reach/span overshoot or collapse |
-| smoke-08 | 14 | upstream Gargantua-equivalent outer radius | closest source-radius scale match | no primary geometry advantage over control |
+| smoke-08 | 14 | upstream Gargantua-equivalent exploration endpoint | test the upstream-derived source-radius scale | no primary geometry advantage over control |
 
-If this sweep fails the anti-cheat rule, stop scanning `DISK_OUTER`; the next mechanism to investigate is camera/projection or disk-plane orientation/intersection, not exposure and not another outer-radius micro-scan.
+If this sweep fails the anti-cheat rule, stop scanning `DISK_OUTER`, immediately return it to the frozen set, and investigate camera/projection or disk-plane orientation/intersection next. Do not return to exposure tuning or another outer-radius micro-scan.
 
-## Prepared checkpoint after #746
+## Parameter-channel correction after #752
+- Run #752 proved only the ordinary default renderer. It did not prove the `DISK_OUTER` environment channel.
+- Root cause found afterward: Rust `normalize_visual_experiment_config()` allowed only `FILM_DISK_EXPOSURE`, so a `{DISK_OUTER: ...}` payload could be discarded and the frontend could silently use the production default.
+- The corrected contract is fail-closed: unset environment means production defaults; a set-but-invalid environment produces a Tauri command error and the React diagnostic path does not silently restore defaults.
+- Rust explicitly accepts only `FILM_DISK_EXPOSURE` and `DISK_OUTER`; `DISK_OUTER` must be finite and satisfy `4.2 < value <= 45`; unknown keys and missing/blank `experimentId` are rejected.
+- Native Windows capture must obtain an effective runtime receipt before taking the candidate screenshot. Batch rows record both `requested` and `effective`; mismatch aborts immediately. ROI pixel changes are not parameter proof.
+- Before any nine-group batch, the same release EXE must pass a runtime preflight proving control `effective DISK_OUTER=35` and candidate `effective DISK_OUTER=14` are distinct.
+
+## Prepared checkpoint
 - Accepted visual baseline remains #571; no new candidate has been visually accepted.
-- Run #746 establishes only the batch infrastructure boundary described above.
-- Geometry sweep implementation is prepared on the working branch but has not run until a new real Windows batch Run ID and artifact exist.
-- Required gate before batch dispatch: ordinary PR Windows visual CI must succeed at the new head.
+- Run #746 remains batch-infrastructure-only evidence.
+- The `DISK_OUTER` sweep is still unrun after the parameter-channel correction.
+- Automatic geometry loss is not implemented/verified; the sweep is manual exploration until the pinned reference crop + SHA256 + executable six-metric evaluator exist.
+- A new nine-group batch is forbidden until ordinary PR CI proves the corrected Rust validation and the same-EXE 35-vs-14 effective-value preflight.
