@@ -17,7 +17,7 @@ describe("visual experiment config", () => {
     );
   });
 
-  it("accepts exposure, disk outer, and both together", () => {
+  it("accepts legacy exposure-only experiments and the single-variable DISK_OUTER sweep", () => {
     expect(
       parseVisualExperimentConfig(
         JSON.stringify({ experimentId: "geometry-outer-20", parameters: { DISK_OUTER: 20 } }),
@@ -28,14 +28,18 @@ describe("visual experiment config", () => {
         JSON.stringify({ experimentId: "exposure-160", parameters: { FILM_DISK_EXPOSURE: 1.6 } }),
       ),
     ).toEqual({ enabled: true, experimentId: "exposure-160", filmDiskExposure: 1.6, diskOuter: 35 });
-    expect(
-      parseVisualExperimentConfig(
-        JSON.stringify({
-          experimentId: "combined",
-          parameters: { FILM_DISK_EXPOSURE: 1.4, DISK_OUTER: 14 },
-        }),
-      ),
-    ).toEqual({ enabled: true, experimentId: "combined", filmDiskExposure: 1.4, diskOuter: 14 });
+  });
+
+  it("rejects empty and multi-variable DISK_OUTER sweep payloads", () => {
+    expect(() =>
+      parseVisualExperimentConfig(JSON.stringify({ experimentId: "empty", parameters: {} })),
+    ).toThrow(/must not be empty/);
+    expect(() =>
+      parseVisualExperimentConfig(JSON.stringify({
+        experimentId: "combined",
+        parameters: { FILM_DISK_EXPOSURE: 1.4, DISK_OUTER: 14 },
+      })),
+    ).toThrow(/exactly one DISK_OUTER/);
   });
 
   it("throws for set-but-invalid payloads instead of silently using production defaults", () => {
