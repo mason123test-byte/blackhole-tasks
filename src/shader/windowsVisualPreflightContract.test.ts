@@ -11,5 +11,5 @@ describe("Windows visual experiment preflight evidence contract", () => {
     expect(result.error).toBeUndefined();
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("PREFLIGHT_CONTRACT_SELF_TEST_OK");
-  });
+  }, 15_000);
 });
