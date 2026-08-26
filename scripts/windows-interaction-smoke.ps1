@@ -3,7 +3,9 @@ param(
   [string]$ExePath,
   [string]$OutputDirectory = "output/windows-smoke",
   [switch]$VisualOnly,
-  [switch]$CandidateOnly
+  [switch]$CandidateOnly,
+  [ValidateSet("candidate", "crossing-first", "crossing-second", "crossing-third-plus")]
+  [string]$VisualMode = "candidate"
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,6 +14,9 @@ $fullScriptPath = Join-Path $PSScriptRoot "windows-interaction-smoke-full.ps1"
 
 if ($CandidateOnly -and -not $VisualOnly) {
   throw "CandidateOnly is valid only with VisualOnly."
+}
+if (-not $CandidateOnly -and $VisualMode -ne "candidate") {
+  throw "VisualMode diagnostics require CandidateOnly."
 }
 
 if (-not $VisualOnly) {
@@ -32,16 +37,23 @@ if ($boundaryIndex -lt 0) {
 }
 
 $visualSource = $fullSource.Substring(0, $boundaryIndex)
+$hardcodedCandidateCapture = '  Capture-VisualComparisonFrame $resolvedExePath "candidate" $visualCandidatePath'
+$selectedCandidateCapture = '  Capture-VisualComparisonFrame $resolvedExePath $env:BLACKHOLE_VISUAL_CAPTURE_MODE $visualCandidatePath'
+if (-not $visualSource.Contains($hardcodedCandidateCapture)) {
+  throw "VisualMode candidate capture anchor was not found in windows-interaction-smoke-full.ps1."
+}
+$visualSource = $visualSource.Replace($hardcodedCandidateCapture, $selectedCandidateCapture)
+
 $receiptAnchor = '$orbWindow = Wait-OrbRenderReady $visualProcess.Id'
 $receiptBlock = @'
 $orbWindow = Wait-OrbRenderReady $visualProcess.Id
-if ($Mode -eq "candidate") {
+if ($Mode -in @("candidate", "crossing-first", "crossing-second", "crossing-third-plus")) {
   $receiptDeadline = [DateTime]::UtcNow.AddSeconds(8)
   $receiptWindow = $null
   do {
     $receiptMatch = @(Get-AppWindows $visualProcess.Id | Where-Object {
       $_.Title.StartsWith("黑洞任务|renderer=webgl2|frame=ready|") -and
-      $_.Title -match 'effectiveSource=gpu-uniform-readback;effectiveExperimentId=[^;|]+;effectiveEnabled=[01];effectiveFilmDiskExposure=[0-9.]+;effectiveDiskOuter=[0-9.]+'
+      $_.Title -match 'effectiveSource=gpu-uniform-readback;effectiveExperimentId=[^;|]+;effectiveEnabled=[01];effectiveFilmDiskExposure=[0-9.]+;effectiveDiskOuter=[0-9.]+;crossingSource=gpu-uniform-readback;requestedVisualMode=[^;|]+;effectiveVisualCompare=[0-9.]+;effectiveCrossingOrder=[^;|]+'
     })
     if ($receiptMatch.Count -gt 0) {
       $receiptWindow = $receiptMatch[0]
@@ -50,7 +62,7 @@ if ($Mode -eq "candidate") {
     Start-Sleep -Milliseconds 50
   } while ([DateTime]::UtcNow -lt $receiptDeadline)
   if ($null -eq $receiptWindow) {
-    throw "Candidate render did not publish a GPU-uniform effective visual experiment receipt before capture."
+    throw "Candidate render did not publish GPU-uniform visual experiment and crossing-order receipts before capture."
   }
   $orbWindow = $receiptWindow
   Set-Content -LiteralPath (Join-Path $OutputDirectory "visual-candidate-effective.txt") -Value $orbWindow.Title -NoNewline
@@ -61,6 +73,7 @@ if (-not $visualSource.Contains($receiptAnchor)) {
 }
 $visualSource = $visualSource.Replace($receiptAnchor, $receiptBlock)
 $visualBlock = [ScriptBlock]::Create($visualSource)
+$env:BLACKHOLE_VISUAL_CAPTURE_MODE = $VisualMode
 try {
   & $visualBlock -ExePath $ExePath -OutputDirectory $OutputDirectory -CandidateOnly:$CandidateOnly
 } catch {
@@ -69,6 +82,8 @@ try {
     "error=$($_.Exception.Message)"
   ) | Set-Content -LiteralPath (Join-Path $OutputDirectory "visual-bootstrap-diagnostics.txt")
   throw
+} finally {
+  Remove-Item Env:BLACKHOLE_VISUAL_CAPTURE_MODE -ErrorAction SilentlyContinue
 }
 
 $requiredEvidence = if ($CandidateOnly) {
@@ -106,4 +121,4 @@ if (-not $CandidateOnly) {
   ) | Set-Content -LiteralPath $logPath
 }
 
-"WINDOWS_VISUAL_ONLY_OK output=$OutputDirectory candidateOnly=$CandidateOnly"
+"WINDOWS_VISUAL_ONLY_OK output=$OutputDirectory candidateOnly=$CandidateOnly visualMode=$VisualMode"
