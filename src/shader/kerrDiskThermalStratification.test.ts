@@ -6,7 +6,10 @@ const diskFalloff = (radius: number) => Math.pow(4.20 / radius, 0.38);
 describe("Gargantua disk thermal stratification", () => {
   it("keeps the physical Kerr geometry while making the inner disk hotter and the outer disk warmer/dimmer", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float radialProgress = clamp((hitRadius - DISK_INNER) / (DISK_OUTER - DISK_INNER), 0.0, 1.0);",
+      "float experimentDiskOuter = visualExperimentDiskOuter();",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float radialProgress = clamp((hitRadius - DISK_INNER) / (experimentDiskOuter - DISK_INNER), 0.0, 1.0);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float innerHeat = 1.0 - smoothstep(0.04, 0.72, radialProgress);",

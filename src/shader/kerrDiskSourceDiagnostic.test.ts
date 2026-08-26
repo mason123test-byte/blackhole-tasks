@@ -16,7 +16,10 @@ describe("Kerr disk source structure", () => {
       "float grazing = mix(0.80 + 0.20 * smoothstep(0.0, 1.0, abs(sin(hitPhi))), 1.0, DISK_SOURCE_DIAGNOSTIC);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
-      "float radialProgress = clamp((hitRadius - DISK_INNER) / (DISK_OUTER - DISK_INNER), 0.0, 1.0);",
+      "float experimentDiskOuter = visualExperimentDiskOuter();",
+    );
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
+      "float radialProgress = clamp((hitRadius - DISK_INNER) / (experimentDiskOuter - DISK_INNER), 0.0, 1.0);",
     );
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain(
       "float innerHeat = 1.0 - smoothstep(0.04, 0.72, radialProgress);",
