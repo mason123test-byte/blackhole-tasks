@@ -20,37 +20,50 @@ fn normalize_visual_comparison_mode(value: Option<&str>) -> &'static str {
     }
 }
 
-fn normalize_visual_experiment_config(value: Option<&str>) -> String {
+fn normalize_visual_experiment_config(value: Option<&str>) -> Result<String, String> {
     let Some(raw) = value else {
-        return String::new();
+        return Ok(String::new());
     };
-    let Ok(parsed) = serde_json::from_str::<Value>(raw) else {
-        return String::new();
-    };
-    let Some(object) = parsed.as_object() else {
-        return String::new();
-    };
+    let parsed = serde_json::from_str::<Value>(raw)
+        .map_err(|error| format!("BLACKHOLE_VISUAL_EXPERIMENT is invalid JSON: {error}"))?;
+    let object = parsed
+        .as_object()
+        .ok_or_else(|| "BLACKHOLE_VISUAL_EXPERIMENT must be a JSON object".to_owned())?;
     let valid_id = object
         .get("experimentId")
         .and_then(Value::as_str)
         .map(str::trim)
         .is_some_and(|id| !id.is_empty());
-    let Some(parameters) = object.get("parameters").and_then(Value::as_object) else {
-        return String::new();
-    };
-    let allowed_parameters = parameters.keys().all(|key| key == "FILM_DISK_EXPOSURE");
-    let valid_exposure = parameters
-        .get("FILM_DISK_EXPOSURE")
-        .map(|value| {
-            value
-                .as_f64()
-                .is_some_and(|exposure| exposure.is_finite() && exposure > 0.0)
-        })
-        .unwrap_or(true);
-    if !valid_id || !allowed_parameters || !valid_exposure {
-        return String::new();
+    if !valid_id {
+        return Err("BLACKHOLE_VISUAL_EXPERIMENT requires a non-empty experimentId".to_owned());
     }
-    raw.to_owned()
+    let parameters = object
+        .get("parameters")
+        .and_then(Value::as_object)
+        .ok_or_else(|| "BLACKHOLE_VISUAL_EXPERIMENT requires a parameters object".to_owned())?;
+    if parameters
+        .keys()
+        .any(|key| key != "FILM_DISK_EXPOSURE" && key != "DISK_OUTER")
+    {
+        return Err("BLACKHOLE_VISUAL_EXPERIMENT contains an unknown parameter".to_owned());
+    }
+    if let Some(value) = parameters.get("FILM_DISK_EXPOSURE") {
+        let exposure = value.as_f64().ok_or_else(|| {
+            "FILM_DISK_EXPOSURE must be a finite positive number".to_owned()
+        })?;
+        if !exposure.is_finite() || exposure <= 0.0 {
+            return Err("FILM_DISK_EXPOSURE must be a finite positive number".to_owned());
+        }
+    }
+    if let Some(value) = parameters.get("DISK_OUTER") {
+        let disk_outer = value
+            .as_f64()
+            .ok_or_else(|| "DISK_OUTER must be a finite number".to_owned())?;
+        if !disk_outer.is_finite() || disk_outer <= 4.2 || disk_outer > 45.0 {
+            return Err("DISK_OUTER must satisfy 4.2 < value <= 45".to_owned());
+        }
+    }
+    Ok(raw.to_owned())
 }
 
 #[tauri::command]
@@ -60,7 +73,7 @@ fn get_visual_comparison_mode() -> String {
 }
 
 #[tauri::command]
-fn get_visual_experiment_config() -> String {
+fn get_visual_experiment_config() -> Result<String, String> {
     let value = std::env::var("BLACKHOLE_VISUAL_EXPERIMENT").ok();
     normalize_visual_experiment_config(value.as_deref())
 }
@@ -741,22 +754,43 @@ mod smoke_command_tests {
 
     #[test]
     fn validates_visual_experiment_environment_payload() {
-        let valid = r#"{"experimentId":"batch-a","parameters":{"FILM_DISK_EXPOSURE":1.6}}"#;
-        assert_eq!(normalize_visual_experiment_config(Some(valid)), valid);
-        assert_eq!(normalize_visual_experiment_config(None), "");
-        assert_eq!(normalize_visual_experiment_config(Some("not-json")), "");
+        let exposure = r#"{"experimentId":"batch-exposure","parameters":{"FILM_DISK_EXPOSURE":1.6}}"#;
         assert_eq!(
-            normalize_visual_experiment_config(Some(
-                r#"{"experimentId":"bad","parameters":{"FILM_DISK_EXPOSURE":0.0}}"#
-            )),
-            ""
+            normalize_visual_experiment_config(Some(exposure)),
+            Ok(exposure.to_owned())
         );
+        let disk_outer = r#"{"experimentId":"batch-outer","parameters":{"DISK_OUTER":14.0}}"#;
         assert_eq!(
-            normalize_visual_experiment_config(Some(
-                r#"{"experimentId":"bad","parameters":{"OBSERVER_THETA":1.5}}"#
-            )),
-            ""
+            normalize_visual_experiment_config(Some(disk_outer)),
+            Ok(disk_outer.to_owned())
         );
+        let combined = r#"{"experimentId":"batch-combined","parameters":{"FILM_DISK_EXPOSURE":1.4,"DISK_OUTER":20.0}}"#;
+        assert_eq!(
+            normalize_visual_experiment_config(Some(combined)),
+            Ok(combined.to_owned())
+        );
+        assert_eq!(normalize_visual_experiment_config(None), Ok(String::new()));
+        assert!(normalize_visual_experiment_config(Some("not-json")).is_err());
+        assert!(normalize_visual_experiment_config(Some(
+            r#"{"experimentId":"bad","parameters":{"FILM_DISK_EXPOSURE":0.0}}"#
+        ))
+        .is_err());
+        assert!(normalize_visual_experiment_config(Some(
+            r#"{"experimentId":"bad-low","parameters":{"DISK_OUTER":4.2}}"#
+        ))
+        .is_err());
+        assert!(normalize_visual_experiment_config(Some(
+            r#"{"experimentId":"bad-high","parameters":{"DISK_OUTER":45.1}}"#
+        ))
+        .is_err());
+        assert!(normalize_visual_experiment_config(Some(
+            r#"{"experimentId":"bad-key","parameters":{"OBSERVER_THETA":1.5}}"#
+        ))
+        .is_err());
+        assert!(normalize_visual_experiment_config(Some(
+            r#"{"parameters":{"DISK_OUTER":14.0}}"#
+        ))
+        .is_err());
     }
 
     #[test]
