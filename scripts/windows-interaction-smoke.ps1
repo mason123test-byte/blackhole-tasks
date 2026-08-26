@@ -32,6 +32,34 @@ if ($boundaryIndex -lt 0) {
 }
 
 $visualSource = $fullSource.Substring(0, $boundaryIndex)
+$receiptAnchor = '$orbWindow = Wait-OrbRenderReady $visualProcess.Id'
+$receiptBlock = @'
+$orbWindow = Wait-OrbRenderReady $visualProcess.Id
+if ($Mode -eq "candidate") {
+  $receiptDeadline = [DateTime]::UtcNow.AddSeconds(8)
+  $receiptWindow = $null
+  do {
+    $receiptMatch = @(Get-AppWindows $visualProcess.Id | Where-Object {
+      $_.Title.StartsWith("黑洞任务|renderer=webgl2|frame=ready|") -and
+      $_.Title -match 'effectiveExperimentId=[^;|]+;effectiveEnabled=[01];effectiveFilmDiskExposure=[0-9.]+;effectiveDiskOuter=[0-9.]+'
+    })
+    if ($receiptMatch.Count -gt 0) {
+      $receiptWindow = $receiptMatch[0]
+      break
+    }
+    Start-Sleep -Milliseconds 50
+  } while ([DateTime]::UtcNow -lt $receiptDeadline)
+  if ($null -eq $receiptWindow) {
+    throw "Candidate render did not publish an effective visual experiment receipt before capture."
+  }
+  $orbWindow = $receiptWindow
+  Set-Content -LiteralPath (Join-Path $OutputDirectory "visual-candidate-effective.txt") -Value $orbWindow.Title -NoNewline
+}
+'@
+if (-not $visualSource.Contains($receiptAnchor)) {
+  throw "Effective receipt injection anchor was not found in windows-interaction-smoke-full.ps1."
+}
+$visualSource = $visualSource.Replace($receiptAnchor, $receiptBlock)
 $visualBlock = [ScriptBlock]::Create($visualSource)
 try {
   & $visualBlock -ExePath $ExePath -OutputDirectory $OutputDirectory -CandidateOnly:$CandidateOnly
@@ -44,11 +72,12 @@ try {
 }
 
 $requiredEvidence = if ($CandidateOnly) {
-  @("visual-candidate.png")
+  @("visual-candidate.png", "visual-candidate-effective.txt")
 } else {
   @(
     "visual-baseline.png",
     "visual-candidate.png",
+    "visual-candidate-effective.txt",
     "visual-split.png",
     "visual-difference.png",
     "visual-comparison-metrics.txt"
