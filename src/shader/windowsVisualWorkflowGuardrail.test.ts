@@ -57,11 +57,14 @@ describe("Windows Gargantua visual workflow guardrail", () => {
     expect(lifecycleIndex).toBeGreaterThan(metricsIndex);
   });
 
-  it("splits fast checks while preserving real Windows visual and full validation", () => {
+  it("splits fast checks while preserving real Windows visual, crossing diagnostics, and full validation", () => {
     expect(workflowSource).toContain("name: Frontend fast checks");
     expect(workflowSource).toContain("runs-on: ubuntu-latest");
     expect(workflowSource).toContain("name: Rust fast checks");
     expect(workflowSource).toContain("name: Windows visual evidence");
+    expect(workflowSource).toContain("name: Windows crossing-order diagnostic");
+    expect(workflowSource).toContain("inputs.validation_mode == 'diagnostic'");
+    expect(workflowSource).toContain("windows-crossing-diagnostic.ps1");
     expect(workflowSource).toContain("name: Full Windows validation");
     expect(workflowSource).toContain("npm run tauri build -- --no-bundle");
     expect(workflowSource).toContain("-VisualOnly");
@@ -116,6 +119,7 @@ describe("Windows Gargantua visual workflow guardrail", () => {
       "- name: Upload Windows visual artifact",
     );
     const nextJobStarts = [
+      workflowSource.indexOf("windows-crossing-diagnostic:", visualUploadStart),
       workflowSource.indexOf("windows-batch:", visualUploadStart),
       workflowSource.indexOf("windows-full:", visualUploadStart),
     ].filter((index) => index > visualUploadStart);
