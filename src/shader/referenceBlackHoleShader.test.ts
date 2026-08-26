@@ -122,7 +122,9 @@ describe("Interstellar Gargantua Kerr WebGL black-hole port", () => {
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float colorGain = crossingColorGain(diskCrossingCount);");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float alphaGain = crossingAlphaGain(diskCrossingCount);");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float effectiveAlpha = clamp(diskAlpha * alphaGain, 0.0, 0.90);");
-    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("accumulatedDisk += transmittance * (diskColor * colorGain) * effectiveAlpha;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("float incomingTransmittance = transmittance;");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("includeCrossingInDiagnostic(crossingDiagnosticMode, diskCrossingCount)");
+    expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("accumulatedDisk += incomingTransmittance * (diskColor * colorGain) * effectiveAlpha;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("transmittance *= 1.0 - effectiveAlpha;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).toContain("diskCrossingCount += 1;");
     expect(REFERENCE_BLACK_HOLE_FRAGMENT).not.toContain("bool diskHit");
