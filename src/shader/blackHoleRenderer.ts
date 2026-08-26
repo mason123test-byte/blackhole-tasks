@@ -10,6 +10,11 @@ import {
   type NormalizedVisualExperiment,
 } from "./visualExperiment";
 import {
+  encodeEffectiveVisualExperimentReceipt,
+  readVisualExperimentUniformReceipt,
+  requireVisualExperimentUniformLocations,
+} from "./visualExperimentGpuReceipt";
+import {
   buildSceneTextureSignature,
   createSceneTextureBitmap,
   type SceneTextureState,
@@ -236,11 +241,23 @@ function startBlackHoleSession(
       experimentFilmDiskExposure: gl.getUniformLocation(program, "u_experiment_film_disk_exposure"),
       experimentDiskOuter: gl.getUniformLocation(program, "u_experiment_disk_outer"),
     };
+    const visualExperimentUniforms = requireVisualExperimentUniformLocations({
+      enabled: uniforms.visualExperimentEnabled,
+      filmDiskExposure: uniforms.experimentFilmDiskExposure,
+      diskOuter: uniforms.experimentDiskOuter,
+    });
     gl.uniform1i(uniforms.sceneTexture, 0);
     gl.uniform1f(uniforms.visualCompare, visualComparison.shaderMode);
-    gl.uniform1f(uniforms.visualExperimentEnabled, visualExperiment.enabled ? 1 : 0);
-    gl.uniform1f(uniforms.experimentFilmDiskExposure, visualExperiment.filmDiskExposure);
-    gl.uniform1f(uniforms.experimentDiskOuter, visualExperiment.diskOuter);
+    gl.uniform1f(visualExperimentUniforms.enabled, visualExperiment.enabled ? 1 : 0);
+    gl.uniform1f(visualExperimentUniforms.filmDiskExposure, visualExperiment.filmDiskExposure);
+    gl.uniform1f(visualExperimentUniforms.diskOuter, visualExperiment.diskOuter);
+    const effectiveVisualExperiment = readVisualExperimentUniformReceipt(
+      gl,
+      program,
+      visualExperimentUniforms,
+      visualExperiment,
+    );
+    const effectiveReceiptDiagnostic = encodeEffectiveVisualExperimentReceipt(effectiveVisualExperiment);
     const compositorUniforms = {
       resolution: gl.getUniformLocation(compositorProgram, "u_resolution"),
       frameTexture: gl.getUniformLocation(compositorProgram, "u_frame_texture"),
@@ -467,7 +484,10 @@ function startBlackHoleSession(
 
       if (validatedEnergy !== null) {
         gl.finish();
-        reportOrbFrame("webgl2", validatedEnergy, canvas.width, canvas.height, validatedDiagnostic);
+        const receiptDiagnostic = validatedDiagnostic
+          ? `${validatedDiagnostic};${effectiveReceiptDiagnostic}`
+          : effectiveReceiptDiagnostic;
+        reportOrbFrame("webgl2", validatedEnergy, canvas.width, canvas.height, receiptDiagnostic);
       }
 
       measuredFrames += 1;
