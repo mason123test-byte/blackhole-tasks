@@ -13,7 +13,7 @@ function Assert-Close([double]$Actual, [double]$Expected, [string]$Name) {
 }
 
 function Read-DiagnosticReceipt([string]$Title) {
-  $pattern = 'effectiveSource=(gpu-uniform-readback);effectiveExperimentId=([^;|]+);effectiveEnabled=([01]);effectiveFilmDiskExposure=([0-9.]+);effectiveDiskOuter=([0-9.]+);crossingSource=(gpu-uniform-readback);requestedVisualMode=([^;|]+);effectiveVisualCompare=([0-9.]+);effectiveCrossingOrder=([^;|]+)'
+  $pattern = 'effectiveSource=(gpu-uniform-readback);effectiveExperimentId=([^;|]+);effectiveEnabled=([01]);effectiveFilmDiskExposure=([0-9.]+);effectiveDiskOuter=([0-9.]+);crossingSource=(gpu-uniform-readback);requestedCrossingOrder=([^;|]+);effectiveVisualCompare=([0-9.]+);effectiveCrossingOrder=([^;|]+)'
   if ($Title -notmatch $pattern) {
     throw "Malformed or incomplete GPU crossing diagnostic receipt: $Title"
   }
@@ -24,7 +24,7 @@ function Read-DiagnosticReceipt([string]$Title) {
     filmDiskExposure = [double]::Parse($Matches[4], [System.Globalization.CultureInfo]::InvariantCulture)
     diskOuter = [double]::Parse($Matches[5], [System.Globalization.CultureInfo]::InvariantCulture)
     crossingSource = $Matches[6]
-    requestedVisualMode = [uri]::UnescapeDataString($Matches[7])
+    requestedCrossingOrder = [uri]::UnescapeDataString($Matches[7])
     visualCompare = [double]::Parse($Matches[8], [System.Globalization.CultureInfo]::InvariantCulture)
     crossingOrder = [uri]::UnescapeDataString($Matches[9])
   }
@@ -34,23 +34,24 @@ function Assert-DiagnosticReceipt($Receipt, $Case) {
   if ($Receipt.visualSource -ne "gpu-uniform-readback" -or $Receipt.crossingSource -ne "gpu-uniform-readback") {
     throw "Diagnostic receipt must come from GPU uniform readback."
   }
-  if ($Receipt.enabled) { throw "Crossing diagnostics must not enable visual parameter experiments." }
-  if ($Receipt.experimentId -ne "accepted-571") { throw "Unexpected production experiment id: $($Receipt.experimentId)" }
+  if ($Receipt.enabled -ne $Case.enabled) { throw "visual experiment enabled mismatch for $($Case.id)" }
+  if ($Receipt.experimentId -ne $Case.experimentId) { throw "experimentId mismatch for $($Case.id): $($Receipt.experimentId)" }
   Assert-Close $Receipt.filmDiskExposure 1.55 "$($Case.id) filmDiskExposure"
   Assert-Close $Receipt.diskOuter 35.0 "$($Case.id) diskOuter"
-  if ($Receipt.requestedVisualMode -ne $Case.visualMode) { throw "requestedVisualMode mismatch for $($Case.id)" }
+  if ($Receipt.requestedCrossingOrder -ne $Case.crossingOrder) { throw "requestedCrossingOrder mismatch for $($Case.id)" }
   Assert-Close $Receipt.visualCompare $Case.shaderMode "$($Case.id) visualCompare"
   if ($Receipt.crossingOrder -ne $Case.crossingOrder) { throw "crossingOrder mismatch for $($Case.id)" }
 }
 
 if ($SelfTest) {
-  $good = '黑洞任务|renderer=webgl2|frame=ready|energy=200|size=920x700|diag=a1-m1-am255-sr1-e0-f36053;effectiveSource=gpu-uniform-readback;effectiveExperimentId=accepted-571;effectiveEnabled=0;effectiveFilmDiskExposure=1.550000;effectiveDiskOuter=35.000000;crossingSource=gpu-uniform-readback;requestedVisualMode=crossing-second;effectiveVisualCompare=4.000000;effectiveCrossingOrder=second'
-  $case = [pscustomobject]@{ id="second"; visualMode="crossing-second"; shaderMode=4.0; crossingOrder="second" }
+  $good = '黑洞任务|renderer=webgl2|frame=ready|energy=200|size=920x700|diag=a1-m1-am255-sr1-e0-f36053;effectiveSource=gpu-uniform-readback;effectiveExperimentId=crossing-second;effectiveEnabled=1;effectiveFilmDiskExposure=1.550000;effectiveDiskOuter=35.000000;crossingSource=gpu-uniform-readback;requestedCrossingOrder=second;effectiveVisualCompare=4.000000;effectiveCrossingOrder=second'
+  $case = [pscustomobject]@{ id="second"; experimentId="crossing-second"; enabled=$true; shaderMode=4.0; crossingOrder="second" }
   Assert-DiagnosticReceipt (Read-DiagnosticReceipt $good) $case
   foreach ($bad in @(
     $good.Replace('crossingSource=gpu-uniform-readback;', ''),
     $good.Replace('effectiveDiskOuter=35.000000', 'effectiveDiskOuter=14.000000'),
-    $good.Replace('effectiveCrossingOrder=second', 'effectiveCrossingOrder=first')
+    $good.Replace('effectiveCrossingOrder=second', 'effectiveCrossingOrder=first'),
+    $good.Replace('effectiveExperimentId=crossing-second', 'effectiveExperimentId=accepted-571')
   )) {
     $failed = $false
     try { Assert-DiagnosticReceipt (Read-DiagnosticReceipt $bad) $case } catch { $failed = $true }
@@ -77,10 +78,10 @@ function Write-DiagnosticLog([string]$Message) {
 }
 
 $cases = @(
-  [pscustomobject]@{id="normal";visualMode="candidate";shaderMode=1.0;crossingOrder="normal"},
-  [pscustomobject]@{id="first";visualMode="crossing-first";shaderMode=3.0;crossingOrder="first"},
-  [pscustomobject]@{id="second";visualMode="crossing-second";shaderMode=4.0;crossingOrder="second"},
-  [pscustomobject]@{id="third-plus";visualMode="crossing-third-plus";shaderMode=5.0;crossingOrder="third-plus"}
+  [pscustomobject]@{id="normal";experimentId="accepted-571";enabled=$false;visualMode="candidate";shaderMode=1.0;crossingOrder="normal"},
+  [pscustomobject]@{id="first";experimentId="crossing-first";enabled=$true;visualMode="crossing-first";shaderMode=3.0;crossingOrder="first"},
+  [pscustomobject]@{id="second";experimentId="crossing-second";enabled=$true;visualMode="crossing-second";shaderMode=4.0;crossingOrder="second"},
+  [pscustomobject]@{id="third-plus";experimentId="crossing-third-plus";enabled=$true;visualMode="crossing-third-plus";shaderMode=5.0;crossingOrder="third-plus"}
 )
 $rows = [System.Collections.Generic.List[object]]::new()
 Write-DiagnosticLog "DIAGNOSTIC_START headSha=$headSha runId=$runId exeSha256=$exeSha cases=4 diskOuter=35 exposure=1.55"
@@ -90,7 +91,13 @@ foreach ($case in $cases) {
   New-Item -ItemType Directory -Force -Path $caseDirectory | Out-Null
   try {
     Remove-Item Env:BLACKHOLE_VISUAL_EXPERIMENT -ErrorAction SilentlyContinue
-    Write-DiagnosticLog "CAPTURE_START id=$($case.id) visualMode=$($case.visualMode) requestedCrossing=$($case.crossingOrder) exeSha256=$exeSha"
+    if ($case.enabled) {
+      $env:BLACKHOLE_VISUAL_EXPERIMENT = ([ordered]@{
+        experimentId = $case.experimentId
+        parameters = [ordered]@{ DISK_OUTER = 35.0 }
+      } | ConvertTo-Json -Compress)
+    }
+    Write-DiagnosticLog "CAPTURE_START id=$($case.id) experimentId=$($case.experimentId) requestedCrossing=$($case.crossingOrder) exeSha256=$exeSha"
     & (Join-Path $PSScriptRoot "windows-interaction-smoke.ps1") `
       -ExePath $resolvedExePath `
       -OutputDirectory $caseDirectory `
@@ -112,8 +119,8 @@ foreach ($case in $cases) {
     $imageSha = (Get-FileHash -LiteralPath $imagePath -Algorithm SHA256).Hash.ToLowerInvariant()
     $row = [ordered]@{
       schemaVersion="1.0"; headSha=$headSha; runId=$runId; id=$case.id; imagePath=$imageName; imageSha256=$imageSha; exeSha256=$exeSha
-      requested=[ordered]@{visualMode=$case.visualMode;crossingOrder=$case.crossingOrder;filmDiskExposure=1.55;diskOuter=35.0}
-      effective=[ordered]@{source=$receipt.crossingSource;visualMode=$receipt.requestedVisualMode;visualCompare=[double]$receipt.visualCompare;crossingOrder=$receipt.crossingOrder;filmDiskExposure=[double]$receipt.filmDiskExposure;diskOuter=[double]$receipt.diskOuter}
+      requested=[ordered]@{experimentId=$case.experimentId;enabled=[bool]$case.enabled;crossingOrder=$case.crossingOrder;filmDiskExposure=1.55;diskOuter=35.0}
+      effective=[ordered]@{source=$receipt.crossingSource;experimentId=$receipt.experimentId;enabled=[bool]$receipt.enabled;visualCompare=[double]$receipt.visualCompare;crossingOrder=$receipt.crossingOrder;filmDiskExposure=[double]$receipt.filmDiskExposure;diskOuter=[double]$receipt.diskOuter}
     }
     ($row | ConvertTo-Json -Compress -Depth 6) | Add-Content -LiteralPath $jsonlPath
     $rows.Add([pscustomobject]$row)
