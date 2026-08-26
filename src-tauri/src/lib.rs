@@ -48,9 +48,9 @@ fn normalize_visual_experiment_config(value: Option<&str>) -> Result<String, Str
         return Err("BLACKHOLE_VISUAL_EXPERIMENT contains an unknown parameter".to_owned());
     }
     if let Some(value) = parameters.get("FILM_DISK_EXPOSURE") {
-        let exposure = value.as_f64().ok_or_else(|| {
-            "FILM_DISK_EXPOSURE must be a finite positive number".to_owned()
-        })?;
+        let exposure = value
+            .as_f64()
+            .ok_or_else(|| "FILM_DISK_EXPOSURE must be a finite positive number".to_owned())?;
         if !exposure.is_finite() || exposure <= 0.0 {
             return Err("FILM_DISK_EXPOSURE must be a finite positive number".to_owned());
         }
@@ -754,7 +754,8 @@ mod smoke_command_tests {
 
     #[test]
     fn validates_visual_experiment_environment_payload() {
-        let exposure = r#"{"experimentId":"batch-exposure","parameters":{"FILM_DISK_EXPOSURE":1.6}}"#;
+        let exposure =
+            r#"{"experimentId":"batch-exposure","parameters":{"FILM_DISK_EXPOSURE":1.6}}"#;
         assert_eq!(
             normalize_visual_experiment_config(Some(exposure)),
             Ok(exposure.to_owned())
@@ -787,10 +788,10 @@ mod smoke_command_tests {
             r#"{"experimentId":"bad-key","parameters":{"OBSERVER_THETA":1.5}}"#
         ))
         .is_err());
-        assert!(normalize_visual_experiment_config(Some(
-            r#"{"parameters":{"DISK_OUTER":14.0}}"#
-        ))
-        .is_err());
+        assert!(
+            normalize_visual_experiment_config(Some(r#"{"parameters":{"DISK_OUTER":14.0}}"#))
+                .is_err()
+        );
     }
 
     #[test]
