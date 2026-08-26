@@ -6,8 +6,8 @@ import {
   MIRROR_COMPOSITOR_FRAGMENT,
   getRenderProfile,
   getRenderSize,
-  getVisualComparisonSettings,
 } from "./blackHoleRenderer";
+import { getVisualComparisonSettings } from "./crossingOrderDiagnostic";
 
 const blackHoleCanvasSource = readFileSync(
   resolve(process.cwd(), "src/components/orb/BlackHoleCanvas.tsx"),
@@ -49,10 +49,13 @@ describe("black-hole render profiles", () => {
   });
 
   it("freezes only diagnostic visual-comparison frames", () => {
-    expect(getVisualComparisonSettings("normal")).toEqual({ shaderMode: 1, fixedTime: null });
-    expect(getVisualComparisonSettings("baseline")).toEqual({ shaderMode: 0, fixedTime: 12 });
-    expect(getVisualComparisonSettings("candidate")).toEqual({ shaderMode: 1, fixedTime: 12 });
-    expect(getVisualComparisonSettings("split")).toEqual({ shaderMode: 2, fixedTime: 12 });
+    expect(getVisualComparisonSettings("normal")).toEqual({ shaderMode: 1, fixedTime: null, crossingOrder: "normal" });
+    expect(getVisualComparisonSettings("baseline")).toEqual({ shaderMode: 0, fixedTime: 12, crossingOrder: "normal" });
+    expect(getVisualComparisonSettings("candidate")).toEqual({ shaderMode: 1, fixedTime: 12, crossingOrder: "normal" });
+    expect(getVisualComparisonSettings("split")).toEqual({ shaderMode: 2, fixedTime: 12, crossingOrder: "normal" });
+    expect(getVisualComparisonSettings("candidate", "first")).toEqual({ shaderMode: 3, fixedTime: 12, crossingOrder: "first" });
+    expect(getVisualComparisonSettings("candidate", "second")).toEqual({ shaderMode: 4, fixedTime: 12, crossingOrder: "second" });
+    expect(getVisualComparisonSettings("candidate", "third-plus")).toEqual({ shaderMode: 5, fixedTime: 12, crossingOrder: "third-plus" });
   });
 
   it("expands visual-comparison windows before starting the expensive WebGL frame", () => {
@@ -72,6 +75,7 @@ describe("black-hole render profiles", () => {
     expect(rendererSource).toContain("requireVisualExperimentUniformLocations");
     expect(rendererSource).toContain("readVisualExperimentUniformReceipt");
     expect(rendererSource).toContain("encodeEffectiveVisualExperimentReceipt");
+    expect(rendererSource).toContain("readCrossingDiagnosticUniformReceipt");
     expect(blackHoleCanvasSource).not.toContain("effectiveDiskOuter=${visualExperiment.diskOuter.toFixed(6)}");
   });
 
