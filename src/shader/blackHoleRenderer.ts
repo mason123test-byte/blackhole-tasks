@@ -15,6 +15,7 @@ import {
   requireVisualExperimentUniformLocations,
 } from "./visualExperimentGpuReceipt";
 import {
+  crossingDiagnosticModeFromExperimentId,
   encodeCrossingDiagnosticReceipt,
   getVisualComparisonSettings,
   normalizeVisualComparisonMode,
@@ -156,9 +157,10 @@ function startBlackHoleSession(
   options: RendererSessionOptions = {},
 ) {
   const requestedVisualMode = options.visualComparisonMode ?? "normal";
-  const profile = getRenderProfile(options.quality ?? "balanced", options.lowPowerMode);
-  const visualComparison = getVisualComparisonSettings(requestedVisualMode);
   const visualExperiment = options.visualExperiment ?? DEFAULT_VISUAL_EXPERIMENT;
+  const crossingDiagnostic = crossingDiagnosticModeFromExperimentId(visualExperiment.experimentId);
+  const profile = getRenderProfile(options.quality ?? "balanced", options.lowPowerMode);
+  const visualComparison = getVisualComparisonSettings(requestedVisualMode, crossingDiagnostic);
   const freezeAfterValidatedFrame = visualComparison.fixedTime !== null;
   const gl = canvas.getContext("webgl2", {
     alpha: true,
@@ -257,7 +259,7 @@ function startBlackHoleSession(
       gl,
       program,
       uniforms.visualCompare,
-      requestedVisualMode,
+      crossingDiagnostic,
       visualComparison.shaderMode,
     );
     const effectiveReceiptDiagnostic = [
