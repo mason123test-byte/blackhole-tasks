@@ -53,9 +53,7 @@ fn normalize_visual_experiment_config(value: Option<&str>) -> Result<String, Str
     if parameters.contains_key("DISK_OUTER")
         && (parameters.len() != 1 || !parameters.contains_key("DISK_OUTER"))
     {
-        return Err(
-            "DISK_OUTER sweep requires exactly one DISK_OUTER parameter".to_owned(),
-        );
+        return Err("DISK_OUTER sweep requires exactly one DISK_OUTER parameter".to_owned());
     }
     if let Some(value) = parameters.get("FILM_DISK_EXPOSURE") {
         let exposure = value
