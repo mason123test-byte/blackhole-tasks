@@ -84,11 +84,12 @@ describe("Windows Gargantua visual workflow guardrail", () => {
     expect(workflowSource).toContain("cargo test");
   });
 
-  it("uses only the newest head commit for PR fast-path change detection", () => {
+  it("keeps current PR Rust changes in the fast validation gate across later commits", () => {
+    expect(workflowSource).toContain("$base = '${{ github.event.pull_request.base.sha }}'");
     expect(workflowSource).toContain("$head = '${{ github.event.pull_request.head.sha }}'");
-    expect(workflowSource).toContain('$parent = (git rev-parse "$head^").Trim()');
-    expect(workflowSource).toContain("git diff --name-only $parent $head");
-    expect(workflowSource).not.toContain("github.event.pull_request.base.sha");
+    expect(workflowSource).toContain("git diff --name-only $base $head");
+    expect(workflowSource).not.toContain('$parent = (git rev-parse "$head^").Trim()');
+    expect(workflowSource).toContain("Test Rust visual experiment validation");
   });
 
   it("keeps shader-only iterations on the no-Rust fast path", () => {
