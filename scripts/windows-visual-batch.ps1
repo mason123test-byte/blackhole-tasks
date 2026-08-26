@@ -19,19 +19,20 @@ function Write-BatchLog([string]$Message) {
   ("{0:o} {1}" -f [DateTime]::UtcNow, $Message) | Tee-Object -FilePath $batchLogPath -Append
 }
 function Assert-Close([double]$Actual, [double]$Expected, [string]$Name) {
-  if ([Math]::Abs($Actual - $Expected) -gt 0.000001) { throw "$Name mismatch: expected=$Expected actual=$Actual" }
+  if (-not [double]::IsFinite($Actual) -or [Math]::Abs($Actual - $Expected) -gt 0.000001) { throw "$Name mismatch: expected=$Expected actual=$Actual" }
 }
 function Read-EffectiveReceipt([string]$Path) {
   if (-not (Test-Path -LiteralPath $Path)) { throw "Missing effective receipt: $Path" }
   $title = Get-Content -LiteralPath $Path -Raw
-  if ($title -notmatch 'effectiveExperimentId=([^;|]+);effectiveEnabled=([01]);effectiveFilmDiskExposure=([0-9.]+);effectiveDiskOuter=([0-9.]+)') {
-    throw "Malformed effective receipt: $title"
+  if ($title -notmatch 'effectiveSource=(gpu-uniform-readback);effectiveExperimentId=([^;|]+);effectiveEnabled=([01]);effectiveFilmDiskExposure=([0-9.]+);effectiveDiskOuter=([0-9.]+)') {
+    throw "Malformed or non-GPU effective receipt: $title"
   }
   [pscustomobject]@{
-    experimentId = [uri]::UnescapeDataString($Matches[1])
-    enabled = $Matches[2] -eq '1'
-    filmDiskExposure = [double]::Parse($Matches[3], [System.Globalization.CultureInfo]::InvariantCulture)
-    diskOuter = [double]::Parse($Matches[4], [System.Globalization.CultureInfo]::InvariantCulture)
+    source = $Matches[1]
+    experimentId = [uri]::UnescapeDataString($Matches[2])
+    enabled = $Matches[3] -eq '1'
+    filmDiskExposure = [double]::Parse($Matches[4], [System.Globalization.CultureInfo]::InvariantCulture)
+    diskOuter = [double]::Parse($Matches[5], [System.Globalization.CultureInfo]::InvariantCulture)
   }
 }
 function Get-MetricDelta($Metrics, $Control) {
@@ -74,7 +75,7 @@ $cases=@(
 $headSha=if($env:GITHUB_SHA){$env:GITHUB_SHA}else{"local"}; $runId=if($env:GITHUB_RUN_ID){$env:GITHUB_RUN_ID}else{"local"}
 $rows=[System.Collections.Generic.List[object]]::new(); $controlMetrics=$null
 $exeDigest=(Get-FileHash -LiteralPath $resolvedExePath -Algorithm SHA256).Hash.ToLowerInvariant()
-Write-BatchLog "BATCH_START headSha=$headSha runId=$runId exeSha256=$exeDigest cases=9 sweep=DISK_OUTER receiptRequired=true"
+Write-BatchLog "BATCH_START headSha=$headSha runId=$runId exeSha256=$exeDigest cases=9 sweep=DISK_OUTER receiptRequired=gpu-uniform-readback"
 if($env:BLACKHOLE_BATCH_NPM_CI_COUNT -ne "1" -or $env:BLACKHOLE_BATCH_EXE_BUILD_COUNT -ne "1"){throw "Batch build evidence markers must both equal one."}
 
 foreach($case in $cases){
@@ -85,24 +86,25 @@ foreach($case in $cases){
     if($case.enabled){
       $env:BLACKHOLE_VISUAL_EXPERIMENT=([ordered]@{experimentId=$case.id;parameters=[ordered]@{DISK_OUTER=[double]$case.diskOuter}}|ConvertTo-Json -Compress)
     }
-    Write-BatchLog "CAPTURE_START id=$($case.id) requestedEnabled=$($case.enabled) requestedDiskOuter=$($case.diskOuter) exeSha256=$exeDigest"
+    Write-BatchLog "CAPTURE_START id=$($case.id) requestedEnabled=$($case.enabled) requestedExposure=1.55 requestedDiskOuter=$($case.diskOuter) exeSha256=$exeDigest"
     & (Join-Path $PSScriptRoot "windows-interaction-smoke.ps1") -ExePath $resolvedExePath -OutputDirectory $caseDirectory -VisualOnly -CandidateOnly
     $receipt=Read-EffectiveReceipt (Join-Path $caseDirectory "visual-candidate-effective.txt")
+    if($receipt.source -ne "gpu-uniform-readback"){throw "receipt source mismatch for $($case.id): $($receipt.source)"}
     if($receipt.enabled -ne $case.enabled){throw "enabled mismatch for $($case.id)"}
     if($case.enabled -and $receipt.experimentId -ne $case.id){throw "experimentId mismatch for $($case.id): $($receipt.experimentId)"}
     if(-not $case.enabled -and $receipt.experimentId -ne "accepted-571"){throw "control experimentId mismatch: $($receipt.experimentId)"}
     Assert-Close $receipt.filmDiskExposure 1.55 "$($case.id) filmDiskExposure"
     Assert-Close $receipt.diskOuter $case.diskOuter "$($case.id) diskOuter"
-    Write-BatchLog "EFFECTIVE_RECEIPT_OK id=$($case.id) effectiveId=$($receipt.experimentId) enabled=$($receipt.enabled) exposure=$($receipt.filmDiskExposure) diskOuter=$($receipt.diskOuter)"
+    Write-BatchLog "EFFECTIVE_RECEIPT_OK id=$($case.id) source=$($receipt.source) effectiveId=$($receipt.experimentId) enabled=$($receipt.enabled) exposure=$($receipt.filmDiskExposure) diskOuter=$($receipt.diskOuter)"
 
     $candidatePath=Join-Path $caseDirectory "visual-candidate.png"; $outputImageName="$($case.id).png"; $outputImagePath=Join-Path $OutputDirectory $outputImageName
     if(-not(Test-Path -LiteralPath $candidatePath) -or (Get-Item -LiteralPath $candidatePath).Length -eq 0){throw "Native WebView2 capture missing for $($case.id)."}
     Copy-Item -LiteralPath $candidatePath -Destination $outputImagePath
     $metrics=Get-FrozenRoiMetrics $outputImagePath; if($null -eq $controlMetrics){$controlMetrics=$metrics}; $delta=Get-MetricDelta $metrics $controlMetrics
     $row=[ordered]@{
-      schemaVersion="3.0";headSha=$headSha;runId=$runId;experimentId=$case.id;captureStatus="success";imagePath=$outputImageName
+      schemaVersion="4.0";headSha=$headSha;runId=$runId;experimentId=$case.id;captureStatus="success";imagePath=$outputImageName
       requested=[ordered]@{experimentId=if($case.enabled){$case.id}else{"accepted-571"};enabled=[bool]$case.enabled;filmDiskExposure=1.55;diskOuter=[double]$case.diskOuter}
-      effective=[ordered]@{experimentId=$receipt.experimentId;enabled=[bool]$receipt.enabled;filmDiskExposure=[double]$receipt.filmDiskExposure;diskOuter=[double]$receipt.diskOuter}
+      effective=[ordered]@{source=$receipt.source;experimentId=$receipt.experimentId;enabled=[bool]$receipt.enabled;filmDiskExposure=[double]$receipt.filmDiskExposure;diskOuter=[double]$receipt.diskOuter}
       fixedRoiMetrics=$metrics;deltaFromControl=$delta
     }
     ($row|ConvertTo-Json -Compress -Depth 8)|Add-Content -LiteralPath $metricsPath; $rows.Add([pscustomobject]$row)
@@ -115,12 +117,14 @@ $candidateEffective=@($rows|Where-Object{$_.effective.enabled}|ForEach-Object{[d
 if($candidateEffective.Count -ne 8 -or (@($candidateEffective|Sort-Object -Unique)).Count -ne 8){throw "Eight candidate effective DISK_OUTER values must be unique."}
 $expected=@(32.0,29.0,26.0,23.0,20.0,18.0,16.0,14.0)
 for($i=0;$i -lt 8;$i++){Assert-Close $candidateEffective[$i] $expected[$i] "candidate effective DISK_OUTER index $i"}
+if(@($rows|Where-Object{$_.effective.source -ne "gpu-uniform-readback"}).Count -ne 0){throw "All nine rows must use GPU uniform readback receipts."}
+if(@($rows|Where-Object{[Math]::Abs([double]$_.effective.filmDiskExposure - 1.55) -gt 0.000001}).Count -ne 0){throw "All nine effective exposure values must remain fixed at 1.55."}
 New-ContactSheet $cases $rows
 $expectedFiles=@("control.png","smoke-01.png","smoke-02.png","smoke-03.png","smoke-04.png","smoke-05.png","smoke-06.png","smoke-07.png","smoke-08.png","metrics.jsonl","batch-summary.json","contact-sheet.png","batch.log")
 $summary=[ordered]@{
-  schemaVersion="3.0";headSha=$headSha;runId=$runId;totalGroups=9;successfulGroups=$rows.Count
-  parameterReceiptVerified=$true
-  geometrySweep=[ordered]@{parameter="DISK_OUTER";controlEffective=35.0;candidateEffective=$candidateEffective}
+  schemaVersion="4.0";headSha=$headSha;runId=$runId;totalGroups=9;successfulGroups=$rows.Count
+  parameterReceiptVerified=$true;effectiveSource="gpu-uniform-readback";sameExeSha256=$exeDigest
+  geometrySweep=[ordered]@{parameter="DISK_OUTER";controlEffective=35.0;candidateEffective=$candidateEffective;filmDiskExposure=1.55}
   geometryEvaluation=[ordered]@{mode="manual-exploration";automatedGeometryLoss=$false;reason="upstream binary reference crop SHA256 not yet verified in repository CI"}
   auxiliaryRoiMetricsOnly=$true;files=$expectedFiles;notAVisualAcceptance=$true
 }
@@ -128,5 +132,5 @@ $summary|ConvertTo-Json -Depth 10|Set-Content -LiteralPath $summaryPath
 $metricLineCount=@(Get-Content -LiteralPath $metricsPath).Count; $actual=@(Get-ChildItem -LiteralPath $OutputDirectory -File|ForEach-Object Name|Sort-Object)
 $missing=@($expectedFiles|Where-Object{$_ -notin $actual});$unexpected=@($actual|Where-Object{$_ -notin $expectedFiles})
 if($rows.Count -ne 9 -or $metricLineCount -ne 9 -or $missing.Count -ne 0 -or $unexpected.Count -ne 0){throw "Batch output validation failed groups=$($rows.Count) metricLines=$metricLineCount missing=$($missing -join ',') unexpected=$($unexpected -join ',')"}
-Write-BatchLog "BATCH_SUMMARY successfulGroups=9 metricLines=9 parameterReceiptVerified=true geometryEvaluation=manual-exploration notAVisualAcceptance=true"
+Write-BatchLog "BATCH_SUMMARY successfulGroups=9 metricLines=9 effectiveSource=gpu-uniform-readback parameterReceiptVerified=true geometryEvaluation=manual-exploration notAVisualAcceptance=true"
 Write-BatchLog "BATCH_OK processRuns=9 exeSha256=$exeDigest"
