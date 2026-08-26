@@ -41,7 +41,7 @@ if ($Mode -eq "candidate") {
   do {
     $receiptMatch = @(Get-AppWindows $visualProcess.Id | Where-Object {
       $_.Title.StartsWith("黑洞任务|renderer=webgl2|frame=ready|") -and
-      $_.Title -match 'effectiveExperimentId=[^;|]+;effectiveEnabled=[01];effectiveFilmDiskExposure=[0-9.]+;effectiveDiskOuter=[0-9.]+'
+      $_.Title -match 'effectiveSource=gpu-uniform-readback;effectiveExperimentId=[^;|]+;effectiveEnabled=[01];effectiveFilmDiskExposure=[0-9.]+;effectiveDiskOuter=[0-9.]+'
     })
     if ($receiptMatch.Count -gt 0) {
       $receiptWindow = $receiptMatch[0]
@@ -50,7 +50,7 @@ if ($Mode -eq "candidate") {
     Start-Sleep -Milliseconds 50
   } while ([DateTime]::UtcNow -lt $receiptDeadline)
   if ($null -eq $receiptWindow) {
-    throw "Candidate render did not publish an effective visual experiment receipt before capture."
+    throw "Candidate render did not publish a GPU-uniform effective visual experiment receipt before capture."
   }
   $orbWindow = $receiptWindow
   Set-Content -LiteralPath (Join-Path $OutputDirectory "visual-candidate-effective.txt") -Value $orbWindow.Title -NoNewline
