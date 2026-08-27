@@ -18,6 +18,7 @@ import {
   crossingDiagnosticModeFromExperimentId,
   encodeCrossingDiagnosticReceipt,
   getVisualComparisonSettings,
+  isCrossingDiagnosticFrameReady,
   normalizeVisualComparisonMode,
   readCrossingDiagnosticUniformReceipt,
   type VisualComparisonMode,
@@ -473,12 +474,17 @@ function startBlackHoleSession(
         validatedDiagnostic = `a${alphaEnergy}-m${maxChannel}-am${maxAlpha}-sr${expandedSceneReady ? 1 : 0}-e${glError}-f${framebufferStatus}`;
         canvas.dataset.energy = String(validatedEnergy);
         canvas.dataset.diagnostic = validatedDiagnostic;
-        const crossingDiagnosticReady = visualComparison.crossingOrder !== "normal" &&
-          expandedSceneReady &&
-          glError === gl.NO_ERROR &&
-          framebufferStatus === gl.FRAMEBUFFER_COMPLETE &&
-          alphaEnergy > 100;
-        rendererReady = crossingDiagnosticReady || validatedEnergy > 100;
+        const crossingDiagnosticReady = isCrossingDiagnosticFrameReady({
+          crossingOrder: visualComparison.crossingOrder,
+          expandedSceneReady,
+          glError,
+          noErrorValue: gl.NO_ERROR,
+          framebufferComplete: framebufferStatus === gl.FRAMEBUFFER_COMPLETE,
+          rgbContributionPixels: validatedEnergy,
+          alphaPixels: alphaEnergy,
+        });
+        rendererReady = crossingDiagnosticReady ||
+          (visualComparison.crossingOrder === "normal" && validatedEnergy > 100);
       }
 
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);

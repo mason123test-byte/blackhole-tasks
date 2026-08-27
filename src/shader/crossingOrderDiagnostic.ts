@@ -8,12 +8,23 @@ export interface VisualComparisonSettings {
 }
 
 export const CROSSING_DIAGNOSTIC_RECEIPT_SOURCE = "gpu-uniform-readback" as const;
+export const CROSSING_DIAGNOSTIC_MIN_RGB_PIXELS = 8;
 
 export interface EffectiveCrossingDiagnosticReceipt {
   source: typeof CROSSING_DIAGNOSTIC_RECEIPT_SOURCE;
   requestedMode: CrossingOrderDiagnosticMode;
   effectiveShaderMode: number;
   effectiveCrossingOrder: CrossingOrderDiagnosticMode;
+}
+
+export interface CrossingDiagnosticFrameEvidence {
+  crossingOrder: CrossingOrderDiagnosticMode;
+  expandedSceneReady: boolean;
+  glError: number;
+  noErrorValue: number;
+  framebufferComplete: boolean;
+  rgbContributionPixels: number;
+  alphaPixels: number;
 }
 
 export function normalizeVisualComparisonMode(value: unknown): VisualComparisonMode {
@@ -48,6 +59,15 @@ export function includesCrossingOrder(mode: CrossingOrderDiagnosticMode, crossin
   if (mode === "first") return crossingIndex === 0;
   if (mode === "second") return crossingIndex === 1;
   return crossingIndex >= 2;
+}
+
+export function isCrossingDiagnosticFrameReady(evidence: CrossingDiagnosticFrameEvidence) {
+  if (evidence.crossingOrder === "normal") return false;
+  if (!evidence.expandedSceneReady || evidence.glError !== evidence.noErrorValue || !evidence.framebufferComplete) {
+    return false;
+  }
+  if (!Number.isFinite(evidence.rgbContributionPixels) || evidence.rgbContributionPixels < 0) return false;
+  return evidence.rgbContributionPixels >= CROSSING_DIAGNOSTIC_MIN_RGB_PIXELS;
 }
 
 function crossingOrderFromShaderMode(shaderMode: number): CrossingOrderDiagnosticMode {

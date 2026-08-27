@@ -38,6 +38,18 @@ if ($boundaryIndex -lt 0) {
 
 $visualSource = $fullSource.Substring(0, $boundaryIndex)
 
+# Win32 window text must be read at its actual length because the GPU receipt
+# can exceed 400 characters. Replace the legacy fixed 256-character probe in
+# the executed visual prefix with GetWindowTextLengthW-sized storage.
+$getTextAnchor = '[DllImport("user32.dll", CharSet = CharSet.Unicode)]`n    private static extern int GetWindowText(IntPtr window, StringBuilder text, int maximumCount);'
+$getTextReplacement = '[DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "GetWindowTextLengthW")]`n    private static extern int GetWindowTextLength(IntPtr window);`n`n    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "GetWindowTextW")]`n    private static extern int GetWindowText(IntPtr window, StringBuilder text, int maximumCount);'
+$titleReadAnchor = '                var title = new StringBuilder(256);`n                GetWindowText(window, title, title.Capacity);'
+$titleReadReplacement = '                var titleLength = Math.Max(GetWindowTextLength(window), 0);`n                var title = new StringBuilder(titleLength + 1);`n                GetWindowText(window, title, title.Capacity);'
+if (-not $visualSource.Contains($getTextAnchor) -or -not $visualSource.Contains($titleReadAnchor)) {
+  throw "Dynamic Win32 title-read anchors were not found in windows-interaction-smoke-full.ps1."
+}
+$visualSource = $visualSource.Replace($getTextAnchor, $getTextReplacement).Replace($titleReadAnchor, $titleReadReplacement)
+
 # Crossing diagnostics are selected by BLACKHOLE_VISUAL_EXPERIMENT experimentId
 # and therefore still use the existing valid candidate comparison mode. No
 # unknown comparison value is allowed to fall back to normal rendering.
@@ -46,12 +58,10 @@ if (-not $visualSource.Contains($hardcodedCandidateCapture)) {
   throw "Candidate capture anchor was not found in windows-interaction-smoke-full.ps1."
 }
 
-# A crossing-isolation frame may correctly contain almost no bright disk pixels.
-# In that diagnostic-only case the GPU receipt plus a valid WebGL framebuffer is
-# the readiness proof; ordinary visual modes still require the established
-# energy > 100 condition.
+# Diagnostic capture must have real RGB crossing contribution. A receipt-only
+# frame or an alpha-only frame is not sufficient evidence.
 $readinessAnchor = '[int]$Matches[1] -gt 100 -and [int]$Matches[2] -ge 240 -and [int]$Matches[3] -ge 180'
-$readinessReplacement = '([int]$Matches[1] -gt 100 -or $lastTitle -match ''crossingSource=gpu-uniform-readback;requestedCrossingOrder=(first|second|third-plus);effectiveVisualCompare=[0-9.]+;effectiveCrossingOrder=(first|second|third-plus)'') -and [int]$Matches[2] -ge 240 -and [int]$Matches[3] -ge 180'
+$readinessReplacement = '([int]$Matches[1] -gt 100 -or ([int]$Matches[1] -ge 8 -and $lastTitle -match ''crossingSource=gpu-uniform-readback;requestedCrossingOrder=(first|second|third-plus);effectiveVisualCompare=[0-9.]+;effectiveCrossingOrder=(first|second|third-plus)'')) -and [int]$Matches[2] -ge 240 -and [int]$Matches[3] -ge 180'
 if (-not $visualSource.Contains($readinessAnchor)) {
   throw "Crossing diagnostic readiness anchor was not found in windows-interaction-smoke-full.ps1."
 }
@@ -116,8 +126,6 @@ foreach ($name in $requiredEvidence) {
 }
 
 if (-not $CandidateOnly) {
-  # Candidate is already an expanded real Windows WebView2 scene. Publish an
-  # explicit expanded-scene filename so the visual artifact is self-describing.
   Copy-Item -LiteralPath (Join-Path $OutputDirectory "visual-candidate.png") `
     -Destination (Join-Path $OutputDirectory "02-single-scene-expanded.png") -Force
 

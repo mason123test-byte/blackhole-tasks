@@ -45,8 +45,10 @@ function Assert-DiagnosticReceipt($Receipt, $Case) {
 
 if ($SelfTest) {
   $good = '黑洞任务|renderer=webgl2|frame=ready|energy=200|size=920x700|diag=a1-m1-am255-sr1-e0-f36053;effectiveSource=gpu-uniform-readback;effectiveExperimentId=crossing-second;effectiveEnabled=1;effectiveFilmDiskExposure=1.550000;effectiveDiskOuter=35.000000;crossingSource=gpu-uniform-readback;requestedCrossingOrder=second;effectiveVisualCompare=4.000000;effectiveCrossingOrder=second'
+  $longGood = $good + ';receiptPadding=' + ('x' * 160)
+  if ($longGood.Length -le 400) { throw "Long GPU receipt fixture must exceed 400 characters." }
   $case = [pscustomobject]@{ id="second"; experimentId="crossing-second"; enabled=$true; shaderMode=4.0; crossingOrder="second" }
-  Assert-DiagnosticReceipt (Read-DiagnosticReceipt $good) $case
+  Assert-DiagnosticReceipt (Read-DiagnosticReceipt $longGood) $case
   foreach ($bad in @(
     $good.Replace('crossingSource=gpu-uniform-readback;', ''),
     $good.Replace('effectiveDiskOuter=35.000000', 'effectiveDiskOuter=14.000000'),
@@ -57,7 +59,7 @@ if ($SelfTest) {
     try { Assert-DiagnosticReceipt (Read-DiagnosticReceipt $bad) $case } catch { $failed = $true }
     if (-not $failed) { throw "Crossing diagnostic contract accepted invalid evidence." }
   }
-  "CROSSING_DIAGNOSTIC_SELF_TEST_OK"
+  "CROSSING_DIAGNOSTIC_SELF_TEST_OK longReceiptLength=$($longGood.Length)"
   return
 }
 

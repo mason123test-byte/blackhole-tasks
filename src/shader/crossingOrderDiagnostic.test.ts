@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  CROSSING_DIAGNOSTIC_MIN_RGB_PIXELS,
   crossingDiagnosticModeFromExperimentId,
   getVisualComparisonSettings,
   includesCrossingOrder,
+  isCrossingDiagnosticFrameReady,
   normalizeVisualComparisonMode,
   readCrossingDiagnosticUniformReceipt,
 } from "./crossingOrderDiagnostic";
@@ -26,6 +28,22 @@ describe("crossing-order diagnostics", () => {
     expect([0, 1, 2, 3].filter((index) => includesCrossingOrder("third-plus", index))).toEqual([2, 3]);
     expect([0, 1, 2, 3].filter((index) => includesCrossingOrder("normal", index))).toEqual([0, 1, 2, 3]);
     expect(() => includesCrossingOrder("first", -1)).toThrow(/non-negative integer/);
+  });
+
+  it("does not accept alpha-only diagnostic pixels as crossing evidence", () => {
+    const base = {
+      crossingOrder: "second" as const,
+      expandedSceneReady: true,
+      glError: 0,
+      noErrorValue: 0,
+      framebufferComplete: true,
+      rgbContributionPixels: 0,
+      alphaPixels: 920 * 700,
+    };
+    expect(isCrossingDiagnosticFrameReady(base)).toBe(false);
+    expect(isCrossingDiagnosticFrameReady({ ...base, rgbContributionPixels: CROSSING_DIAGNOSTIC_MIN_RGB_PIXELS - 1 })).toBe(false);
+    expect(isCrossingDiagnosticFrameReady({ ...base, rgbContributionPixels: CROSSING_DIAGNOSTIC_MIN_RGB_PIXELS })).toBe(true);
+    expect(isCrossingDiagnosticFrameReady({ ...base, crossingOrder: "normal", rgbContributionPixels: 1000 })).toBe(false);
   });
 
   it("fails closed unless the crossing selector is read back from the GPU", () => {
