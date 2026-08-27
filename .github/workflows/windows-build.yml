@@ -223,26 +223,18 @@ jobs:
           $help | Select-String -- '--no-bundle'
       - name: Build release EXE once without installers
         run: npm run tauri build -- --no-bundle
-      - name: Capture normal and crossing-order contributions sequentially
+      - name: Capture staged crossing-order observability sequentially
         shell: pwsh
         run: |
           ./scripts/windows-crossing-diagnostic.ps1 `
             -ExePath "src-tauri/target/release/blackhole-tasks.exe" `
             -OutputDirectory "output/windows-crossing-diagnostic"
-      - name: Upload exact crossing diagnostic evidence
+      - name: Upload staged crossing diagnostic evidence
         if: always()
         uses: actions/upload-artifact@v5
         with:
           name: blackhole-tasks-windows-crossing-diagnostic-${{ github.run_number }}
-          path: |
-            output/windows-crossing-diagnostic/normal.png
-            output/windows-crossing-diagnostic/first.png
-            output/windows-crossing-diagnostic/second.png
-            output/windows-crossing-diagnostic/third-plus.png
-            output/windows-crossing-diagnostic/diagnostic.jsonl
-            output/windows-crossing-diagnostic/diagnostic-summary.json
-            output/windows-crossing-diagnostic/contact-sheet.png
-            output/windows-crossing-diagnostic/diagnostic.log
+          path: output/windows-crossing-diagnostic/*
           if-no-files-found: error
           retention-days: 14
 

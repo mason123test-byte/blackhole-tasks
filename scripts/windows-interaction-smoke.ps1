@@ -4,7 +4,8 @@ param(
   [string]$OutputDirectory = "output/windows-smoke",
   [switch]$VisualOnly,
   [switch]$CandidateOnly,
-  [ValidateSet("candidate", "crossing-first", "crossing-second", "crossing-third-plus")]
+  [switch]$AllowEmptyDiagnosticCapture,
+  [ValidateSet("candidate", "crossing-first", "crossing-second", "crossing-third-plus", "crossing-third-reach", "crossing-third-pre-trans", "crossing-termination")]
   [string]$VisualMode = "candidate"
 )
 
@@ -18,6 +19,9 @@ if ($CandidateOnly -and -not $VisualOnly) {
 if (-not $CandidateOnly -and $VisualMode -ne "candidate") {
   throw "VisualMode diagnostics require CandidateOnly."
 }
+if ($AllowEmptyDiagnosticCapture -and (-not $CandidateOnly -or $VisualMode -eq "candidate")) {
+  throw "AllowEmptyDiagnosticCapture is diagnostic-only and requires CandidateOnly."
+}
 
 if (-not $VisualOnly) {
   & $fullScriptPath -ExePath $ExePath -OutputDirectory $OutputDirectory
@@ -25,10 +29,6 @@ if (-not $VisualOnly) {
   return
 }
 
-# Keep one source of truth for the native WebView2 visual capture helpers. The
-# full smoke script deliberately performs all visual A/B captures before the
-# native task lifecycle begins. VisualOnly executes exactly that validated
-# prefix and stops at the explicit full-interaction boundary below.
 $fullSource = Get-Content -LiteralPath $fullScriptPath -Raw
 $fullInteractionBoundary = '$diagnosticMarkerPath = [System.IO.Path]::ChangeExtension($resolvedExePath, ".smoke-diagnostics")'
 $boundaryIndex = $fullSource.IndexOf($fullInteractionBoundary, [System.StringComparison]::Ordinal)
@@ -66,18 +66,18 @@ if (-not $visualSource.Contains($getTextAnchor) -or -not $visualSource.Contains(
 }
 $visualSource = $visualSource.Replace($getTextAnchor, $getTextReplacement).Replace($titleReadAnchor, $titleReadReplacement)
 
-# Crossing diagnostics are selected by BLACKHOLE_VISUAL_EXPERIMENT experimentId
-# and therefore still use the existing valid candidate comparison mode. No
-# unknown comparison value is allowed to fall back to normal rendering.
 $hardcodedCandidateCapture = '  Capture-VisualComparisonFrame $resolvedExePath "candidate" $visualCandidatePath'
 if (-not $visualSource.Contains($hardcodedCandidateCapture)) {
   throw "Candidate capture anchor was not found in windows-interaction-smoke-full.ps1."
 }
 
-# Diagnostic capture must have real RGB crossing contribution. A receipt-only
-# frame or an alpha-only frame is not sufficient evidence.
+# Diagnostic capture normally needs real RGB crossing contribution. For the
+# explicit staged observability run only, an all-black GPU-proven diagnostic
+# frame is also capturable so zero remains auditable negative evidence. The
+# bypass is capture-only and is never visual acceptance.
 $readinessAnchor = '[int]$Matches[1] -gt 100 -and [int]$Matches[2] -ge 240 -and [int]$Matches[3] -ge 180'
-$readinessReplacement = '([int]$Matches[1] -gt 100 -or ([int]$Matches[1] -ge 8 -and $lastTitle -match ''crossingSource=gpu-uniform-readback;requestedCrossingOrder=(first|second|third-plus);effectiveVisualCompare=[0-9.]+;effectiveCrossingOrder=(first|second|third-plus)'')) -and [int]$Matches[2] -ge 240 -and [int]$Matches[3] -ge 180'
+$diagnosticReceiptPattern = 'crossingSource=gpu-uniform-readback;requestedCrossingOrder=(first|second|third-plus|third-reach|third-pre-trans|termination);effectiveVisualCompare=[0-9.]+;effectiveCrossingOrder=(first|second|third-plus|third-reach|third-pre-trans|termination)'
+$readinessReplacement = '(([int]$Matches[1] -gt 100) -or ([int]$Matches[1] -ge 8 -and $lastTitle -match ''' + $diagnosticReceiptPattern + ''') -or ($script:AllowEmptyDiagnosticCapture -and [int]$Matches[1] -eq 0 -and $lastTitle -match ''' + $diagnosticReceiptPattern + ''')) -and [int]$Matches[2] -ge 240 -and [int]$Matches[3] -ge 180'
 if (-not $visualSource.Contains($readinessAnchor)) {
   throw "Crossing diagnostic readiness anchor was not found in windows-interaction-smoke-full.ps1."
 }
@@ -112,6 +112,7 @@ if (-not $visualSource.Contains($receiptAnchor)) {
 }
 $visualSource = $visualSource.Replace($receiptAnchor, $receiptBlock)
 $visualBlock = [ScriptBlock]::Create($visualSource)
+$script:AllowEmptyDiagnosticCapture = $AllowEmptyDiagnosticCapture.IsPresent
 try {
   & $visualBlock -ExePath $ExePath -OutputDirectory $OutputDirectory -CandidateOnly:$CandidateOnly
 } catch {
@@ -120,6 +121,8 @@ try {
     "error=$($_.Exception.Message)"
   ) | Set-Content -LiteralPath (Join-Path $OutputDirectory "visual-bootstrap-diagnostics.txt")
   throw
+} finally {
+  $script:AllowEmptyDiagnosticCapture = $false
 }
 
 $requiredEvidence = if ($CandidateOnly) {
@@ -155,4 +158,4 @@ if (-not $CandidateOnly) {
   ) | Set-Content -LiteralPath $logPath
 }
 
-"WINDOWS_VISUAL_ONLY_OK output=$OutputDirectory candidateOnly=$CandidateOnly visualMode=$VisualMode"
+"WINDOWS_VISUAL_ONLY_OK output=$OutputDirectory candidateOnly=$CandidateOnly visualMode=$VisualMode allowEmptyDiagnosticCapture=$($AllowEmptyDiagnosticCapture.IsPresent)"

@@ -1,5 +1,12 @@
 export type VisualComparisonMode = "normal" | "baseline" | "candidate" | "split";
-export type CrossingOrderDiagnosticMode = "normal" | "first" | "second" | "third-plus";
+export type CrossingOrderDiagnosticMode =
+  | "normal"
+  | "first"
+  | "second"
+  | "third-plus"
+  | "third-reach"
+  | "third-pre-trans"
+  | "termination";
 
 export interface VisualComparisonSettings {
   shaderMode: number;
@@ -35,6 +42,9 @@ export function crossingDiagnosticModeFromExperimentId(experimentId: string): Cr
   if (experimentId === "crossing-first") return "first";
   if (experimentId === "crossing-second") return "second";
   if (experimentId === "crossing-third-plus") return "third-plus";
+  if (experimentId === "crossing-third-reach") return "third-reach";
+  if (experimentId === "crossing-third-pre-trans") return "third-pre-trans";
+  if (experimentId === "crossing-termination") return "termination";
   return "normal";
 }
 
@@ -45,6 +55,9 @@ export function getVisualComparisonSettings(
   if (crossingOrder === "first") return { shaderMode: 3, fixedTime: 12, crossingOrder };
   if (crossingOrder === "second") return { shaderMode: 4, fixedTime: 12, crossingOrder };
   if (crossingOrder === "third-plus") return { shaderMode: 5, fixedTime: 12, crossingOrder };
+  if (crossingOrder === "third-reach") return { shaderMode: 6, fixedTime: 12, crossingOrder };
+  if (crossingOrder === "third-pre-trans") return { shaderMode: 7, fixedTime: 12, crossingOrder };
+  if (crossingOrder === "termination") return { shaderMode: 8, fixedTime: 12, crossingOrder };
   if (mode === "baseline") return { shaderMode: 0, fixedTime: 12, crossingOrder: "normal" };
   if (mode === "split") return { shaderMode: 2, fixedTime: 12, crossingOrder: "normal" };
   if (mode === "candidate") return { shaderMode: 1, fixedTime: 12, crossingOrder: "normal" };
@@ -58,6 +71,7 @@ export function includesCrossingOrder(mode: CrossingOrderDiagnosticMode, crossin
   if (mode === "normal") return true;
   if (mode === "first") return crossingIndex === 0;
   if (mode === "second") return crossingIndex === 1;
+  if (mode === "termination") return false;
   return crossingIndex >= 2;
 }
 
@@ -74,6 +88,9 @@ function crossingOrderFromShaderMode(shaderMode: number): CrossingOrderDiagnosti
   if (Math.abs(shaderMode - 3) <= 0.00001) return "first";
   if (Math.abs(shaderMode - 4) <= 0.00001) return "second";
   if (Math.abs(shaderMode - 5) <= 0.00001) return "third-plus";
+  if (Math.abs(shaderMode - 6) <= 0.00001) return "third-reach";
+  if (Math.abs(shaderMode - 7) <= 0.00001) return "third-pre-trans";
+  if (Math.abs(shaderMode - 8) <= 0.00001) return "termination";
   return "normal";
 }
 
