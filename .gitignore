@@ -1,0 +1,12 @@
+node_modules/
+dist/
+vite.config.js
+vite.config.d.ts
+*.tsbuildinfo
+src-tauri/target/
+*.log
+.idea/
+.vscode/
+.learnings/
+output/
+.playwright-cli/

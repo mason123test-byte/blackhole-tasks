@@ -1,0 +1,396 @@
+name: Windows Build
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      validation_mode:
+        description: Validation depth
+        required: true
+        default: visual
+        type: choice
+        options:
+          - visual
+          - diagnostic
+          - full
+          - batch
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-build-${{ github.event.pull_request.head.ref || github.ref_name }}-${{ inputs.validation_mode || 'visual' }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-fast:
+    name: Frontend fast checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Type-check frontend
+        run: npm run typecheck
+      - name: Lint frontend
+        run: npm run lint
+      - name: Test frontend
+        run: npm run test
+
+  rust-fast:
+    name: Rust fast checks
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source with comparison history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Detect Rust-affecting changes
+        id: rust-changes
+        shell: pwsh
+        run: |
+          $changed = @()
+          if ('${{ github.event_name }}' -eq 'pull_request') {
+            # Rust validation follows the complete current PR delta. A later
+            # docs/test-only commit must not hide an earlier Rust change in the
+            # same PR from the validation gate.
+            $base = '${{ github.event.pull_request.base.sha }}'
+            $head = '${{ github.event.pull_request.head.sha }}'
+            $changed = @(git diff --name-only $base $head)
+          } elseif ('${{ github.event_name }}' -eq 'push' -and '${{ github.event.before }}' -and '${{ github.event.before }}' -ne '0000000000000000000000000000000000000000') {
+            $changed = @(git diff --name-only '${{ github.event.before }}' '${{ github.sha }}')
+          } else {
+            $changed = @('src-tauri/manual-full-validation')
+          }
+          $rustChanged = $false
+          foreach ($path in $changed) {
+            if ($path -match '^(src-tauri/|rust-toolchain(?:\.toml)?$|Cargo\.(toml|lock)$|\.github/workflows/windows-build\.yml$)') { $rustChanged = $true; break }
+          }
+          "changed-files=$($changed -join ',')"
+          "rust_changed=$($rustChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+      - name: Select pinned Rust toolchain
+        if: ${{ steps.rust-changes.outputs.rust_changed == 'true' }}
+        shell: pwsh
+        run: |
+          $expectedVersion = '1.97.1'
+          $stableVersion = (& rustc +stable --version 2>$null | Out-String).Trim()
+          if ($stableVersion -match '^rustc 1\.97\.1 ') {
+            $env:RUSTUP_TOOLCHAIN = 'stable'; "RUSTUP_TOOLCHAIN=stable" >> $env:GITHUB_ENV
+            "Using hosted stable toolchain because it matches pinned ${expectedVersion}: $stableVersion"
+          } else {
+            $exact = '1.97.1-x86_64-pc-windows-msvc'
+            if (-not (rustup toolchain list | Select-String -SimpleMatch $exact)) { rustup toolchain install 1.97.1 --profile minimal --component rustfmt }
+            $env:RUSTUP_TOOLCHAIN = '1.97.1'; "RUSTUP_TOOLCHAIN=1.97.1" >> $env:GITHUB_ENV
+          }
+          rustc --version
+          cargo --version
+      - name: Cache Rust build
+        if: ${{ steps.rust-changes.outputs.rust_changed == 'true' }}
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          cache-on-failure: true
+      - name: Check Rust formatting
+        if: ${{ steps.rust-changes.outputs.rust_changed == 'true' }}
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - name: Check Rust
+        if: ${{ steps.rust-changes.outputs.rust_changed == 'true' }}
+        run: cargo check --manifest-path src-tauri/Cargo.toml --all-targets
+      - name: Test Rust visual experiment validation
+        if: ${{ steps.rust-changes.outputs.rust_changed == 'true' }}
+        run: cargo test --manifest-path src-tauri/Cargo.toml validates_visual_experiment_environment_payload
+      - name: Record skipped duplicate Rust compile
+        if: ${{ steps.rust-changes.outputs.rust_changed != 'true' }}
+        shell: pwsh
+        run: |
+          "RUST_FAST_SKIPPED reason=no-rust-affecting-files"
+          "Windows visual evidence still performs a real Tauri release build for this commit."
+
+  windows-visual:
+    name: Windows visual evidence
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.validation_mode == 'visual' }}
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - name: Select pinned Rust toolchain
+        shell: pwsh
+        run: |
+          $expectedVersion = '1.97.1'
+          $stableVersion = (& rustc +stable --version 2>$null | Out-String).Trim()
+          if ($stableVersion -match '^rustc 1\.97\.1 ') {
+            $env:RUSTUP_TOOLCHAIN = 'stable'; "RUSTUP_TOOLCHAIN=stable" >> $env:GITHUB_ENV
+            "Using hosted stable toolchain because it matches pinned ${expectedVersion}: $stableVersion"
+          } else {
+            $exact = '1.97.1-x86_64-pc-windows-msvc'
+            if (-not (rustup toolchain list | Select-String -SimpleMatch $exact)) { rustup toolchain install 1.97.1 --profile minimal }
+            $env:RUSTUP_TOOLCHAIN = '1.97.1'; "RUSTUP_TOOLCHAIN=1.97.1" >> $env:GITHUB_ENV
+          }
+          rustc --version
+          cargo --version
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          cache-on-failure: true
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Verify locked Tauri CLI supports no-bundle
+        shell: pwsh
+        run: |
+          $help = npm run tauri -- build --help 2>&1 | Out-String
+          if ($help -notmatch '--no-bundle') { throw "The project-locked Tauri CLI does not advertise --no-bundle." }
+          $help | Select-String -- '--no-bundle'
+      - name: Build runnable Tauri EXE without installers
+        run: npm run tauri build -- --no-bundle
+      - name: Capture native Windows visual evidence only
+        shell: pwsh
+        run: |
+          ./scripts/windows-interaction-smoke.ps1 `
+            -ExePath "src-tauri/target/release/blackhole-tasks.exe" `
+            -OutputDirectory "output/windows-visual" `
+            -VisualOnly
+      - name: Verify control and DISK_OUTER=14 runtime preflight
+        shell: pwsh
+        run: |
+          ./scripts/windows-visual-experiment-preflight.ps1 `
+            -ExePath "src-tauri/target/release/blackhole-tasks.exe" `
+            -OutputDirectory "output/windows-visual"
+      - name: Upload Windows visual artifact
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: blackhole-tasks-windows-visual-${{ github.run_number }}
+          path: output/windows-visual/*
+          if-no-files-found: warn
+          retention-days: 14
+
+  windows-crossing-diagnostic:
+    name: Windows crossing-order diagnostic
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_mode == 'diagnostic' }}
+    runs-on: windows-latest
+    timeout-minutes: 55
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - name: Select pinned Rust toolchain
+        shell: pwsh
+        run: |
+          $expectedVersion = '1.97.1'
+          $stableVersion = (& rustc +stable --version 2>$null | Out-String).Trim()
+          if ($stableVersion -match '^rustc 1\.97\.1 ') {
+            $env:RUSTUP_TOOLCHAIN = 'stable'; "RUSTUP_TOOLCHAIN=stable" >> $env:GITHUB_ENV
+          } else {
+            $exact = '1.97.1-x86_64-pc-windows-msvc'
+            if (-not (rustup toolchain list | Select-String -SimpleMatch $exact)) { rustup toolchain install 1.97.1 --profile minimal }
+            $env:RUSTUP_TOOLCHAIN = '1.97.1'; "RUSTUP_TOOLCHAIN=1.97.1" >> $env:GITHUB_ENV
+          }
+          rustc --version
+          cargo --version
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          cache-on-failure: true
+      - name: Install frontend dependencies once
+        run: npm ci
+      - name: Verify locked Tauri CLI supports no-bundle
+        shell: pwsh
+        run: |
+          $help = npm run tauri -- build --help 2>&1 | Out-String
+          if ($help -notmatch '--no-bundle') { throw "The project-locked Tauri CLI does not advertise --no-bundle." }
+          $help | Select-String -- '--no-bundle'
+      - name: Build release EXE once without installers
+        run: npm run tauri build -- --no-bundle
+      - name: Capture staged crossing-order observability sequentially
+        shell: pwsh
+        run: |
+          ./scripts/windows-crossing-diagnostic.ps1 `
+            -ExePath "src-tauri/target/release/blackhole-tasks.exe" `
+            -OutputDirectory "output/windows-crossing-diagnostic"
+      - name: Upload staged crossing diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: blackhole-tasks-windows-crossing-diagnostic-${{ github.run_number }}
+          path: output/windows-crossing-diagnostic/*
+          if-no-files-found: error
+          retention-days: 14
+
+  windows-batch:
+    name: Windows visual batch
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_mode == 'batch' }}
+    runs-on: windows-latest
+    timeout-minutes: 70
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - name: Select pinned Rust toolchain
+        shell: pwsh
+        run: |
+          $expectedVersion = '1.97.1'
+          $stableVersion = (& rustc +stable --version 2>$null | Out-String).Trim()
+          if ($stableVersion -match '^rustc 1\.97\.1 ') {
+            $env:RUSTUP_TOOLCHAIN = 'stable'; "RUSTUP_TOOLCHAIN=stable" >> $env:GITHUB_ENV
+          } else {
+            $exact = '1.97.1-x86_64-pc-windows-msvc'
+            if (-not (rustup toolchain list | Select-String -SimpleMatch $exact)) { rustup toolchain install 1.97.1 --profile minimal }
+            $env:RUSTUP_TOOLCHAIN = '1.97.1'; "RUSTUP_TOOLCHAIN=1.97.1" >> $env:GITHUB_ENV
+          }
+          rustc --version
+          cargo --version
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          cache-on-failure: true
+      - name: Install frontend dependencies once
+        run: npm ci
+      - name: Record completed dependency install
+        shell: pwsh
+        run: '"BLACKHOLE_BATCH_NPM_CI_COUNT=1" >> $env:GITHUB_ENV'
+      - name: Verify locked Tauri CLI supports no-bundle
+        shell: pwsh
+        run: |
+          $help = npm run tauri -- build --help 2>&1 | Out-String
+          if ($help -notmatch '--no-bundle') { throw "The project-locked Tauri CLI does not advertise --no-bundle." }
+          $help | Select-String -- '--no-bundle'
+      - name: Build release EXE once without installers
+        run: npm run tauri build -- --no-bundle
+      - name: Record completed release EXE build
+        shell: pwsh
+        run: '"BLACKHOLE_BATCH_EXE_BUILD_COUNT=1" >> $env:GITHUB_ENV'
+      - name: Verify control and DISK_OUTER=14 runtime preflight
+        shell: pwsh
+        run: |
+          ./scripts/windows-visual-experiment-preflight.ps1 `
+            -ExePath "src-tauri/target/release/blackhole-tasks.exe" `
+            -OutputDirectory "output/windows-visual-preflight"
+      - name: Capture control and eight experiments sequentially
+        shell: pwsh
+        run: |
+          ./scripts/windows-visual-batch.ps1 `
+            -ExePath "src-tauri/target/release/blackhole-tasks.exe" `
+            -OutputDirectory "output/windows-visual-batch"
+      - name: Upload exact Windows batch evidence
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: blackhole-tasks-windows-visual-batch-${{ github.run_number }}
+          path: |
+            output/windows-visual-batch/control.png
+            output/windows-visual-batch/smoke-01.png
+            output/windows-visual-batch/smoke-02.png
+            output/windows-visual-batch/smoke-03.png
+            output/windows-visual-batch/smoke-04.png
+            output/windows-visual-batch/smoke-05.png
+            output/windows-visual-batch/smoke-06.png
+            output/windows-visual-batch/smoke-07.png
+            output/windows-visual-batch/smoke-08.png
+            output/windows-visual-batch/metrics.jsonl
+            output/windows-visual-batch/batch-summary.json
+            output/windows-visual-batch/contact-sheet.png
+            output/windows-visual-batch/batch.log
+          if-no-files-found: error
+          retention-days: 14
+
+  windows-full:
+    name: Full Windows validation
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_mode == 'full' }}
+    needs: [frontend-fast, rust-fast]
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - name: Select pinned Rust toolchain
+        shell: pwsh
+        run: |
+          $expectedVersion = '1.97.1'
+          $stableVersion = (& rustc +stable --version 2>$null | Out-String).Trim()
+          if ($stableVersion -match '^rustc 1\.97\.1 ') {
+            $env:RUSTUP_TOOLCHAIN = 'stable'; "RUSTUP_TOOLCHAIN=stable" >> $env:GITHUB_ENV
+          } else {
+            $exact = '1.97.1-x86_64-pc-windows-msvc'
+            if (-not (rustup toolchain list | Select-String -SimpleMatch $exact)) { rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy }
+            $env:RUSTUP_TOOLCHAIN = '1.97.1'; "RUSTUP_TOOLCHAIN=1.97.1" >> $env:GITHUB_ENV
+          }
+          rustc --version
+          cargo --version
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          cache-on-failure: true
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - name: Lint Rust
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
+      - name: Test Rust
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Build Tauri EXE and installers
+        run: npm run tauri build
+      - name: Interaction-test native Windows app
+        shell: pwsh
+        run: |
+          ./scripts/windows-interaction-smoke.ps1 `
+            -ExePath "src-tauri/target/release/blackhole-tasks.exe" `
+            -OutputDirectory "output/windows-smoke"
+      - name: Capture expanded Windows visual evidence
+        shell: pwsh
+        run: |
+          ./scripts/windows-expanded-visual-evidence.ps1 `
+            -ExePath "src-tauri/target/release/blackhole-tasks.exe" `
+            -OutputPath "output/windows-smoke/02-single-scene-expanded.png"
+      - name: Upload Windows installers
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: blackhole-tasks-windows-${{ github.run_number }}
+          path: |
+            src-tauri/target/release/blackhole-tasks.exe
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload Windows full smoke artifact
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: blackhole-tasks-windows-smoke-${{ github.run_number }}
+          path: output/windows-smoke/*
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,231 @@
+GARGANTUA VISUAL GUARDRAILS / 错误复盘与执行前检查清单
+
+目的
+====
+本文件用于防止在把黑洞视觉目标调整为《星际穿越》Gargantua 时重复犯同样的错误。
+每次修改 shader、ray tracing、disk emissivity、camera、spin、workflow visual threshold 之前，必须先逐条检查本文件。
+如果某个方案违反下方任意“禁止项”，即使单测通过、IoU 看起来不错，也不得作为最终方案。
+
+权威目标来源
+============
+1. Oliver James, Eugénie von Tunzelmann, Paul Franklin, Kip S. Thorne (2015),
+   "Gravitational lensing by spinning black holes in astrophysics, and in the movie Interstellar".
+   DNGR 使用 spinning Kerr black hole 的 curved spacetime ray-bundle propagation。
+   电影版 Gargantua 的盘面、多重像、critical curves、almost-trapped rays 均来自该几何。
+2. Caltech / DNEG SIGGRAPH material: "Building Interstellar's black hole: the gravitational renderer".
+3. 电影最终画面为了可读性弱化了强 Doppler / frequency-shift 亮度不对称，并对 spin 做了艺术取舍。
+
+已经犯过的错误
+==============
+
+ERROR 01 — 把“下半部分形状问题”误当成 emissivity / exposure 问题
+------------------------------------------------------------------
+错误做法：
+- 反复调整 lower exposure、annulus center/width、critical boost、opacity、secondary crossing gain。
+- 这些参数主要改变亮度、厚度和过曝面积，不能从根本上改变下半部分的拓扑和成像路径。
+
+后果：
+- 下半部分虽然会变细、变暗、边缘更明显，但仍然是原来那种“规则圆环/同心环”结构。
+- 用户看到的核心问题没有变：形状仍不像《星际穿越》。
+
+以后必须做到：
+- 当用户反馈“形状不对”时，优先检查 ray geometry / geodesic intersection / image order，不能先调亮度。
+- emissivity 只能在几何正确之后做二级微调。
+
+ERROR 02 — 用 screen-space lower deformation 塑造 U 形
+----------------------------------------------------
+错误做法：
+- 根据 screen.y 判断下半区。
+- 使用 lowerMajorAxisScale / lowerMinorAxisScale / lowerTargetScale 直接扭曲 rayPlane。
+
+后果：
+- 能快速得到 U 形，但它不是 Kerr/Schwarzschild geodesic 自然产生的多重盘面像。
+- 下半区域会出现水滴、梨形、人工压缩、与上半结构关系不自然等问题。
+
+以后必须做到：
+- production candidate 禁止通过 screen.y 或 referenceUv.y 直接改变 ray 初始方向来塑造下半黑洞。
+- 下半结构必须来自真实 ray propagation + disk-plane intersections / image order。
+- baseline 可以保留旧逻辑用于 A/B，但 production candidate 不能回退到这种方案。
+
+ERROR 03 — 把 secondary image 当成“独立下环”来调
+-----------------------------------------------
+错误做法：
+- 用一个 annulus 函数把下方做成规则圆环，再靠 crossingGain 增亮。
+
+后果：
+- 视觉结果看起来像“黑洞下面套了一个光圈”，而不是同一张薄吸积盘经过强引力透镜形成的 higher-order image。
+
+以后必须做到：
+- direct / primary-lensed / secondary / higher-order image 必须来自同一张盘的不同 geodesic intersection/order。
+- 每个 crossing 的位置、宽度、弯曲方向优先由 geometry 决定，不能由单独的屏幕圆环模板决定。
+- 如果下半部分仍呈现“同心圆感”，视为几何尚未解决，不得通过继续减宽 annulus 来掩盖。
+
+ERROR 04 — 过早把 Schwarzschild + 小修正称作 Kerr
+-----------------------------------------------
+错误做法：
+- 给 Schwarzschild acceleration 添加一项 heuristic frame-dragging 后，就把结果描述成 Kerr 风格已解决。
+
+后果：
+- 一阶近似只能产生轻微左右偏斜，不能保证 Kerr null geodesic、critical curve、caustic、multiple image topology 正确。
+- gain 过大时还会把右下环拉坠、污染上拱，却仍然没有得到电影版下方结构。
+
+以后必须做到：
+- 明确区分：
+  a) Schwarzschild geodesic
+  b) Kerr-inspired correction
+  c) 真正 Kerr geodesic / Hamiltonian integration / DNGR-equivalent model
+- 只有 c) 才能称作真实 Kerr 几何实现。
+- 如果 heuristic spin 主要改变的是偏移而不是多重像结构，应停止继续加 gain。
+
+ERROR 05 — 把“上半必须完全不变”当成永久约束
+-------------------------------------------
+错误做法：
+- 早期为了隔离 lower-lens 调整，用 upperIoU≈1.0 做保护；之后目标已经切换到 Gargantua 整体重构，仍然过度依赖该约束。
+
+后果：
+- 会阻止真正的整体 Kerr geometry 改变，因为 Kerr 自旋/相机/盘面几何本来就可能同时改变上下 critical image。
+
+以后必须做到：
+- upperIoU 仍用于发现“误伤”和不受控变化，但不能阻止合理的整体 Gargantua 几何升级。
+- 每次需要改变上半结构时，必须明确写出原因，并用实际 Windows screenshot 与电影目标做视觉判定。
+- 不能偷偷降低阈值来通过错误画面。
+
+ERROR 06 — 用指标替代实际截图判断
+--------------------------------
+错误做法：
+- 看到 lowerIoU / upperIoU / lowerXor 变好，就认为视觉更像电影。
+
+后果：
+- 指标只能说明 candidate 与 baseline 的差异大小，不能说明 candidate 与《星际穿越》参考画面的相似度。
+
+以后必须做到：
+- 每个有效迭代必须下载并实际检查 Windows artifact：
+  visual-candidate.png
+  visual-baseline.png
+  visual-split.png
+  expanded screenshot
+- 必须人工检查：
+  shadow 轮廓、水平 direct disk、上方远侧拱、下方 secondary image、内黑间隙、上下盘带厚度、左右翼长度、亮度层次、是否同心、是否水滴、是否断裂、是否有 seam/mirror。
+- 只有“实际截图更接近 Gargantua”才允许保留该版本。
+
+ERROR 07 — 目标参考不够固定，边改边换标准
+---------------------------------------
+错误做法：
+- 一开始以 ghostty Inferno 为参考，之后再切换到 Gargantua，却没有立即重写所有视觉验收目标。
+
+后果：
+- 出现“旧 Inferno 指标/形状约束”和“新 Gargantua 目标”互相冲突。
+
+以后必须做到：
+- 当前唯一视觉目标：Interstellar / Gargantua film silhouette。
+- ghostty-blackhole 只作为已有 WebGL2 Schwarzschild 数值积分实现参考，不再作为最终造型参考。
+- Bruneton 只作为实时 black-hole ray intersection / LUT 架构参考，不等价于 Kerr/DNGR。
+
+ERROR 08 — 把‘边缘更明显’误认为‘形状已经正确’
+--------------------------------------------
+错误做法：
+- 通过 lowerMinorAxisScale、annulus narrowing、critical boost 收窄，让下半边缘更清楚后就过早认为问题解决。
+
+后果：
+- 用户真正要求的是《星际穿越》的几何形状，不只是“有边缘”。
+
+以后必须做到：
+- “边缘清楚”只是必要条件，不是成功条件。
+- 下方必须像同一薄盘的强透镜 secondary/higher-order image，而不是规则发光 U 或圆环。
+
+ERROR 09 — 调参幅度过多时没有及时回到根因
+---------------------------------------
+错误做法：
+- 连续尝试 1.28→1.40、annulus 3.15→2.95→2.80、width 0.85→0.68→0.58 等多个参数。
+
+后果：
+- 这些轮次改善了亮度/厚度，却消耗了大量迭代，没有解决根因。
+
+以后必须做到：
+- 同一类 photometric 参数连续 2 次只能改善亮度、不能改变目标形状时，立即停止该方向。
+- 转到 ray geometry / camera / Kerr integration / disk intersection order。
+
+ERROR 10 — 允许 heuristic frame dragging 同时污染上下结构
+------------------------------------------------------
+错误做法：
+- FRAME_DRAG_GAIN=0.035 全局加入后，上方 upperIoU 明显下降，启动能量暴涨，右下弧被拉坠。
+
+以后必须做到：
+- heuristic spin 只能作为过渡实验。
+- 一旦出现上拱明显污染、能量异常、下弧下坠，而不是正确的 Kerr multiple-image deformation，就降低/撤销 heuristic，并转向真实 Kerr 方程。
+- 不得为了“有自旋”而保留错误的视觉结果。
+
+ERROR 11 — 混用 DNGR local-sky 与 Odyssey finite-observer 初值
+-----------------------------------------------------------
+错误做法：
+- camera event / local tetrad 来自 DNGR，同时又把 Odyssey finite image-plane 的坐标或长度塞进同一套初值。
+- 把两个各自自洽的 ray initialization 模型各取一半进行拼接。
+
+后果：
+- 屏幕方向、canonical momentum 与 observer geometry 不再属于同一个物理模型，critical rays 和多重像会出现错误形变或数值伪影。
+
+以后必须做到：
+- 一套 ray 初值必须完整采用同一个物理模型。
+- 采用 DNGR fixed-event FIDO local-sky 时，screen direction 必须完整经过同一 tetrad/canonical-momentum 变换。
+- 采用 Odyssey finite-observer image-plane 时，也必须完整沿用 Odyssey 的 image-plane → BL coordinates → canonical momentum 路径，不能与 DNGR local-sky 混拼。
+
+ERROR 12 — 半透明薄盘第一次 valid crossing 就 break
+--------------------------------------------------
+错误做法：
+- ray 第一次穿过 equatorial thin disk 后立即停止 tracing。
+
+后果：
+- secondary / higher-order disk images 被直接丢失，即便 Kerr geodesic 本身能够继续产生后续真实交点。
+
+以后必须做到：
+- 半透明盘需要继续 tracing 后续 valid crossings。
+- direct / secondary / higher-order contribution 必须按 ray 顺序通过 optical depth / transmittance 合成，不能把后续交点伪造成独立屏幕圆环。
+
+ERROR 13 — 把“下方 secondary image 比较圆”本身判定为错误
+-----------------------------------------------------
+错误做法：
+- 看到下方结构接近圆形就认为一定不符合 Gargantua，并尝试人工拉扁、扭成 U 形或做非圆 deformation。
+
+后果：
+- Figure 15(a) 本身就有明显的、较圆的 secondary image；人为追求“非圆”会再次破坏真实 Kerr topology。
+
+以后必须做到：
+- 判断重点是 secondary image 的尺寸、厚度、critical-curve proximity、稳定性以及它与 direct disk / upper arc 的连接关系。
+- 不得为了消除“圆形感”使用 screen-space deformation；圆形本身不是失败条件。
+
+每次修改前强制检查
+================
+
+[ ] 1. 本轮要解决的是 GEOMETRY 还是 PHOTOMETRY？先写清楚。
+[ ] 2. 如果用户反馈“形状不对”，本轮是否真的修改 ray geometry / intersection topology？
+[ ] 3. 是否又在使用 screen.y/referenceUv.y 直接塑造下半部分？如是，停止。
+[ ] 4. 是否又在用 annulus/emissivity/exposure 假装解决几何？如是，停止。
+[ ] 5. 下方结构是否来自同一薄盘的真实 secondary/higher-order image？
+[ ] 6. 是否明确区分 Kerr-inspired heuristic 与真正 Kerr geodesic？
+[ ] 7. 本轮是否保持 direct disk 接近电影版水平薄盘？
+[ ] 8. 是否保持电影版弱 Doppler，而不是做成天体物理观测风格的强一亮一暗？
+[ ] 9. 是否避免 whole-frame mirror / screenshot flip / framebuffer fake lower half / duplicate ring？
+[ ] 10. 是否保持一个 WebGL2 production rendering path？
+[ ] 11. 是否先写/更新测试，再改实现？
+[ ] 12. 是否运行完整 Windows CI，而不是只看本地/代码？
+[ ] 13. 是否实际下载并查看 candidate/baseline/split/expanded 四类截图？
+[ ] 14. 是否逐项对照 Gargantua：水平盘、上拱、下方多重像、内黑间隙、左右翼、非同心感、暖白金层次？
+[ ] 15. 如果实图只是“更暗/更细”，但形状基本没变，必须判定本轮失败。
+[ ] 16. 如果本轮真实视觉不如上一轮，必须回退该视觉方向，不能因为 CI 绿色就保留。
+[ ] 17. 不得宣称“与星际穿越一致”或“1:1”，除非真实 Windows 图已经达到该标准；否则写明仍存在的具体差距。
+
+当前最重要的未解决问题
+====================
+- 当前已采用真实 Kerr null-geodesic integration 与多次 disk crossings；后续判断重点转为 critical / almost-trapped ray 稳定性、secondary/higher-order image 厚度与 Figure 15(a) 的连接关系。
+- 不能再使用 Schwarzschild heuristic、screen-space lower deformation 或 annulus 假环回退解决视觉问题。
+- camera framing、critical-curve sampling、intersection interpolation 和 ray-bundle/filtering 仍需以真实 Windows 图逐轮验证。
+
+下一阶段正确方向
+================
+1. 保留单 WebGL2 renderer 与 thin disk。
+2. 保持 production candidate 中下半结构完全来自真实 Kerr ray propagation 与 disk crossings。
+3. 保持完整、自洽的 camera initialization model，不再混用 DNGR / Odyssey 初值。
+4. 显式保留 direct / primary / secondary / higher-order disk intersections，并按 transmittance 顺序合成。
+5. 优先完善 adaptive integration、critical / almost-trapped ray sampling、disk intersection interpolation 与 higher-order anti-aliasing。
+6. 几何稳定后再做 4500K、弱 Doppler、camera flare、streak texture 等电影 photometry。
+7. 每轮必须以真实 Windows artifact 与权威 Gargantua Figure 15(a) 做视觉判断。

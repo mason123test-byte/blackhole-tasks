@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "BlackHole Tasks",
+  "version": "0.1.4",
+  "identifier": "com.blackhole.tasks",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "orb",
+        "title": "黑洞任务",
+        "url": "index.html?window=orb",
+        "width": 240,
+        "height": 180,
+        "minWidth": 240,
+        "minHeight": 180,
+        "maxWidth": 920,
+        "maxHeight": 700,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "focus": false,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' asset: data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "category": "Productivity",
+    "shortDescription": "黑洞悬浮四象限任务管理工具",
+    "longDescription": "在单一黑洞引力场中直接编辑四象限任务的本地优先 Windows 工具",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
+    "resources": ["../THIRD_PARTY_NOTICES.md"],
+    "windows": {
+      "nsis": { "displayLanguageSelector": true, "installerIcon": "icons/icon.ico" },
+      "wix": { "language": ["zh-CN", "en-US"] }
+    }
+  }
+}
