@@ -41,10 +41,26 @@ $visualSource = $fullSource.Substring(0, $boundaryIndex)
 # Win32 window text must be read at its actual length because the GPU receipt
 # can exceed 400 characters. Replace the legacy fixed 256-character probe in
 # the executed visual prefix with GetWindowTextLengthW-sized storage.
-$getTextAnchor = '[DllImport("user32.dll", CharSet = CharSet.Unicode)]`n    private static extern int GetWindowText(IntPtr window, StringBuilder text, int maximumCount);'
-$getTextReplacement = '[DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "GetWindowTextLengthW")]`n    private static extern int GetWindowTextLength(IntPtr window);`n`n    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "GetWindowTextW")]`n    private static extern int GetWindowText(IntPtr window, StringBuilder text, int maximumCount);'
-$titleReadAnchor = '                var title = new StringBuilder(256);`n                GetWindowText(window, title, title.Capacity);'
-$titleReadReplacement = '                var titleLength = Math.Max(GetWindowTextLength(window), 0);`n                var title = new StringBuilder(titleLength + 1);`n                GetWindowText(window, title, title.Capacity);'
+$getTextAnchor = @'
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetWindowText(IntPtr window, StringBuilder text, int maximumCount);
+'@.Trim()
+$getTextReplacement = @'
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "GetWindowTextLengthW")]
+    private static extern int GetWindowTextLength(IntPtr window);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "GetWindowTextW")]
+    private static extern int GetWindowText(IntPtr window, StringBuilder text, int maximumCount);
+'@.Trim()
+$titleReadAnchor = @'
+                var title = new StringBuilder(256);
+                GetWindowText(window, title, title.Capacity);
+'@.Trim()
+$titleReadReplacement = @'
+                var titleLength = Math.Max(GetWindowTextLength(window), 0);
+                var title = new StringBuilder(titleLength + 1);
+                GetWindowText(window, title, title.Capacity);
+'@.Trim()
 if (-not $visualSource.Contains($getTextAnchor) -or -not $visualSource.Contains($titleReadAnchor)) {
   throw "Dynamic Win32 title-read anchors were not found in windows-interaction-smoke-full.ps1."
 }
