@@ -30,6 +30,33 @@ function Read-DiagnosticReceipt([string]$Title) {
   }
 }
 
+# Machine-readable GPU evidence comes from the *offscreen RGBA8 FBO*,
+# not from the window screenshot (which includes task UI and desktop pixels).
+function Read-GpuFrame([string]$Title) {
+  $size=[regex]::Match($Title, 'size=([0-9]+)x([0-9]+)')
+  $match=[regex]::Match($Title, ';g1=([0-9]+(?:,[0-9]+){11})(?=;|\||$)')
+  if(-not $size.Success -or -not $match.Success){throw 'Missing RGBA8 framebuffer size/g1 evidence in GPU title receipt.'}
+  [int64]$width=[int64]::Parse($size.Groups[1].Value)
+  [int64]$height=[int64]::Parse($size.Groups[2].Value)
+  [int64]$total=$width*$height
+  if($width -lt 240 -or $height -lt 180 -or $total -gt 16777216){throw 'Invalid diagnostic GPU framebuffer dimensions.'}
+  $v=@($match.Groups[1].Value.Split(',') | ForEach-Object {[int64]::Parse($_,[System.Globalization.CultureInfo]::InvariantCulture)})
+  if($v.Count -ne 12 -or $v[0] -gt $total -or $v[1] -gt $v[0] -or $v[3] -gt $total -or $v[2] -gt 765*$total){throw 'Invalid GPU framebuffer metrics bounds.'}
+  [int64]$reasonSum=0
+  for($j=4;$j -lt 12;$j++){$reasonSum+=$v[$j]}
+  if($reasonSum -gt $total){throw 'Invalid termination reason population.'}
+  [pscustomobject]@{
+    source='webgl2-gl.readPixels-rgba8';width=$width;height=$height;totalPixels=$total
+    nonZeroRgbPixels=$v[0];rgbContributionPixels=$v[1];rgbEnergy=$v[2];alphaPixels=$v[3]
+    nonZeroRgbCoverage=[double]$v[0]/[double]$total
+    rgbCoverage=[double]$v[1]/[double]$total
+    terminationReasons=[pscustomobject]@{
+      reachedThird=$v[4];horizon=$v[5];escape=$v[6];maxSteps=$v[7]
+      transmittanceCutoff=$v[8];integratorReject=$v[9];pretraceCull=$v[10];otherVisible=$v[11]
+    }
+  }
+}
+
 function Assert-DiagnosticReceipt($Receipt, $Case) {
   if ($Receipt.visualSource -ne "gpu-uniform-readback" -or $Receipt.crossingSource -ne "gpu-uniform-readback") {
     throw "Diagnostic receipt must come from GPU uniform readback."
@@ -56,6 +83,11 @@ if ($SelfTest) {
   if ($longGood.Length -le 400) { throw "Long GPU receipt fixture must exceed 400 characters." }
   $case = [pscustomobject]@{ id="third-reach"; experimentId="crossing-third-reach"; enabled=$true; shaderMode=6.0; crossingOrder="third-reach" }
   Assert-DiagnosticReceipt (Read-DiagnosticReceipt $longGood) $case
+  $gpuTest=Read-GpuFrame ($longGood+';g1=2,1,13,2,0,1,0,0,0,0,0,0')
+  if($gpuTest.nonZeroRgbPixels -ne 2 -or $gpuTest.terminationReasons.horizon -ne 1){throw 'GPU metrics fixture failed'}
+  $invalidGpu=$false
+  try { Read-GpuFrame ($longGood+';g1=644001,1,13,2,0,1,0,0,0,0,0,0')|Out-Null } catch { $invalidGpu=$true }
+  if(-not $invalidGpu){throw 'GPU metrics bounds not enforced'}
   if ((Get-Finding 0 0 0) -ne 'third-valid-crossing-not-reached') { throw 'reachability finding failed' }
   if ((Get-Finding 12 0 0) -ne 'third-reached-but-emission-zero') { throw 'emission finding failed' }
   if ((Get-Finding 12 9 0) -ne 'third-emission-present-but-post-transmittance-zero') { throw 'transmittance finding failed' }
@@ -84,7 +116,13 @@ $metricsPath = Join-Path $OutputDirectory "diagnostic-metrics.json"
 $summaryPath = Join-Path $OutputDirectory "diagnostic-summary.json"
 $contactSheetPath = Join-Path $OutputDirectory "contact-sheet.png"
 $exeSha = (Get-FileHash -LiteralPath $resolvedExePath -Algorithm SHA256).Hash.ToLowerInvariant()
-$headSha = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else { "local" }
+# A pull_request job checks out a synthetic merge commit (GITHUB_SHA).
+# Record both the actual PR head and the built checkout SHA, never conflate them.
+$checkoutSha = (& git rev-parse HEAD 2>$null | Out-String).Trim()
+$headSha = if ($env:GITHUB_EVENT_NAME -eq 'pull_request' -and $env:GITHUB_EVENT_PATH) {
+  $evt = Get-Content -LiteralPath $env:GITHUB_EVENT_PATH -Raw | ConvertFrom-Json
+  [string]$evt.pull_request.head.sha
+} elseif ($env:GITHUB_SHA) { $env:GITHUB_SHA } else { "local" }
 $runId = if ($env:GITHUB_RUN_ID) { $env:GITHUB_RUN_ID } else { "local" }
 
 function Write-DiagnosticLog([string]$Message) {
@@ -141,7 +179,7 @@ $cases = @(
   [pscustomobject]@{id="termination";experimentId="crossing-termination";enabled=$true;visualMode="crossing-termination";shaderMode=8.0;crossingOrder="termination"}
 )
 $rows = [System.Collections.Generic.List[object]]::new(); $captureErrors=[System.Collections.Generic.List[string]]::new()
-Write-DiagnosticLog "DIAGNOSTIC_START headSha=$headSha runId=$runId exeSha256=$exeSha cases=$($cases.Count) diskOuter=35 exposure=1.55 visualAcceptance=false"
+Write-DiagnosticLog "DIAGNOSTIC_START headSha=$headSha runId=$runId checkoutSha=$checkoutSha exeSha256=$exeSha cases=$($cases.Count) diskOuter=35 exposure=1.55 visualAcceptance=false"
 
 foreach ($case in $cases) {
   $caseDirectory = Join-Path $env:TEMP "blackhole-crossing-$($case.id)-$([Guid]::NewGuid().ToString('N'))"
@@ -154,15 +192,22 @@ foreach ($case in $cases) {
     if ($case.id -ne 'normal') { $smokeArgs.AllowEmptyDiagnosticCapture=$true }
     & (Join-Path $PSScriptRoot "windows-interaction-smoke.ps1") @smokeArgs
     $receiptPath=Join-Path $caseDirectory "visual-candidate-effective.txt"; if(-not(Test-Path $receiptPath)){throw "Missing GPU receipt for $($case.id)."}
-    $receipt=Read-DiagnosticReceipt (Get-Content $receiptPath -Raw); Assert-DiagnosticReceipt $receipt $case
+    $receiptTitle=Get-Content $receiptPath -Raw
+    $receipt=Read-DiagnosticReceipt $receiptTitle
+    Assert-DiagnosticReceipt $receipt $case
+    if($case.id -ne 'normal' -and $receiptTitle -notmatch 'diag=a[0-9]+-m[0-9]+-am[0-9]+-sr1-e0-f36053;'){
+      throw 'GPU framebuffer/scene status invalid in diagnostic receipt.'
+    }
     $sourceImage=Join-Path $caseDirectory "visual-candidate.png"; if(-not(Test-Path $sourceImage)){throw "Missing native WebView2 image for $($case.id)."}
     $imageName="$($case.id).png"; $imagePath=Join-Path $OutputDirectory $imageName; Copy-Item $sourceImage $imagePath -Force
-    $imageSha=(Get-FileHash $imagePath -Algorithm SHA256).Hash.ToLowerInvariant(); $metrics=Get-PngMetrics $imagePath ($case.id -eq 'termination')
-    $row=[ordered]@{schemaVersion="2.0";headSha=$headSha;runId=$runId;id=$case.id;imagePath=$imageName;imageSha256=$imageSha;exeSha256=$exeSha;dataSource="native-webview2-client-readback";visualAcceptance=$false;
+    $imageSha=(Get-FileHash $imagePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $screenshot=Get-PngMetrics $imagePath $false
+    $gpu=if($case.id -ne 'normal'){Read-GpuFrame $receiptTitle}else{$null}
+    $row=[ordered]@{schemaVersion="2.0";headSha=$headSha;checkoutSha=$checkoutSha;runId=$runId;id=$case.id;imagePath=$imageName;imageSha256=$imageSha;exeSha256=$exeSha;dataSource="native-webview2-window-screenshot";framebufferDataSource="webgl2-gl.readPixels-rgba8";visualAcceptance=$false;
       requested=[ordered]@{experimentId=$case.experimentId;enabled=[bool]$case.enabled;crossingOrder=$case.crossingOrder;filmDiskExposure=1.55;diskOuter=35.0};
-      effective=[ordered]@{source=$receipt.crossingSource;experimentId=$receipt.experimentId;enabled=[bool]$receipt.enabled;visualCompare=[double]$receipt.visualCompare;crossingOrder=$receipt.crossingOrder;filmDiskExposure=[double]$receipt.filmDiskExposure;diskOuter=[double]$receipt.diskOuter};metrics=$metrics}
+      effective=[ordered]@{source=$receipt.crossingSource;experimentId=$receipt.experimentId;enabled=[bool]$receipt.enabled;visualCompare=[double]$receipt.visualCompare;crossingOrder=$receipt.crossingOrder;filmDiskExposure=[double]$receipt.filmDiskExposure;diskOuter=[double]$receipt.diskOuter};screenshotMetrics=$screenshot;framebufferMetrics=$gpu}
     ($row|ConvertTo-Json -Compress -Depth 8)|Add-Content $jsonlPath; $rows.Add([pscustomobject]$row)
-    Write-DiagnosticLog "CAPTURE_OK id=$($case.id) processRun=$($rows.Count)/$($cases.Count) rgbPixels=$($metrics.rgbContributionPixels) coverage=$($metrics.rgbCoverage) rgbEnergy=$($metrics.rgbEnergy) imageSha256=$imageSha"
+    Write-DiagnosticLog "CAPTURE_OK id=$($case.id) processRun=$($rows.Count)/$($cases.Count) gpuNonzero=$($gpu.nonZeroRgbPixels) gpuEnergy=$($gpu.rgbEnergy) screenshotRgb=$($screenshot.rgbContributionPixels) imageSha256=$imageSha"
   } catch {
     $message="$($case.id): $($_.Exception.Message)"; $captureErrors.Add($message); Write-DiagnosticLog "CAPTURE_FAILED $message"
   } finally { Remove-Item Env:BLACKHOLE_VISUAL_EXPERIMENT -ErrorAction SilentlyContinue; Remove-Item $caseDirectory -Recurse -Force -ErrorAction SilentlyContinue }
@@ -170,19 +215,19 @@ foreach ($case in $cases) {
 
 $rows | ConvertTo-Json -Depth 10 | Set-Content $metricsPath
 $byId=@{}; foreach($row in $rows){$byId[$row.id]=$row}
-$reach=if($byId.ContainsKey('third-reach')){[int64]$byId['third-reach'].metrics.rgbContributionPixels}else{-1}
-$pre=if($byId.ContainsKey('third-pre-trans')){[int64]$byId['third-pre-trans'].metrics.rgbContributionPixels}else{-1}
-$post=if($byId.ContainsKey('third-plus')){[int64]$byId['third-plus'].metrics.rgbContributionPixels}else{-1}
+$reach=if($byId.ContainsKey('third-reach')){[int64]$byId['third-reach'].framebufferMetrics.nonZeroRgbPixels}else{-1}
+$pre=if($byId.ContainsKey('third-pre-trans')){[int64]$byId['third-pre-trans'].framebufferMetrics.nonZeroRgbPixels}else{-1}
+$post=if($byId.ContainsKey('third-plus')){[int64]$byId['third-plus'].framebufferMetrics.nonZeroRgbPixels}else{-1}
 $finding=if($reach -ge 0 -and $pre -ge 0 -and $post -ge 0){Get-Finding $reach $pre $post}else{'incomplete-diagnostic-evidence'}
 
 $images=@($rows | Where-Object { Test-Path (Join-Path $OutputDirectory $_.imagePath) })
 $thumbWidth=360;$thumbHeight=274;$labelHeight=34;$columns=3;$gridRows=[Math]::Ceiling($images.Count/$columns)
 $sheet=[System.Drawing.Bitmap]::new($thumbWidth*$columns,($thumbHeight+$labelHeight)*[int]$gridRows);$graphics=[System.Drawing.Graphics]::FromImage($sheet);$font=[System.Drawing.Font]::new([System.Drawing.FontFamily]::GenericSansSerif,11)
-try{$graphics.Clear([System.Drawing.Color]::Black);for($i=0;$i-lt$images.Count;$i++){$row=$images[$i];$src=[System.Drawing.Bitmap]::FromFile((Resolve-Path (Join-Path $OutputDirectory $row.imagePath)));try{$c=$i%$columns;$gr=[Math]::Floor($i/$columns);$left=$c*$thumbWidth;$top=$gr*($thumbHeight+$labelHeight);$graphics.DrawImage($src,[System.Drawing.Rectangle]::new($left,$top,$thumbWidth,$thumbHeight));$graphics.DrawString("$($row.id) rgb=$($row.metrics.rgbContributionPixels)",$font,[System.Drawing.Brushes]::White,[single]($left+6),[single]($top+$thumbHeight+6))}finally{$src.Dispose()}};$sheet.Save($contactSheetPath,[System.Drawing.Imaging.ImageFormat]::Png)}finally{$font.Dispose();$graphics.Dispose();$sheet.Dispose()}
+try{$graphics.Clear([System.Drawing.Color]::Black);for($i=0;$i-lt$images.Count;$i++){$row=$images[$i];$src=[System.Drawing.Bitmap]::FromFile((Resolve-Path (Join-Path $OutputDirectory $row.imagePath)));try{$c=$i%$columns;$gr=[Math]::Floor($i/$columns);$left=$c*$thumbWidth;$top=$gr*($thumbHeight+$labelHeight);$graphics.DrawImage($src,[System.Drawing.Rectangle]::new($left,$top,$thumbWidth,$thumbHeight));$graphics.DrawString("$($row.id) gpuNonzero=$($row.framebufferMetrics.nonZeroRgbPixels)",$font,[System.Drawing.Brushes]::White,[single]($left+6),[single]($top+$thumbHeight+6))}finally{$src.Dispose()}};$sheet.Save($contactSheetPath,[System.Drawing.Imaging.ImageFormat]::Png)}finally{$font.Dispose();$graphics.Dispose();$sheet.Dispose()}
 
-$terminationReasons=if($byId.ContainsKey('termination')){$byId['termination'].metrics.terminationReasons}else{$null}
+$terminationReasons=if($byId.ContainsKey('termination')){$byId['termination'].framebufferMetrics.terminationReasons}else{$null}
 $expectedFiles=@($cases|ForEach-Object{"$($_.id).png"})+@("diagnostic.jsonl","diagnostic-metrics.json","diagnostic-summary.json","contact-sheet.png","diagnostic.log")
-$summary=[ordered]@{schemaVersion="2.0";headSha=$headSha;runId=$runId;requestedGroups=$cases.Count;successfulGroups=$rows.Count;sameExeSha256=$exeSha;diskOuter=35.0;filmDiskExposure=1.55;effectiveSource="gpu-uniform-readback";pixelDataSource="native-webview2-client-readback";visualAcceptance=$false;diagnosticFinding=$finding;thirdReachPixels=$reach;thirdPreTransPixels=$pre;thirdPostTransPixels=$post;terminationReasons=$terminationReasons;captureErrors=@($captureErrors);files=$expectedFiles}
+$summary=[ordered]@{schemaVersion="2.0";headSha=$headSha;checkoutSha=$checkoutSha;runId=$runId;requestedGroups=$cases.Count;successfulGroups=$rows.Count;sameExeSha256=$exeSha;diskOuter=35.0;filmDiskExposure=1.55;effectiveSource="gpu-uniform-readback";pixelDataSource="native-webview2-window-screenshot";framebufferDataSource="webgl2-gl.readPixels-rgba8";visualAcceptance=$false;diagnosticFinding=$finding;thirdReachPixels=$reach;thirdPreTransPixels=$pre;thirdPostTransPixels=$post;terminationReasons=$terminationReasons;captureErrors=@($captureErrors);files=$expectedFiles}
 $summary|ConvertTo-Json -Depth 10|Set-Content $summaryPath
 Write-DiagnosticLog "DIAGNOSTIC_FINDING finding=$finding thirdReachPixels=$reach thirdPreTransPixels=$pre thirdPostTransPixels=$post visualAcceptance=false"
 if($captureErrors.Count -gt 0){throw "Diagnostic capture infrastructure errors: $($captureErrors -join ' | ')"}

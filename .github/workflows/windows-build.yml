@@ -183,7 +183,7 @@ jobs:
 
   windows-crossing-diagnostic:
     name: Windows crossing-order diagnostic
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_mode == 'diagnostic' }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.validation_mode == 'diagnostic') || (github.event_name == 'pull_request' && github.event.pull_request.number == 1 && github.head_ref == 'agent/initial-blackhole-tasks') }}
     runs-on: windows-latest
     timeout-minutes: 55
     steps:

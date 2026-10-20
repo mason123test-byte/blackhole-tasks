@@ -33,6 +33,35 @@ import {
 export const BLACK_HOLE_RENDERER_INFO = REFERENCE_BLACK_HOLE_INFO;
 export { normalizeVisualComparisonMode, type VisualComparisonMode };
 
+/** Framebuffer-only diagnostic accounting. Screen captures include UI/desktop
+ * pixels and cannot establish whether a Kerr crossing emitted light.
+ * Wire format g1: RGB>0, RGB>8, RGB byte sum, alpha>8, 8 termination bins.
+ */
+export function gpuDiagnosticFrameReceipt(pixels: Uint8Array, termination: boolean): string {
+  if (pixels.length % 4 !== 0) throw new Error("Invalid RGBA8 framebuffer");
+  let nonzero = 0, over8 = 0, energy = 0, alpha = 0;
+  const bins = [0, 0, 0, 0, 0, 0, 0, 0];
+  for (let i = 0; i < pixels.length; i += 4) {
+    const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2], a = pixels[i + 3];
+    const peak = Math.max(r, g, b);
+    if (peak > 0) nonzero++;
+    if (peak > 8) over8++;
+    if (a > 8) alpha++;
+    energy += r + g + b;
+    if (!termination || peak < 64) continue;
+    if (Math.abs(r - g) < 16 && Math.abs(g - b) < 16) bins[0]++;
+    else if (r >= 64 && g < 48 && b < 48) bins[1]++;
+    else if (g >= 64 && r < 48 && b < 48) bins[2]++;
+    else if (b >= 64 && r < 48 && g < 48) bins[3]++;
+    else if (r >= 64 && g >= 64 && b < 48) bins[4]++;
+    else if (r >= 64 && b >= 64 && g < 48) bins[5]++;
+    else if (g >= 64 && b >= 64 && r < 48) bins[6]++;
+    else bins[7]++;
+  }
+  return [nonzero, over8, energy, alpha, ...bins].join(",");
+}
+
+
 export const MIRROR_COMPOSITOR_FRAGMENT = `#version 300 es
 precision highp float;
 in vec2 v_uv;
@@ -471,7 +500,9 @@ function startBlackHoleSession(
         const framebufferStatus = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
         const expandedSceneReady = getExpanded() < 0.5 || sceneReady;
         validatedEnergy = expandedSceneReady ? energy : 0;
-        validatedDiagnostic = `a${alphaEnergy}-m${maxChannel}-am${maxAlpha}-sr${expandedSceneReady ? 1 : 0}-e${glError}-f${framebufferStatus}`;
+        // Raw, pre-compositor gl.readPixels metrics only for diagnostic modes.
+        const gpuFrame = crossingDiagnostic === "normal" ? "" : `;g1=${gpuDiagnosticFrameReceipt(pixels, crossingDiagnostic === "termination")}`;
+        validatedDiagnostic = `a${alphaEnergy}-m${maxChannel}-am${maxAlpha}-sr${expandedSceneReady ? 1 : 0}-e${glError}-f${framebufferStatus}${gpuFrame}`;
         canvas.dataset.energy = String(validatedEnergy);
         canvas.dataset.diagnostic = validatedDiagnostic;
         const crossingDiagnosticReady = isCrossingDiagnosticFrameReady({

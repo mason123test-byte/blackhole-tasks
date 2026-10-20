@@ -77,7 +77,7 @@ if (-not $visualSource.Contains($hardcodedCandidateCapture)) {
 # bypass is capture-only and is never visual acceptance.
 $readinessAnchor = '[int]$Matches[1] -gt 100 -and [int]$Matches[2] -ge 240 -and [int]$Matches[3] -ge 180'
 $diagnosticReceiptPattern = 'crossingSource=gpu-uniform-readback;requestedCrossingOrder=(first|second|third-plus|third-reach|third-pre-trans|termination);effectiveVisualCompare=[0-9.]+;effectiveCrossingOrder=(first|second|third-plus|third-reach|third-pre-trans|termination)'
-$readinessReplacement = '(([int]$Matches[1] -gt 100) -or ([int]$Matches[1] -ge 8 -and $lastTitle -match ''' + $diagnosticReceiptPattern + ''') -or ($script:AllowEmptyDiagnosticCapture -and [int]$Matches[1] -eq 0 -and $lastTitle -match ''' + $diagnosticReceiptPattern + ''')) -and [int]$Matches[2] -ge 240 -and [int]$Matches[3] -ge 180'
+$readinessReplacement = '(([int]$Matches[1] -gt 100) -or ([int]$Matches[1] -ge 8 -and $lastTitle -match ''' + $diagnosticReceiptPattern + ''') -or ($script:AllowEmptyDiagnosticCapture -and [int]$Matches[1] -ge 0 -and $lastTitle -match ''' + $diagnosticReceiptPattern + ''')) -and [int]$Matches[2] -ge 240 -and [int]$Matches[3] -ge 180'
 if (-not $visualSource.Contains($readinessAnchor)) {
   throw "Crossing diagnostic readiness anchor was not found in windows-interaction-smoke-full.ps1."
 }
