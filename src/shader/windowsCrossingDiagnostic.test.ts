@@ -27,6 +27,11 @@ describe("Windows crossing-order diagnostic evidence contract", () => {
     expect(smoke).not.toContain("new StringBuilder(1024)");
     expect(smoke).toContain("AllowEmptyDiagnosticCapture");
     expect(smoke).toContain("$script:AllowEmptyDiagnosticCapture");
+    // PowerShell -match mutates automatic $Matches, corrupting parsed
+    // numeric renderer dimensions for an all-black diagnostic frame.
+    expect(smoke).toContain("[regex]::IsMatch($lastTitle,");
+    expect(smoke).not.toContain("$lastTitle -match ''' + $diagnosticReceiptPattern");
+
     expect(diagnostic).toContain('visualAcceptance=$false');
     expect(diagnostic).toContain('third-valid-crossing-not-reached');
     expect(diagnostic).toContain('third-reached-but-emission-zero');
