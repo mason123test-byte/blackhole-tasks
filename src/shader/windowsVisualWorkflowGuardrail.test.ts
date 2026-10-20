@@ -1,0 +1,156 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+const workflowSource = readFileSync(
+  resolve(process.cwd(), ".github/workflows/windows-build.yml"),
+  "utf8",
+);
+const rustToolchainSource = readFileSync(
+  resolve(process.cwd(), "rust-toolchain.toml"),
+  "utf8",
+);
+const smokeEntrySource = readFileSync(
+  resolve(process.cwd(), "scripts/windows-interaction-smoke.ps1"),
+  "utf8",
+);
+const fullSmokeSource = readFileSync(
+  resolve(process.cwd(), "scripts/windows-interaction-smoke-full.ps1"),
+  "utf8",
+);
+
+describe("Windows Gargantua visual workflow guardrail", () => {
+  it("keeps baseline IoU diagnostic-only and fails an effectively blank production candidate", () => {
+    expect(fullSmokeSource).toContain("VISUAL_COMPARISON_METRICS");
+    expect(fullSmokeSource).toContain("candidateBrightPixels");
+    expect(fullSmokeSource).toContain("Candidate Gargantua render is effectively blank");
+    expect(fullSmokeSource).not.toContain('if ($lowerIoU -gt 0.93)');
+    expect(fullSmokeSource).not.toContain('if ($upperIoU -lt 0.98)');
+    expect(fullSmokeSource).not.toContain("Lower accretion arc did not change visibly enough");
+    expect(fullSmokeSource).not.toContain("Lower-arc candidate changed the upper arc too much");
+  });
+
+  it("captures only after the renderer reports a validated WebGL frame", () => {
+    const readyIndex = fullSmokeSource.indexOf(
+      "$orbWindow = Wait-OrbRenderReady $visualProcess.Id",
+    );
+    const captureIndex = fullSmokeSource.indexOf(
+      "Save-ScreenRegion $OutputPath $expandedWindow.ClientBounds",
+    );
+    expect(readyIndex).toBeGreaterThan(-1);
+    expect(captureIndex).toBeGreaterThan(readyIndex);
+  });
+
+  it("has an explicit VisualOnly boundary before native task lifecycle interactions", () => {
+    expect(smokeEntrySource).toContain("[switch]$VisualOnly");
+    expect(smokeEntrySource).toContain("windows-interaction-smoke-full.ps1");
+    expect(smokeEntrySource).toContain("$fullSource.Substring(0, $boundaryIndex)");
+    expect(smokeEntrySource).toContain("WINDOWS_VISUAL_ONLY_OK");
+    expect(smokeEntrySource).toContain("interactionLifecycleExecuted=false");
+    expect(smokeEntrySource).not.toContain("DragFromTo($dragStartX");
+
+    const metricsIndex = fullSmokeSource.indexOf(
+      "Write-VisualComparisonEvidence $visualBaselinePath $visualCandidatePath",
+    );
+    const lifecycleIndex = fullSmokeSource.indexOf("$diagnosticMarkerPath =");
+    expect(metricsIndex).toBeGreaterThan(-1);
+    expect(lifecycleIndex).toBeGreaterThan(metricsIndex);
+  });
+
+  it("splits fast checks while preserving real Windows visual, crossing diagnostics, and full validation", () => {
+    expect(workflowSource).toContain("name: Frontend fast checks");
+    expect(workflowSource).toContain("runs-on: ubuntu-latest");
+    expect(workflowSource).toContain("name: Rust fast checks");
+    expect(workflowSource).toContain("name: Windows visual evidence");
+    expect(workflowSource).toContain("name: Windows crossing-order diagnostic");
+    expect(workflowSource).toContain("inputs.validation_mode == 'diagnostic'");
+    expect(workflowSource).toContain("windows-crossing-diagnostic.ps1");
+    expect(workflowSource).toContain("name: Full Windows validation");
+    expect(workflowSource).toContain("npm run tauri build -- --no-bundle");
+    expect(workflowSource).toContain("-VisualOnly");
+    expect(workflowSource).toContain("inputs.validation_mode == 'full'");
+    expect(workflowSource).toContain("Build Tauri EXE and installers");
+    expect(workflowSource).toContain("Interaction-test native Windows app");
+  });
+
+  it("deduplicates push/PR runs and caches Rust without skipping full validation", () => {
+    expect(workflowSource).toContain(
+      "github.event.pull_request.head.ref || github.ref_name",
+    );
+    expect(workflowSource).toContain("cancel-in-progress: true");
+    expect(workflowSource).toContain("uses: Swatinem/rust-cache@v2");
+    expect(workflowSource).toContain("cache-on-failure: true");
+    expect(workflowSource).toContain("Detect Rust-affecting changes");
+    expect(workflowSource).toContain("RUST_FAST_SKIPPED reason=no-rust-affecting-files");
+    expect(workflowSource).toContain("needs: [frontend-fast, rust-fast]");
+    expect(workflowSource).toContain("cargo clippy");
+    expect(workflowSource).toContain("cargo test");
+  });
+
+  it("keeps current PR Rust changes in the fast validation gate across later commits", () => {
+    expect(workflowSource).toContain("$base = '${{ github.event.pull_request.base.sha }}'");
+    expect(workflowSource).toContain("$head = '${{ github.event.pull_request.head.sha }}'");
+    expect(workflowSource).toContain("git diff --name-only $base $head");
+    expect(workflowSource).not.toContain('$parent = (git rev-parse "$head^").Trim()');
+    expect(workflowSource).toContain("Test Rust visual experiment validation");
+  });
+
+  it("keeps shader-only iterations on the no-Rust fast path", () => {
+    const rustAffectingPath = /^(src-tauri\/|rust-toolchain(?:\.toml)?$|Cargo\.(toml|lock)$|\.github\/workflows\/windows-build\.yml$)/;
+    expect("src/shader/referenceBlackHoleShader.ts").not.toMatch(rustAffectingPath);
+    expect("src/shader/blackHoleRenderer.ts").not.toMatch(rustAffectingPath);
+    expect("src/shader/windowsVisualWorkflowGuardrail.test.ts").not.toMatch(rustAffectingPath);
+    expect("src-tauri/src/lib.rs").toMatch(rustAffectingPath);
+    expect(".github/workflows/windows-build.yml").toMatch(rustAffectingPath);
+  });
+
+  it("pins Rust while reusing the hosted toolchain when the exact version already matches", () => {
+    expect(rustToolchainSource).toContain('channel = "1.97.1"');
+    expect(rustToolchainSource).toContain('components = ["rustfmt", "clippy"]');
+    expect(workflowSource).toContain("rustc +stable --version");
+    expect(workflowSource).toContain("Using hosted stable toolchain because it matches pinned");
+    expect(workflowSource).toContain("RUSTUP_TOOLCHAIN=stable");
+    expect(workflowSource).toContain("rustup toolchain install 1.97.1");
+    expect(workflowSource).not.toContain("rustup toolchain install stable");
+  });
+
+  it("keeps transient visual artifacts screenshot-focused", () => {
+    const visualUploadStart = workflowSource.indexOf(
+      "- name: Upload Windows visual artifact",
+    );
+    const nextJobStarts = [
+      workflowSource.indexOf("windows-crossing-diagnostic:", visualUploadStart),
+      workflowSource.indexOf("windows-batch:", visualUploadStart),
+      workflowSource.indexOf("windows-full:", visualUploadStart),
+    ].filter((index) => index > visualUploadStart);
+    const visualJobEnd = Math.min(...nextJobStarts);
+    expect(visualUploadStart).toBeGreaterThan(-1);
+    expect(visualJobEnd).toBeGreaterThan(visualUploadStart);
+    const visualUpload = workflowSource.slice(visualUploadStart, visualJobEnd);
+    expect(visualUpload).toContain("path: output/windows-visual/*");
+    expect(visualUpload).not.toContain("blackhole-tasks.exe");
+  });
+
+  it("settles the inline add UI before issuing the native task drag in full mode", () => {
+    const createdIndex = fullSmokeSource.indexOf(
+      'Wait-SmokeTaskState $smokeTaskTitle $true "q1" "todo" | Out-Null',
+    );
+    const escapeIndex = fullSmokeSource.indexOf(
+      '[System.Windows.Forms.SendKeys]::SendWait("{ESC}")',
+      createdIndex,
+    );
+    const settleIndex = fullSmokeSource.indexOf(
+      "Start-Sleep -Milliseconds 500",
+      escapeIndex,
+    );
+    const dragIndex = fullSmokeSource.indexOf(
+      "[BlackHoleWindowProbe]::DragFromTo($dragStartX, $taskY, $dragTargetX, $dragTargetY)",
+      createdIndex,
+    );
+
+    expect(createdIndex).toBeGreaterThan(-1);
+    expect(escapeIndex).toBeGreaterThan(createdIndex);
+    expect(settleIndex).toBeGreaterThan(escapeIndex);
+    expect(dragIndex).toBeGreaterThan(settleIndex);
+  });
+});

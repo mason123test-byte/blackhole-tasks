@@ -1,0 +1,9 @@
+.gravity-app.is-expanded .gravity-check {
+  position: relative;
+}
+
+.gravity-app.is-expanded .gravity-check::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}

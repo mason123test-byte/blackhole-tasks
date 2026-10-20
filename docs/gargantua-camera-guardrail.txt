@@ -1,0 +1,82 @@
+GARGANTUA CAMERA GUARDRAIL / DNGR 相机与极轴错误复盘
+
+本文件是 docs/gargantua-visual-guardrails.txt 的补充。
+从本文件创建后，每次修改 Gargantua shader / ray tracing / camera geometry 前，必须同时读取：
+1. docs/gargantua-visual-guardrails.txt
+2. docs/gargantua-camera-guardrail.txt
+
+ERROR 11 — 把远距离 image-plane ray initialization 误当成 DNGR finite camera
+==========================================================================
+
+错误做法
+--------
+从 Odyssey 的远距离 GRRT image-plane tracer 直接移植：
+  imageX = sqrt(r0^2+a^2) sin(theta0) - beta cos(theta0)
+  imageY = alpha
+  imageZ = r0 cos(theta0) + beta sin(theta0)
+然后让不同屏幕像素拥有不同的 Boyer-Lindquist 起始位置，再把 r0=74.1M 当作 DNGR Figure 13/15 的 camera radius。
+
+为什么错
+--------
+DNGR Appendix A.1 的 camera model 明确要求：
+- 每一条 backward ray 都从同一个 camera event (r_c, theta_c, phi_c) 出发；
+- 像素只改变 camera local sky 上的 incoming direction N；
+- N 经过 camera frame -> FIDO tetrad / aberration -> canonical momentum；
+- 然后才从同一个 camera event 积分 Kerr null geodesic。
+
+把 image-plane 各点当成不同 ray origin 会把“有限距离透视相机”错误地变成近似平行/正交投影式成像。
+在 run196 / run199 / run202 中，这会产生明显错误：
+- 12 点和 6 点方向的长竖直尖刺；
+- 上下闭合壳/同心感过强；
+- shadow 尺寸和位置异常；
+- 下方 image 与 DNEG Figure 13/15 的平滑半环关系错误。
+提高 midpoint -> RK4 只能减少颗粒误差，不能修复这个 camera topology 错误。
+
+以后必须做到
+------------
+[ ] Production candidate 的所有 ray 起始位置必须严格相同：r=r_c, theta=theta_c, phi=phi_c。
+[ ] screen x/y 只能改变 camera-local incoming direction，不能改变 ray origin。
+[ ] 使用 DNGR Appendix A.8-A.10 的 local-sky/FIDO 方向变换逻辑。
+[ ] 使用 Kerr metric lapse/omega/varpi 把 FIDO direction 转成 canonical p_r, p_theta, p_phi。
+[ ] 若需要 camera motion，必须通过 DNGR aberration beta/B 向量加入，不能移动 image plane 假装透视。
+[ ] 每次 Windows artifact 都检查 12/6 点竖直尖刺；出现长尖刺即首先检查 camera initialization，而不是调 emissivity。
+[ ] 不能因为 geodesic ODE 是 Kerr 就称整个 camera-ray model 正确；ray origin + tetrad initial momentum 同样属于几何的一部分。
+
+ERROR 12 — 把 Boyer-Lindquist 极轴当成物理边界并 clamp theta
+===========================================================
+
+错误做法
+--------
+在 RK4 每个 stage 和最终更新中使用：
+  clamp(theta, epsilon, PI-epsilon)
+把 theta 强制卡在 [0, PI] 内。
+
+为什么错
+--------
+- theta=0 和 theta=PI 是 Boyer-Lindquist / 球坐标的坐标极点，不是光线的物理边界。
+- 对 L≈0 的 meridional ray，轨迹可以穿过极轴；若把 theta 卡死在极点，p_theta 仍携带穿越动量，后续积分会在坐标奇点附近生成非物理轨迹。
+- 当前 12 点/6 点亮柱正好集中在 screen x≈0，也就是 L≈0 的轴向 ray，症状与该错误高度一致。
+- Odyssey 原始 geodesic 只对 sin(theta) 做除零保护，没有把 theta clamp 到极点。
+
+正确处理
+--------
+穿过极轴时必须做等价球坐标重映射，而不是停住：
+- theta < 0: theta = -theta; phi += PI; p_theta = -p_theta
+- theta > PI: theta = 2*PI-theta; phi += PI; p_theta = -p_theta
+RK4 中间 stage 也要对 theta/p_theta 做等价反射，避免在极轴错误评估导数。
+
+以后必须做到
+------------
+[ ] 禁止在 Kerr geodesic production path 中用 clamp(theta, 0, PI) 作为极轴处理。
+[ ] kerrDerivatives 只允许对 sin(theta) 做数值除零保护。
+[ ] 极轴穿越必须保持同一条物理 ray 的坐标连续等价性。
+[ ] 12/6 点亮柱若仍存在，继续检查 camera sky mapping / aberration / disk intersection，不得回到亮度参数。
+
+当前执行方向
+------------
+- 保留 a/M=0.6、r_c=74.1M、theta_c=1.511、disk 9.26M..18.70M。
+- 保留 single-origin DNGR/FIDO camera initialization。
+- 保留 Odyssey 同源 Kerr canonical ODE 与 RK4 stepping。
+- 移除 RK4 对 theta 的硬 clamp，改为 polar-axis coordinate reflection。
+- 不改变 emissivity、exposure、annulus、lower screen-space geometry。
+- 实图验收优先观察：12/6 尖刺、上下壳闭合感、shadow、水平 direct disk、平滑 lower secondary image。
